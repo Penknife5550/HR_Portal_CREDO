@@ -5,7 +5,13 @@
  * 1. E-Mail-Versand per SMTP (primaerer Kanal) — Vorlage + Empfaenger aus
  *    EmailTemplate/Event-Katalog, jeder Versuch wird im EmailLog protokolliert
  * 2. Aktive DB-Webhooks fuer das Event ZUSAETZLICH ausfuehren (z.B. fuer
- *    n8n-Automatisierungen) — sie sind kein Ersatz fuer den E-Mail-Versand
+ *    n8n-Automatisierungen) — sie sind kein Ersatz fuer den E-Mail-Versand.
+ *    Entfaellt fuer jedes Ereignis aus EVENTS_OHNE_WEBHOOK
+ *    (src/lib/ereignis-liste.ts): Die Mail geht unveraendert hinaus, die
+ *    Payload aber an keine Webhook-URL (heute die Onboarding-
+ *    Abteilungsereignisse, E-A16 — sie tragen den Link der Stelle und Angaben
+ *    zur Ausstattung). Die uebrigen Ausnahmen der Liste rufen triggerWebhooks
+ *    gar nicht erst auf; die Sperre hier sichert auch kuenftige Aufrufer ab.
  *
  * Alle Webhooks werden ausschliesslich ueber die Datenbank konfiguriert
  * und im Admin-Portal (Einstellungen → Webhooks) verwaltet.
@@ -21,6 +27,7 @@ import { prisma } from "@/lib/db";
 import { sendEventEmail, type EventEmailResult } from "@/lib/mailer";
 import { decrypt } from "@/lib/encryption";
 import { isPublicHostname, redactUrlForLog } from "@/lib/url";
+import { webhooksGesperrt } from "@/lib/ereignis-liste";
 
 // Bekannte Event-Typen (erweiterbar)
 export type WebhookEvent =
@@ -31,11 +38,16 @@ export type WebhookEvent =
   | "supervisor-completed"
   | "employee-reminder"
   | "supervisor-reminder"
-  // Onboarding — Abteilungsaufgaben (Paket 5)
+  // Onboarding — Abteilungsaufgaben (Paket 5). Nur Mail, nie DB-Webhooks:
+  // Sie stehen in EVENTS_OHNE_WEBHOOK (E-A16), Schritt 2 entfaellt.
   | "onboarding-department-assigned"
   | "onboarding-department-reminder"
   | "onboarding-task-completed"
   | "onboarding-department-completed"
+  // Ausstattung & Zugaenge (Paket A3): Sammelmail an HR (E-A18) und Absage an
+  // die informierten Stellen (E-A20), ebenfalls in EVENTS_OHNE_WEBHOOK.
+  | "onboarding-ausstattung-offen"
+  | "onboarding-department-abgesagt"
   // Offboarding
   | "offboarding-created"
   | "offboarding-completed"
@@ -82,6 +94,10 @@ export async function triggerWebhooks(
     const emailResult = await sendEventEmail(event, payload);
 
     // 2. Zusatzkanal: DB-konfigurierte Webhooks (unabhaengig vom E-Mail-Ergebnis)
+    //    — nie fuer Ereignisse aus EVENTS_OHNE_WEBHOOK (E-A16): nicht einmal
+    //    die Abfrage, ein dort eingetragener Webhook feuert nie.
+    if (webhooksGesperrt(event)) return emailResult;
+
     try {
       const dbWebhooks = await prisma.webhookConfig.findMany({
         where: { event, isActive: true },

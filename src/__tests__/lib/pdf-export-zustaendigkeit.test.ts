@@ -8,6 +8,10 @@
  * „Führungskraft"). Freitext-Altwerte bleiben unveraendert stehen: haesslich,
  * aber ehrlich (`abteilungLabel`).
  *
+ * Seit Ausstattung & Zugaenge (Paket A3, S16) dazu: Eine von HR gestrichene
+ * Aufgabe (F2) druckt „entfällt“ statt ✓, ohne Erledigt-Datum, und zaehlt
+ * weder im Fortschritt noch in ihrer Kategorie (`checklistFortschritt`).
+ *
  * Geprueft wird ueber die Texte, die pdfkit tatsaechlich setzt; der fertige
  * Stream ist komprimiert und verriete nichts. Der Spy ruft das Original weiter
  * auf, damit Umbruch und Seitenwechsel wie im Ernstfall rechnen.
@@ -15,6 +19,7 @@
 
 import PDFDocument from "pdfkit";
 import {
+  PDF_ENTFAELLT,
   generateOnboardingPDF,
   type OnboardingExportContext,
 } from "@/lib/pdf-export-onboarding";
@@ -103,5 +108,51 @@ describe("Zuständigkeit im PDF", () => {
     // Weder "" noch "—": Eine leere Spalte ist die ehrliche Anzeige.
     expect(gesetzteTexte).not.toContain("");
     expect(gesetzteTexte.filter((t) => t === "Akte anlegen")).toHaveLength(1);
+  });
+});
+
+// =============================================
+// Entfallene Aufgaben (Ausstattung & Zugaenge, F2)
+// =============================================
+
+describe("Entfallene Aufgabe im PDF", () => {
+  // Eigener Lauf mit eigenem Kontext — die Zaehlung oben bleibt unberuehrt.
+  beforeAll(async () => {
+    gesetzteTexte.length = 0;
+    const pdf = await generateOnboardingPDF(
+      {
+        ...CTX,
+        checklistItems: [
+          aufgabe({ title: "Konto anlegen", category: "IT-Einrichtung", isCompleted: true, completedAt: "2026-09-20T08:00:00.000Z" }),
+          aufgabe({ title: "Arbeitsplatz einrichten", category: "IT-Einrichtung" }),
+          aufgabe({
+            title: "Schlüssel ausgeben: Sporthalle",
+            category: "Ausstattung & Zugänge",
+            isCompleted: true,
+            completedAt: "2026-09-21T08:00:00.000Z",
+            entfaelltAm: "2026-09-21T08:00:00.000Z",
+          }),
+          aufgabe({ title: "Parkplatz bereitstellen", category: "Ausstattung & Zugänge" }),
+        ],
+      },
+      "checkliste",
+    );
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+
+  it("zählt nicht im Fortschritt — weder gesamt noch je Kategorie", () => {
+    expect(gesetzteTexte).toContain("Checkliste (1/3)");
+    // „Ausstattung & Zugänge“: nur der Parkplatz zählt, und er ist offen.
+    expect(gesetzteTexte).toContain("0/1");
+    expect(gesetzteTexte).toContain("1/2");
+  });
+
+  it("druckt „entfällt“ statt ✓ und ohne Erledigt-Datum", () => {
+    expect(gesetzteTexte).toContain(PDF_ENTFAELLT);
+    // Genau ein ✓: die erledigte, nicht entfallene Aufgabe.
+    expect(gesetzteTexte.filter((t) => t === "\u2713")).toHaveLength(1);
+    expect(gesetzteTexte).toContain("\u2013");
+    expect(gesetzteTexte).not.toContain("21.09.2026");
+    expect(gesetzteTexte).toContain("20.09.2026");
   });
 });

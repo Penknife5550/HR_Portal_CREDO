@@ -16,6 +16,13 @@
  *
  * Der Dialog ruft KEINE Schnittstelle. Er meldet „senden" an die Karte, die
  * die Aktion ausfuehrt und die Meldung anzeigt (`onAktion("informieren")`).
+ *
+ * Ausstattung & Zugaenge (Mockup 6.4, Onboarding): je Stelle die Zeile „davon
+ * N aus „Ausstattung & Zugänge“, M mit Bemerkung“ (`ausstattungVorschauSatz`
+ * aus den Zaehlern der Vorschau) und unter „Was die Empfänger sehen“ der Satz
+ * zu Bemerkungen, Angaben und Hinweis (`sichtbarkeitsHinweis(…).ausstattungSatz`
+ * aus `abteilungen.ausstattungSicht`). Beides kommt aus derselben Regel wie
+ * Mail und Link-Seite; der Dialog rechnet nichts selbst.
  */
 
 import { useEffect, useRef } from "react";
@@ -24,6 +31,7 @@ import {
   type AbteilungsUebersichtDaten,
   type AbteilungsZeile,
 } from "@/lib/abteilungsaufgaben";
+import { ausstattungVorschauSatz } from "@/lib/ausstattung";
 import { formatDatumDE } from "@/lib/format";
 
 /** Ab der wievielten Aufgabe je Empfaenger „…und n weitere" steht. */
@@ -104,7 +112,7 @@ export function AbteilungenDialog({
 
   const empfaenger = informierbareZeilen(abteilungen);
   const uebersprungen = nichtInformierteZeilen(abteilungen);
-  const sicht = sichtbarkeitsHinweis(abteilungen.modul, empfaenger);
+  const sicht = sichtbarkeitsHinweis(abteilungen.modul, empfaenger, abteilungen.ausstattungSicht);
   const gueltigkeit = gueltigkeitsText(empfaenger);
 
   return (
@@ -161,6 +169,11 @@ export function AbteilungenDialog({
                   </li>
                 ))}
               </ul>
+            )}
+            {sicht.ausstattungSatz && (
+              <p className="mt-1.5 text-xs text-muted-foreground" data-satz="ausstattung">
+                {sicht.ausstattungSatz}
+              </p>
             )}
             {sicht.hinweis && <p className="mt-1.5 text-xs text-muted-foreground">{sicht.hinweis}</p>}
           </section>
@@ -224,6 +237,7 @@ function EmpfaengerBlock({ zeile }: { zeile: AbteilungsZeile }) {
   const sichtbar = aufgaben.slice(0, AUFGABEN_VORSCHAU_MAX);
   const weitere = aufgaben.length - sichtbar.length;
   const adresse = zeile.empfaenger.email ?? zeile.email ?? "";
+  const ausstattung = ausstattungVorschauSatz(zeile.vorschau);
 
   return (
     <li
@@ -250,6 +264,11 @@ function EmpfaengerBlock({ zeile }: { zeile: AbteilungsZeile }) {
             <li className="text-xs text-muted-foreground">…und {weitere} weitere</li>
           )}
         </ul>
+      )}
+      {ausstattung && (
+        <p className="mt-1 text-xs font-medium text-foreground" data-zeile="ausstattung">
+          {ausstattung}
+        </p>
       )}
     </li>
   );

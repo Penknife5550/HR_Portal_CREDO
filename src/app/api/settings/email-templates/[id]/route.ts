@@ -46,14 +46,16 @@ export async function PUT(
     if (!subject?.trim()) return NextResponse.json({ error: "Betreff ist ein Pflichtfeld" }, { status: 400 });
     if (!bodyHtml?.trim()) return NextResponse.json({ error: "HTML-Body ist ein Pflichtfeld" }, { status: 400 });
 
-    // Betreff ohne Unterlagennamen, Begruendung, Nachricht und Link (Paket 4,
-    // betreffOhne im Event-Katalog): Das Versandprotokoll speichert Betreffzeilen
-    // 90 Tage — ein {{link}} laege dort als gueltiger Zugang zur Personalakte.
+    // Betreff ohne Freitexte, Listen und Link (betreffOhne im Event-Katalog:
+    // Paket 4 Unterlagen, Paket A3 Abteilungsmails im Onboarding u. a.): Das
+    // Versandprotokoll speichert Betreffzeilen 90 Tage — ein {{link}} laege
+    // dort als gueltiger Zugang, eine Bemerkung oder Angabe als Freitext.
+    // Der Text ist deshalb allgemein gehalten und gilt fuer jedes Ereignis.
     const imBetreffVerboten = verboteneBetreffVariablen(event.trim(), subject);
     if (imBetreffVerboten.length > 0) {
       return NextResponse.json(
         {
-          error: `Der Betreff darf ${imBetreffVerboten.map((name) => `{{${name}}}`).join(", ")} nicht enthalten: Betreffzeilen stehen 90 Tage im Versandprotokoll. Unterlagen, Begründungen, Nachrichten und der persönliche Link gehören nur in den Text der E-Mail.`,
+          error: `Der Betreff darf ${imBetreffVerboten.map((name) => `{{${name}}}`).join(", ")} nicht enthalten: Betreffzeilen stehen 90 Tage im Versandprotokoll. Listen, Freitexte und Links gehören nur in den Text der E-Mail.`,
         },
         { status: 400 }
       );

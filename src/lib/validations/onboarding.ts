@@ -161,11 +161,17 @@ export type OnboardingAnlegenInput = z.infer<typeof onboardingAnlegenSchema>;
  * setzen darf (nur REVIEWED, COMPLETED, EXPIRED) und aus welchem Stand, prueft
  * die Route — dort gibt es fuer die abgeleiteten Status eine eigene,
  * erklaerende Meldung statt „ungültig".
+ *
+ * `bestaetigt` (Ausstattung & Zugaenge, E-A19): Nur beim Abschluss
+ * (COMPLETED) von Bedeutung — sind noch Ausstattungs- oder Hinweis-Aufgaben
+ * offen, schliesst die Route nur mit `bestaetigt: true` ab (sonst 409
+ * `AUSSTATTUNG_OFFEN` samt Liste). Bei den uebrigen Status wird es ignoriert.
  */
 export const statusAenderungSchema = z.object({
   status: z.enum(ONBOARDING_STATUS, {
     errorMap: () => ({ message: "Ungültiger Status-Wert" }),
   }),
+  bestaetigt: z.boolean({ invalid_type_error: "Ungültige Bestätigung" }).optional(),
 });
 
 export type StatusAenderungInput = z.infer<typeof statusAenderungSchema>;

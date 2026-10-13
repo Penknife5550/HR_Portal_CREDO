@@ -31,12 +31,33 @@
  *   sie stehen in src/lib/abteilungsaufgaben-dienst.ts. Das Ergebnis kommt als
  *   `departmentReminders` zurueck; `total` bleibt Mitarbeiter + Vorgesetzte,
  *   wie die Antwort der Route schon immer zaehlte.
+ * - Abschnitt 3a (Paket A3, vor Abschnitt 3): fehlende Aufgaben aus
+ *   „Ausstattung & Zugänge“ nachholen (src/lib/ausstattung-lauf.ts). Sendet
+ *   nichts.
+ * - Abschnitt 4 (Paket A3, E-A18, nach Abschnitt 3): Sammelmail an das
+ *   HR-Postfach am Werktag vor Dienstbeginn mit allen noch offenen
+ *   Ausstattungsaufgaben eines Vorgangs (`ausstattungSammelmailLauf`, je
+ *   Vorgang einmal, Merker `ausstattungSammelmailAm`).
+ *   Antwortfeld beider Abschnitte: `ausstattung: { nachgeholt: { vorgaenge,
+ *   aufgaben }, sammelmail: { versendet, nichtZugestellt, uebersprungen },
+ *   errors }` — `errors` zaehlt die Ausnahmen beider Abschnitte. `total`
+ *   bleibt Mitarbeiter + Vorgesetzte. Wer die Form aendert, passt
+ *   AUSWERTER.reminders in src/lib/zeitplaner/bericht.ts mit an.
  */
 
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { onboardingErinnerungenSenden } from "@/lib/abteilungsaufgaben-onboarding";
 import type { CronErgebnis } from "@/lib/abteilungsaufgaben-dienst";
+import {
+  ausstattungNachholenLauf,
+  ausstattungSammelmailLauf,
+  leeresNachholErgebnis,
+  leeresSammelmailErgebnis,
+  type AusstattungNachholLauf,
+  type AusstattungSammelmailLauf,
+} from "@/lib/ausstattung-lauf";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import { getBaseUrl } from "@/lib/url";
 import { magicLinkGueltigkeitMs } from "@/lib/auth";
 import {
@@ -279,6 +300,22 @@ export async function onboardingErinnerungenLauf(opts: LaufOptionen = {}): Promi
     }
 
     // =============================================
+    // 3a. Ausstattung & Zugaenge: fehlende Aufgaben nachholen (Paket A3)
+    //
+    // VOR den Abteilungs-Erinnerungen, damit eine heute nachgeholte Aufgabe
+    // schon in der Erinnerung steht. Sendet selbst nichts. Eigenes try wie
+    // Abschnitt 3: Ein Fehler hier darf die uebrigen Abschnitte nicht
+    // entwerten.
+    // =============================================
+    let nachholen: AusstattungNachholLauf = leeresNachholErgebnis();
+    try {
+      nachholen = await ausstattungNachholenLauf(now);
+    } catch (err) {
+      console.error("[Reminders] Ausstattung nachholen fehlgeschlagen:", fehlerKennung(err));
+      nachholen.errors++;
+    }
+
+    // =============================================
     // 3. Abteilungs-Erinnerungen im Onboarding (Paket 5)
     //
     // Eigene Regeln (Stufe nach Faelligkeit, Abstand ab dem letzten Versand,
@@ -300,6 +337,28 @@ export async function onboardingErinnerungenLauf(opts: LaufOptionen = {}): Promi
       departmentReminders.errors++;
     }
 
+    // =============================================
+    // 4. Ausstattung & Zugaenge: Sammelmail an HR (Paket A3, E-A18)
+    //
+    // Am Werktag vor Dienstbeginn (bis einschliesslich Dienstbeginn) je
+    // Vorgang einmal alle noch offenen Ausstattungs- und Hinweis-Aufgaben an
+    // das HR-Postfach. Nach Abschnitt 3: Was eine Stelle heute noch abhakt,
+    // steht dann nicht mehr in der Mail. Eigenes try wie oben.
+    // =============================================
+    let sammelmail: AusstattungSammelmailLauf = leeresSammelmailErgebnis();
+    try {
+      sammelmail = await ausstattungSammelmailLauf(now);
+    } catch (err) {
+      console.error("[Reminders] Sammelmail Ausstattung fehlgeschlagen:", fehlerKennung(err));
+      sammelmail.errors++;
+    }
+    // Antwortfeld beider Ausstattungs-Abschnitte (3a und 4): nur Zaehler.
+    const ausstattung = {
+      nachgeholt: nachholen.nachgeholt,
+      sammelmail: sammelmail.sammelmail,
+      errors: nachholen.errors + sammelmail.errors,
+    };
+
     // Die Aufbewahrung des Versandprotokolls (90 Tage) setzt seit 09/2026 der
     // Lauf „Wartung“ durch (src/lib/email-log-aufbewahrung.ts), nicht mehr
     // dieser Lauf.
@@ -312,6 +371,8 @@ export async function onboardingErinnerungenLauf(opts: LaufOptionen = {}): Promi
       // beiden Onboarding-Spuren, wie seit jeher).
       total: results.employeeReminders + results.supervisorReminders,
       departmentReminders,
+      // Abschnitte 3a und 4: nur Zaehler (keine Namen, keine Titel).
+      ausstattung,
     } };
   } catch (error) {
     console.error("[Reminders] Schwerer Fehler:", error);

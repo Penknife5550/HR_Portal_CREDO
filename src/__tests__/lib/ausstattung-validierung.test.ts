@@ -11,6 +11,11 @@
  * (`modalitaetenAusstattungSchema`); ob Position und Option zum Vorgang
  * gehoeren, prueft wahlPruefen (ausstattung.test.ts), die Grenzen gegen GRENZEN
  * haelt supervisor-grenzen.test.ts.
+ *
+ * Seit S15 die Aktionen der HR-Karte (`ausstattungAktionSchema`): sechs
+ * Aktionen, Regel 11 an jeder Stelle, genau eins von positionId und frei,
+ * Datum mit Rueckprobe, unbekannte Felder fallen weg. Was der Dienst daraus
+ * macht, steht in ausstattung-dienst.test.ts.
  */
 
 import {
@@ -26,6 +31,7 @@ import {
   ID_MAX,
   arbeitsortSchema,
   ausblendungSchema,
+  ausstattungAktionSchema,
   freitextNormalisieren,
   katalogPositionAenderungSchema,
   katalogPositionSchema,
@@ -576,5 +582,95 @@ describe("modalitaetenAusstattungSchema (PUT /api/modalitaeten/[token])", () => 
     expect(fehler(modalitaetenAusstattungSchema.safeParse({ ausstattung: [{ positionId: ID, auswahl: "Haupteingang" }] }))).toBe(
       "Ungültige Eingabe",
     );
+  });
+});
+
+describe("ausstattungAktionSchema (HR-Karte, S15)", () => {
+  it("die sechs Aktionen; unbekannte → „Unbekannte Aktion.“, kein Objekt → „Ungültige Eingabe“", () => {
+    for (const body of [
+      { aktion: "hinzufuegen", positionId: "pos-1" },
+      { aktion: "hinzufuegen", frei: { departmentKey: "IT", bezeichnung: "Tablet" } },
+      { aktion: "aendern", ausstattungId: "z-1", bemerkung: "" },
+      { aktion: "streichen", ausstattungId: "z-1" },
+      { aktion: "hinweis-aendern", departmentKey: "IT", hinweis: "" },
+      { aktion: "hinweis-gesehen", departmentKey: "IT" },
+      { aktion: "hinweis-uebernehmen", departmentKey: "IT", positionId: "pos-1" },
+    ]) {
+      expect(`${body.aktion}: ${ausstattungAktionSchema.safeParse(body).success}`).toBe(`${body.aktion}: true`);
+    }
+    expect(fehler(ausstattungAktionSchema.safeParse({ aktion: "loeschen" }))).toBe("Unbekannte Aktion.");
+    expect(fehler(ausstattungAktionSchema.safeParse(undefined))).toBe("Ungültige Eingabe");
+    expect(fehler(ausstattungAktionSchema.safeParse([]))).toBe("Ungültige Eingabe");
+  });
+
+  it("Regel 11: nie MITARBEITER oder VORGESETZTER — frei, Stellenwechsel, Hinweis", () => {
+    for (const key of ["MITARBEITER", "VORGESETZTER"]) {
+      for (const body of [
+        { aktion: "hinzufuegen", frei: { departmentKey: key, bezeichnung: "Tablet" } },
+        { aktion: "aendern", ausstattungId: "z-1", departmentKey: key },
+        { aktion: "hinweis-aendern", departmentKey: key, hinweis: "x" },
+        { aktion: "hinweis-gesehen", departmentKey: key },
+      ]) {
+        expect(fehler(ausstattungAktionSchema.safeParse(body))).toBe(MELDUNGEN.STELLE_NICHT_ERLAUBT);
+      }
+    }
+    // HR ist erlaubt (Aufgabe im Portal).
+    expect(ausstattungAktionSchema.safeParse({ aktion: "hinzufuegen", frei: { departmentKey: "HR", bezeichnung: "Jobticket" } }).success).toBe(true);
+  });
+
+  it("genau eins von positionId und frei; ein Hinweis braucht Text oder Fälligkeit; Ändern ein Feld", () => {
+    expect(fehler(ausstattungAktionSchema.safeParse({ aktion: "hinzufuegen" }))).toBe(MELDUNGEN.KARTE_POSITION_ODER_FREI);
+    expect(
+      fehler(
+        ausstattungAktionSchema.safeParse({ aktion: "hinzufuegen", positionId: "p", frei: { departmentKey: "IT", bezeichnung: "x" } }),
+      ),
+    ).toBe(MELDUNGEN.KARTE_POSITION_ODER_FREI);
+    expect(fehler(ausstattungAktionSchema.safeParse({ aktion: "hinweis-uebernehmen", departmentKey: "IT" }))).toBe(
+      MELDUNGEN.KARTE_POSITION_ODER_FREI,
+    );
+    expect(fehler(ausstattungAktionSchema.safeParse({ aktion: "hinweis-aendern", departmentKey: "IT" }))).toBe(
+      MELDUNGEN.KARTE_HINWEIS_ODER_FAELLIG,
+    );
+    expect(fehler(ausstattungAktionSchema.safeParse({ aktion: "aendern", ausstattungId: "z-1" }))).toBe(
+      MELDUNGEN.MINDESTENS_EIN_FELD,
+    );
+  });
+
+  it("freie Position: Bezeichnung einzeilig, höchstens GRENZEN.freieBezeichnung; Fälligkeit ±365", () => {
+    const frei = (teil: Record<string, unknown>) =>
+      ausstattungAktionSchema.safeParse({ aktion: "hinzufuegen", frei: { departmentKey: "IT", bezeichnung: "Tablet", ...teil } });
+    expect(frei({ bezeichnung: "x".repeat(GRENZEN.freieBezeichnung) }).success).toBe(true);
+    expect(fehler(frei({ bezeichnung: "x".repeat(GRENZEN.freieBezeichnung + 1) }))).toBe(MELDUNGEN.KARTE_FREI_ZU_LANG);
+    expect(fehler(frei({ bezeichnung: "Zeile 1\nZeile 2" }))).toBe(MELDUNGEN.OHNE_KLAMMERN);
+    expect(fehler(frei({ relativeDueDays: 400 }))).toBe(MELDUNGEN.FAELLIG_UNGUELTIG);
+    expect(frei({ relativeDueDays: -7 }).success).toBe(true);
+  });
+
+  it("Fälligkeit: JJJJ-MM-TT mit Rückprobe, \"\" und null = ohne Fälligkeit", () => {
+    const hinweis = (dueDate: unknown) => ausstattungAktionSchema.safeParse({ aktion: "hinweis-aendern", departmentKey: "IT", dueDate });
+    expect(fehler(hinweis("2026-02-30"))).toBe(MELDUNGEN.KARTE_DATUM_UNGUELTIG);
+    expect(fehler(hinweis("30.09.2026"))).toBe(MELDUNGEN.KARTE_DATUM_UNGUELTIG);
+    const ok = hinweis("2026-09-30");
+    expect(ok.success && ok.data.aktion === "hinweis-aendern" && ok.data.dueDate).toBe("2026-09-30");
+    const leer = hinweis("");
+    expect(leer.success && leer.data.aktion === "hinweis-aendern" && leer.data.dueDate).toBeNull();
+  });
+
+  it("Freitexte normalisiert und begrenzt; unbekannte Felder fallen weg", () => {
+    const r = ausstattungAktionSchema.safeParse({
+      aktion: "aendern",
+      ausstattungId: "z-1",
+      bemerkung: "  Mit Stift\r\nund Hülle ",
+      gestrichenAm: "2026-01-01",
+      quelle: "FUEHRUNGSKRAFT",
+    });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data).toEqual({ aktion: "aendern", ausstattungId: "z-1", bemerkung: "Mit Stift\nund Hülle" });
+    expect(
+      fehler(ausstattungAktionSchema.safeParse({ aktion: "aendern", ausstattungId: "z-1", bemerkung: "x".repeat(GRENZEN.bemerkung + 1) })),
+    ).toBe(MELDUNGEN.BEMERKUNG_ZU_LANG);
+    expect(
+      fehler(ausstattungAktionSchema.safeParse({ aktion: "hinweis-aendern", departmentKey: "IT", hinweis: "x".repeat(GRENZEN.hinweis + 1) })),
+    ).toBe(MELDUNGEN.HINWEIS_ZU_LANG);
   });
 });

@@ -27,6 +27,10 @@ describe("Protokoll-Beschriftungen", () => {
     ["DEPARTMENT_REMINDER_SENT", "Abteilung erinnert"],
     ["OFFBOARDING_REMINDER_SENT", "Abteilung automatisch erinnert"],
     ["DEPARTMENT_LINK_RENEWED", "Abteilungs-Link erneuert"],
+    // Paket A3 (Ausstattung & Zugaenge, Regel 10)
+    ["DEPARTMENT_NACHTRAG_SENT", "Nachtrag an Abteilung gesendet"],
+    // Paket A3 (E-A20): Absage an die informierten Stellen nach EXPIRED
+    ["DEPARTMENT_ABSAGE_SENT", "Absage an Abteilungen gesendet"],
     ["ABTEILUNGSAUFGABE_ERLEDIGT", "Aufgabe per Link erledigt"],
     ["ABTEILUNGSAUFGABE_WIEDER_GEOEFFNET", "Aufgabe per Link wieder geöffnet"],
     ["ABTEILUNGSAUFGABE_KOMMENTIERT", "Kommentar der Abteilung"],

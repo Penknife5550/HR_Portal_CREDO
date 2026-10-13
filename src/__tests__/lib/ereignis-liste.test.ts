@@ -17,11 +17,36 @@ import {
   EVENTS_OHNE_WEBHOOK,
   ereignisOption,
   ereignisOptionLabel,
+  webhooksGesperrt,
 } from "@/lib/ereignis-liste";
 import { EVENT_CATALOG, EVENT_GROUP_ORDER, getEventDefinition } from "@/lib/events";
 import { UNTERLAGEN_EVENTS, UNTERLAGEN_PERSONEN_EVENTS } from "@/lib/unterlagen-mail";
 
 const werte = EREIGNIS_OPTIONEN.map((o) => o.value);
+
+/**
+ * Zentral gesperrte Onboarding-Ereignisse (E-A16, Feinplan F1/F18): Sie laufen
+ * weiter ueber triggerWebhooks, der Dispatcher laesst fuer sie aber den
+ * Webhook-Schritt aus. S18 hat die Sammelmail onboarding-ausstattung-offen
+ * ergaenzt (zusammen mit ihrem Katalogeintrag); S19 die Absage
+ * onboarding-department-abgesagt (E-A20), ebenfalls mit Katalogeintrag.
+ */
+const ZENTRAL_GESPERRTE_ONBOARDING_EVENTS = [
+  "onboarding-department-assigned",
+  "onboarding-department-reminder",
+  "onboarding-task-completed",
+  "onboarding-department-completed",
+  "onboarding-department-abgesagt",
+  "onboarding-ausstattung-offen",
+];
+
+/** Die Gegenstuecke im Offboarding feuern weiter Webhooks (WEBHOOK-Regel). */
+const OFFBOARDING_ABTEILUNGS_EVENTS = [
+  "offboarding-department-assigned",
+  "offboarding-reminder",
+  "offboarding-task-completed",
+  "offboarding-department-completed",
+];
 
 describe("Ereignisliste — Inhalt", () => {
   it.each([
@@ -95,11 +120,13 @@ describe("Ereignisliste — Kennzeichen", () => {
     expect(ereignisOptionLabel(ausgeloest)).toBe(ausgeloest.label);
   });
 
-  it("genau die neun direkt versendeten Events tragen den Hinweis, dass Webhooks nicht feuern", () => {
+  it("genau die neun direkt versendeten und die zentral gesperrten Onboarding-Events tragen den Hinweis, dass Webhooks nicht feuern", () => {
     // Vier Dokumentenpaket-Events (Anhaenge), die drei Mails der
     // Nachforderung an die Person (persoenlicher Upload-Link, Paket 4) und die
     // BEM-Fristenerinnerung (Zeitplaner, nur an die freigegebenen Beauftragten)
-    // und die individuelle E-Mail aus einem Vorgang (Anhaenge, Paket 3).
+    // und die individuelle E-Mail aus einem Vorgang (Anhaenge, Paket 3) —
+    // dazu die Onboarding-Abteilungsereignisse (Link der Stelle, Ausstattung;
+    // E-A16), die triggerWebhooks ohne Webhook-Schritt versendet.
     const mitHinweis = EREIGNIS_OPTIONEN.filter((o) => o.webhookHinweis).map((o) => o.value).sort();
     expect(mitHinweis).toEqual(
       [
@@ -112,6 +139,7 @@ describe("Ereignisliste — Kennzeichen", () => {
         "unterlage-zurueckgewiesen",
         "bem-frist-erinnerung",
         "individuelle-mail",
+        ...ZENTRAL_GESPERRTE_ONBOARDING_EVENTS,
       ].sort()
     );
     for (const event of mitHinweis) {
@@ -121,19 +149,54 @@ describe("Ereignisliste — Kennzeichen", () => {
       expect(ereignisOption(event)!.webhookHinweis).toMatch(/persönlichen Upload-Link/);
     }
     expect(ereignisOption("bem-frist-erinnerung")!.webhookHinweis).toMatch(/freigegebenen Beauftragten/);
+    for (const event of ZENTRAL_GESPERRTE_ONBOARDING_EVENTS) {
+      expect(ereignisOption(event)!.webhookHinweis).toBe(
+        "Webhooks auf dieses Ereignis feuern nicht: Die Mail enthält den Link der Stelle bzw. Angaben zur Ausstattung und wird deshalb nur per SMTP versendet.",
+      );
+    }
   });
 
-  it("EVENTS_OHNE_WEBHOOK deckt genau Dokumentenpaket, Personen-Mails der Nachforderung, BEM-Fristen und die individuelle E-Mail ab", () => {
+  it("die Onboarding-Abteilungsereignisse sind zentral gesperrt, ihre Gegenstuecke im Offboarding nicht", () => {
+    // Die WEBHOOK-Regel der Abteilungsaufgaben gilt nur noch im Offboarding:
+    // Dort feuern Webhooks weiter, und eine deaktivierte Portal-Vorlage mit
+    // aktivem Webhook zaehlt als zugestellt.
+    for (const event of ZENTRAL_GESPERRTE_ONBOARDING_EVENTS) {
+      expect({ event, gesperrt: webhooksGesperrt(event) }).toEqual({ event, gesperrt: true });
+      expect(getEventDefinition(event)?.group).toBe("Onboarding");
+    }
+    for (const event of OFFBOARDING_ABTEILUNGS_EVENTS) {
+      expect(getEventDefinition(event)).toBeDefined();
+      expect({ event, gesperrt: webhooksGesperrt(event) }).toEqual({ event, gesperrt: false });
+      expect(ereignisOption(event)!.webhookHinweis).toBeNull();
+    }
+  });
+
+  it("webhooksGesperrt kennt genau die Schluessel der Liste, keine geerbten Namen", () => {
+    for (const event of Object.keys(EVENTS_OHNE_WEBHOOK)) expect(webhooksGesperrt(event)).toBe(true);
+    for (const event of ["onboarding-created", "unterlagen-vollstaendig", "", "toString", "constructor", "__proto__"]) {
+      expect({ event, gesperrt: webhooksGesperrt(event) }).toEqual({ event, gesperrt: false });
+    }
+  });
+
+  it("EVENTS_OHNE_WEBHOOK deckt genau Dokumentenpaket, Personen-Mails der Nachforderung, BEM-Fristen, die individuelle E-Mail und die zentral gesperrten Onboarding-Ereignisse ab", () => {
     // dokumentenpaket.ts ruft sendEventEmail direkt (ohne Dispatcher, also ohne
     // Webhooks). Kommt dort ein Modul dazu, muss es auch hier stehen — sonst
     // verspricht der Webhook-Reiter einen Aufruf, der nie kommt. Dasselbe gilt
     // fuer die drei Mails der Nachforderung an die Person
-    // (UNTERLAGEN_PERSONEN_EVENTS in unterlagen-mail.ts).
+    // (UNTERLAGEN_PERSONEN_EVENTS in unterlagen-mail.ts). Die Onboarding-
+    // Abteilungsereignisse laufen ueber triggerWebhooks, der fuer sie den
+    // Webhook-Schritt auslaesst (eigene, benannte Liste oben).
     const quelle = fs.readFileSync(path.join(process.cwd(), "src/lib/dokumentenpaket.ts"), "utf8");
     const paketEvents = [...quelle.matchAll(/\bevent:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]).sort();
     expect(paketEvents.length).toBeGreaterThanOrEqual(4);
     expect(Object.keys(EVENTS_OHNE_WEBHOOK).sort()).toEqual(
-      [...paketEvents, ...UNTERLAGEN_PERSONEN_EVENTS, "bem-frist-erinnerung", "individuelle-mail"].sort(),
+      [
+        ...paketEvents,
+        ...UNTERLAGEN_PERSONEN_EVENTS,
+        "bem-frist-erinnerung",
+        "individuelle-mail",
+        ...ZENTRAL_GESPERRTE_ONBOARDING_EVENTS,
+      ].sort(),
     );
     for (const event of Object.keys(EVENTS_OHNE_WEBHOOK)) {
       expect(getEventDefinition(event)).toBeDefined();

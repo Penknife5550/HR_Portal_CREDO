@@ -9,7 +9,6 @@
     "app/(portal)/dashboard/civil-service/[id]/tabs/tab-assessments.tsx": 1,
     "app/(portal)/dashboard/contract-end/[id]/contract-end-detail-content.tsx": 3,
     "app/(portal)/dashboard/offboarding/[id]/offboarding-detail-content.tsx": 3,
-    "app/(portal)/dashboard/[id]/detail-content.tsx": 1,
     "app/(portal)/einstellungen/einstellungen-content.tsx": 4,
     "app/(portal)/exit-interview-vorlagen/exit-interview-vorlagen-content.tsx": 1,
     "app/(portal)/mandanten/mandanten-content.tsx": 1,

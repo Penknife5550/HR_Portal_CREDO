@@ -15,10 +15,6 @@ const mockPrisma = {
     update: jest.fn(),
     updateMany: jest.fn(),
     findUniqueOrThrow: jest.fn(),
-    // Paket 5: `faelligkeitenSetzen` liest damit nach der Abgabe den Vorgang.
-    // Ohne Rueckgabe bricht es sauber ab (gesetzt 0) — die Regeln dazu stehen
-    // in src/__tests__/lib/abteilungsaufgaben-onboarding.test.ts.
-    findUnique: jest.fn(),
   },
   auditLog: { create: jest.fn() },
   organization: { findMany: jest.fn(), findUnique: jest.fn() },
@@ -51,11 +47,21 @@ jest.mock("@/lib/rate-limit", () => ({
   // stillschweigend `undefined` zurueck und der Test stuerbe an einem
   // TypeError statt an einer sprechenden Erwartung.
   getClientIpOrNull: () => "127.0.0.1",
-  // Seit Paket 5 zieht die POST-Route ueber faelligkeitenSetzen auch
-  // src/lib/abteilungsaufgaben-uebergaenge.ts herein, und die baut beim Laden
-  // ihre eigene Bremse je Link. Ohne diese Zeile scheitert schon das Laden des
-  // Moduls ("createRateLimiter is not a function").
+  // Vorsorglich wie oben: Der Adapter (src/lib/abteilungsaufgaben-onboarding.ts)
+  // ist unten gemockt; liefe er echt, zoege er src/lib/abteilungsaufgaben-uebergaenge.ts
+  // herein, und die baut beim Laden ihre eigene Bremse je Link
+  // ("createRateLimiter is not a function").
   createRateLimiter: () => ({ check: () => ({ allowed: true }) }),
+}));
+// Paket A3 (S12): Nach dem Commit der Abgabe holt die ZWEITE Transaktion die
+// Ausstattungsaufgaben nach und setzt die Faelligkeiten
+// (`onboardingAusstattungNachholenIn`). Hier nur ein Spy — die Regeln stehen
+// in ausstattung-aufgaben.test.ts und abteilungsaufgaben-onboarding.test.ts.
+// Liefe der echte Adapter gegen diesen Mock, saehe `onboardingProcess.updateMany`
+// einen zweiten Aufruf (Vorgangssperre) und die Faelle unten zaehlten falsch.
+const mockNachholenIn = jest.fn();
+jest.mock("@/lib/abteilungsaufgaben-onboarding", () => ({
+  onboardingAusstattungNachholenIn: (...a: unknown[]) => mockNachholenIn(...a),
 }));
 // Griff auf den Dispatcher: Die HR-Mail „Einstellungsmodalitaeten
 // eingereicht" muss dieselbe Aussage tragen wie der berechnete Status.
@@ -138,6 +144,7 @@ beforeEach(() => {
   mockPrisma.onboardingProcess.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachAbgabe());
   mockPrisma.auditLog.create.mockResolvedValue({});
+  mockNachholenIn.mockResolvedValue({ gesperrt: true, angelegt: 0, stellen: [], angehoben: 0 });
   mockPrisma.ausstattungsPosition.findMany.mockResolvedValue([]);
   mockPrisma.ausstattungsAusblendung.findMany.mockResolvedValue([]);
   mockPrisma.departmentConfig.findMany.mockResolvedValue([]);
@@ -688,9 +695,10 @@ describe("POST – parallele Spuren", () => {
 
   it("schreibt Beanspruchung, isComplete, Status und Protokoll in EINER Transaktion, in dieser Reihenfolge", async () => {
     mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
-    // Die Faelligkeiten der Checkliste (Paket 5) laufen danach in einer
-    // ZWEITEN, bewusst getrennten Transaktion — sie sind kein Teil der Abgabe
-    // und duerfen sie nicht zum Scheitern bringen.
+    // Die Faelligkeiten der Checkliste (Paket 5) und die Ausstattungsaufgaben
+    // (Paket A3) laufen danach in einer ZWEITEN, bewusst getrennten
+    // Transaktion — sie sind kein Teil der Abgabe und duerfen sie nicht zum
+    // Scheitern bringen.
     await POST(req("POST", {}), { params: params() });
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
@@ -701,6 +709,42 @@ describe("POST – parallele Spuren", () => {
     expect(beanspruchen).toBeLessThan(fertig);
     expect(fertig).toBeLessThan(lesen);
     expect(lesen).toBeLessThan(protokoll);
+  });
+
+  it("ruft in der zweiten Transaktion das Nachholen der Ausstattung mit der Vorgangs-ID auf (Paket A3)", async () => {
+    mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(mockNachholenIn).toHaveBeenCalledTimes(1);
+    const [tx, id, opts] = mockNachholenIn.mock.calls[0];
+    // Das `tx` der zweiten Transaktion (der Mock reicht sich selbst durch).
+    expect(tx).toBe(mockPrisma);
+    expect(id).toBe("ob1");
+    // `jetzt` = Zeitpunkt der Abgabe; kein Versand, also kein `versandAn`.
+    expect(opts.jetzt).toBeInstanceOf(Date);
+    expect(opts.versandAn).toBeUndefined();
+    // Erst NACH dem Commit der Abgabe (Protokoll der ersten Transaktion).
+    expect(mockPrisma.auditLog.create.mock.invocationCallOrder[0]).toBeLessThan(
+      mockNachholenIn.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("laesst einen Fehler im Nachholen die Abgabe nicht umwerfen — nur geloggt", async () => {
+    mockValidate.mockResolvedValue(onboarding(ABGESCHLOSSEN));
+    mockNachholenIn.mockRejectedValue(Object.assign(new Error("geheime@adresse.example"), { code: "P2002" }));
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(req("POST", {}), { params: params() });
+
+    expect(res.status).toBe(200);
+    expect(mockN8n).toHaveBeenCalledWith("supervisor-completed", expect.any(Object));
+    // In die Konsole nur die Kennung, nie die Meldung.
+    expect(JSON.stringify(fehler.mock.calls)).toContain("P2002");
+    expect(JSON.stringify(fehler.mock.calls)).not.toContain("geheime@adresse.example");
+    fehler.mockRestore();
   });
 
   it("meldet 500 und keinen Erfolg, wenn die Transaktion bricht", async () => {

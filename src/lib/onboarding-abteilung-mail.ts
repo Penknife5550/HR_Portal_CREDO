@@ -7,13 +7,17 @@
  * (src/lib/abteilungsaufgaben-dienst.ts, -uebergaenge.ts) baut den
  * gemeinsamen Teil hier und nur das Ereignisspezifische selbst.
  *
- * DATENSPARSAMKEIT. Diese Felder gehen an Abteilungen, an die Fuehrungskraft
- * und an jeden Webhook auf diese Ereignisse. Deshalb stehen hier NUR Name,
- * Einrichtung, Vorgangsnummer und Vertragsbeginn — nie die private Adresse der
+ * DATENSPARSAMKEIT. Diese Felder gehen an Abteilungen und an die
+ * Fuehrungskraft (an Webhooks nicht mehr: Die vier Ereignisse stehen seit
+ * E-A16 in EVENTS_OHNE_WEBHOOK, triggerWebhooks laesst den Webhook-Schritt
+ * aus). Deshalb stehen hier NUR Name,
+ * Einrichtung, Arbeitsort (nur wenn abweichend, F15), Vorgangsnummer und
+ * Vertragsbeginn — nie die private Adresse der
  * Person (`OnboardingProcess.email`), nie etwas aus dem Personalfragebogen
  * ausser dem Namen. `email` im Payload ist IMMER die Adresse des Empfaengers
- * und wird von der Aufrufstelle gesetzt (bei der HR-Meldung
- * onboarding-task-completed gar nicht — Empfaenger ist das An-Feld der Vorlage).
+ * und wird von der Aufrufstelle gesetzt (bei den HR-Mails
+ * onboarding-task-completed und onboarding-ausstattung-offen gar nicht —
+ * Empfaenger ist das HR-Postfach `{{hr_postfach}}` bzw. das An-Feld der Vorlage).
  *
  * `mitarbeiter_name` ist NIE leer und NIE eine Adresse: ohne bekannten Namen
  * MITARBEITER_NEUTRAL („die neue Mitarbeiterin / den neuen Mitarbeiter",
@@ -38,6 +42,25 @@ export interface OnboardingAbteilungsMailVorgang {
   personalData?: { firstName?: string | null; lastName?: string | null } | null;
   organization?: { name: string; mandantNumber?: string | null } | null;
   supervisorData?: { vertragsbeginn?: Date | null } | null;
+  /** Einrichtung (Mandant) — nur fuer den Vergleich mit dem Arbeitsort. */
+  organizationId?: string | null;
+  /** Arbeitsort (E-A10); `null` = Einrichtung des Vorgangs. */
+  arbeitsortId?: string | null;
+  arbeitsort?: { name: string } | null;
+}
+
+/**
+ * Der Arbeitsort fuer die Mail (F15): sein Name, wenn er von der Einrichtung
+ * abweicht — sonst "". Gespeichert wird `arbeitsortId = null`, wenn er gleich
+ * der Einrichtung ist; gleiche ID oder gleicher Name gelten trotzdem als
+ * „nicht abweichend“, damit die Mail nie „Arbeitsort: FES Minden“ neben
+ * „FES Minden“ schreibt.
+ */
+function arbeitsortName(v: OnboardingAbteilungsMailVorgang, einrichtung: string): string {
+  const name = v.arbeitsort?.name?.trim() ?? "";
+  if (!name || name === einrichtung) return "";
+  if (v.arbeitsortId != null && v.arbeitsortId === v.organizationId) return "";
+  return name;
 }
 
 /** Vor- und Nachname aus dem Fragebogen, sonst vom Vorgang (wie mitarbeiterName). */
@@ -57,6 +80,9 @@ function namensTeile(v: OnboardingAbteilungsMailVorgang): { vorname: string; nac
  *   mandantNumber              nur, wenn vorhanden
  *   contractStartDate          Vertragsbeginn ISO ("" ohne)
  *   vertragsbeginn             Vertragsbeginn TT.MM.JJJJ ("" ohne)
+ *   arbeitsort                 Name des Arbeitsorts, nur wenn er von der
+ *                              Einrichtung abweicht, sonst "" (F15) — der
+ *                              Schluessel steht IMMER da (Form der Payload)
  */
 export function onboardingAbteilungsMailFelder(v: OnboardingAbteilungsMailVorgang): Record<string, string> {
   const name = mitarbeiterName(v) ?? MITARBEITER_NEUTRAL;
@@ -78,6 +104,7 @@ export function onboardingAbteilungsMailFelder(v: OnboardingAbteilungsMailVorgan
     ...(mandantNumber ? { mandantNumber } : {}),
     contractStartDate: beginnGueltig ? beginnGueltig.toISOString() : "",
     vertragsbeginn: beginnGueltig ? formatDatumDE(beginnGueltig) : "",
+    arbeitsort: arbeitsortName(v, einrichtung),
   };
 }
 

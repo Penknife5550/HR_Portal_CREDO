@@ -16,6 +16,11 @@
  * Request (POST):
  *   leer oder {}                                   → informieren
  *   { aktion: "erneut-senden" | "erinnern" | "link-erneuern", departmentKey }
+ *   { aktion: "nachtrag", departmentKey }          → Nachtrag senden (Ausstattung &
+ *                                                    Zugaenge, Regel 10; nur Onboarding)
+ *   { aktion: "absage" }                           → Absage an alle informierten Stellen
+ *                                                    (E-A20; nur Onboarding, nur bei
+ *                                                    EXPIRED, sonst 409 NICHT_ABGESAGT)
  *   { action: "remind", departmentKey }            → Alias fuer "erinnern"
  *
  * Gegenstueck im Offboarding: /api/offboarding/[id]/department-links.

@@ -36,18 +36,52 @@
  * die Herkunftstexte `bemerkungLabel`/`hinweisLabel` und die Kurzform der
  * HR-Mail `ausstattungKurz`; Server src/lib/ausstattung-dienst.ts, Karte
  * src/components/ausstattung/modalitaeten-ausstattung-karte.tsx, PDF
- * src/lib/pdf-export-onboarding.ts). Die Funktionen fuer Aufgaben,
- * Faelligkeit, Nachtrag und die Aktionen der Uebersicht kommen mit den
- * folgenden Schritten. Den Server-Teil des Katalogs (Laden, Schreiben,
- * Protokoll, Ausschnitt je Vorgang) traegt src/lib/ausstattung-katalog.ts.
+ * src/lib/pdf-export-onboarding.ts). Seit S12 die Aufgaben je Option und ihre
+ * Faelligkeit (`sollAufgaben`, `hinweisSollAufgabe`,
+ * `fehlendeAusstattungsAufgaben`, `ausstattungsFaelligkeit`,
+ * `anzuhebendeAufgaben`, `vorlaufWarnung`; angelegt werden sie in
+ * src/lib/ausstattung-aufgaben.ts, nachgeholt im Onboarding-Adapter). Seit
+ * S13 Angaben und Hinweis fuer die Mail an die Stelle (`angabenFuer`,
+ * `angabenMailFelder`; geladen in src/lib/ausstattung-daten.ts, verschickt im
+ * Versandkern). Seit S14 der Fortschritt ohne entfallene Aufgaben
+ * (`checklistFortschritt`, F2 — Link-Seite, spaeter Portal, Stepper und PDF)
+ * und die Zeile des Dialogs „Abteilungen informieren“
+ * (`ausstattungVorschauSatz`). Seit S15 die HR-Karte: Aufgabenstand,
+ * Aktionen, Vorlauf-Warnung und waehlbare Stellen in
+ * `ausstattungsUebersichtBauen`, Regel 9 (`aenderungPruefen`,
+ * `hinweisAenderungPruefen`) und die Eintraege der Aenderungsliste
+ * (`aenderungsEintraege`, Regel 10; Server src/lib/ausstattung-dienst.ts).
+ * Seit S16 die Anzeige im Portal (`aufgabenStandText`, `optionsZeilen`,
+ * `bemerkungJeAufgabe`; Karte src/components/ausstattung/ausstattung-karte.tsx,
+ * Dialoge ausstattung-dialoge.tsx, Zusatz am Checklistenpunkt
+ * aufgabe-zusatz.tsx). Seit S17 der Nachtrag (`nachtragListe`,
+ * `nachtragMailFelder`, Regel 10; gelesen in src/lib/ausstattung-daten.ts,
+ * gesendet im Versandkern); der Waechter (Regel 15) steht rein in
+ * abteilungsaufgaben.ts. Seit S18 die Sammelmail an HR am Werktag vor
+ * Dienstbeginn (`letzterWerktagVor`, `sammelmailFaellig`,
+ * `sammelmailListenFelder`, E-A18; Lauf src/lib/ausstattung-lauf.ts). Seit
+ * S19 die Rueckfrage beim Abschluss mit offener Ausstattung
+ * (`abschlussOffeneAufgaben`, `abschlussOffenMeldung`, E-A19; Route PATCH
+ * /api/onboarding/[id], Dialog src/components/ausstattung/abschluss-dialog.tsx);
+ * die Absage an die Stellen (E-A20) steht rein in abteilungsaufgaben.ts. Seit
+ * S20 die Loeschfrist der Freitexte (`freitextGrenze`, E-A22; geleert im Lauf
+ * „Aufbewahrung erzeugter Dokumente“ ueber src/lib/ausstattung-lauf.ts) und
+ * der Brief-Platzhalter `{ausstattung_liste}` (`ausstattungListe`, E-A25;
+ * Resolver in src/lib/doc-template-resolvers.ts). Den Server-Teil des
+ * Katalogs (Laden, Schreiben, Protokoll, Ausschnitt je Vorgang) traegt
+ * src/lib/ausstattung-katalog.ts.
  *
  * Importrichtung: Diese Datei nutzt die reinen Regeln aus abteilungsaufgaben.ts
  * (Empfaenger, Reihenfolge der Stellen, Schluesselform). abteilungsaufgaben.ts
  * importiert deshalb NICHTS von hier — sonst entstuende ein Kreis, und eine
  * Konstante, die beim Laden des Moduls gelesen wird, waere `undefined`.
- * Ausserdem nur noch zwei Dateien ohne eigene Importe: onboarding-spuren.ts
- * (ob die Modalitaeten eingereicht sind — dieselbe Regel wie ueberall) und
- * format.ts (Datum in deutscher Zeit).
+ * Ausserdem nur Dateien ohne eigene Importe: onboarding-spuren.ts (ob die
+ * Modalitaeten eingereicht sind — dieselbe Regel wie ueberall), format.ts
+ * (Datum in deutscher Zeit), seit S13 email-layout.ts (`escapeHtml` fuer die
+ * Angaben im HTML-Teil der Mail) und seit S20 minijob-fristen.ts (Berliner
+ * Kalendertag, Monate mit Monatsende) samt vorgangsjahr.ts (Beginn eines
+ * Berliner Tages; importiert selbst nur minijob-fristen.ts) — keine eigene
+ * Zeitzonenrechnung fuer die Loeschfrist.
  */
 
 import {
@@ -58,15 +92,21 @@ import {
 } from "@/lib/constants";
 import {
   ABTEILUNGS_SCHLUESSEL_MUSTER,
+  WAECHTER_TAGE as WAECHTER_TAGE_ABTEILUNGEN,
   abteilungsReihenfolge,
   empfaengerAufloesen,
+  faelligkeitAus,
   istFuehrungskraft,
   istLinkAbteilung,
   type AbteilungsKonfig,
+  type NachtragListe,
   type VorlagenPunkt,
 } from "@/lib/abteilungsaufgaben";
+import { escapeHtml } from "@/lib/email-layout";
 import { formatDatumDE } from "@/lib/format";
+import { heuteInBerlin, monateSpaeter } from "@/lib/minijob-fristen";
 import { vorgesetzteAbgesendet } from "@/lib/onboarding-spuren";
+import { beginnDesBerlinerTages } from "@/lib/vorgangsjahr";
 
 // =============================================
 // Wertlisten (Zustaende sind Zeichenketten, keine Enums)
@@ -253,8 +293,13 @@ export const HINWEIS_AUFGABE_BESCHREIBUNG = "Den Hinweis der Führungskraft find
 /** F20: Faelligkeit der Hinweis-Aufgabe relativ zum Vertragsbeginn (Vorlauf wie die uebrige Bereitstellung). */
 export const HINWEIS_FAELLIG_TAGE = -7;
 
-/** Regel 15: Der Waechter faerbt die Zeile einer Stelle rot, wenn die frueheste Faelligkeit naeher liegt. */
-export const WAECHTER_TAGE = 7;
+/**
+ * Regel 15: Der Waechter faerbt die Zeile einer Stelle rot, wenn die frueheste
+ * Faelligkeit naeher liegt. Die Regel selbst (`waechterHinweis`) steht rein in
+ * abteilungsaufgaben.ts — dort auch der Wert; hier nur weitergereicht, damit
+ * es keine zweite Zahl gibt.
+ */
+export const WAECHTER_TAGE = WAECHTER_TAGE_ABTEILUNGEN;
 
 /**
  * Reihenfolge in der Checkliste: Ausstattungsaufgaben bekommen
@@ -442,6 +487,62 @@ export const MELDUNGEN = {
   /** Leer nach der Abgabe, obwohl das Formular den Schritt zeigte. */
   UEBERSICHT_NICHTS_ANGEFORDERT: "Die Führungskraft hat keine Ausstattung angefordert.",
   UEBERSICHT_LEER: "Keine Positionen und keine Hinweise an Stellen.",
+  // ---- Aufgaben und Fälligkeit (S12, Regel 14) ----
+  /** Warnung der Karte, wenn der Vertragsbeginn näher liegt als der Vorlauf einer Position (`vorlaufWarnung`). */
+  VORLAUF_WARNUNG: "bis Dienstbeginn voraussichtlich nicht verfügbar – Übergangslösung klären",
+  // ---- HR-Karte (S15; Portal, deshalb ohne Anrede) ----
+  /** 409 VORGANG_ABGESCHLOSSEN (Regel 13), Status COMPLETED. */
+  KARTE_ABGESCHLOSSEN: "Der Vorgang ist abgeschlossen – die Ausstattung lässt sich nicht mehr ändern.",
+  /** 409 VORGANG_ABGESCHLOSSEN (Regel 13), Status EXPIRED. */
+  KARTE_ABGELAUFEN: "Der Vorgang ist abgelaufen – die Ausstattung lässt sich nicht mehr ändern.",
+  /** 409 MODALITAETEN_FEHLEN (E-A11): Bis zur Abgabe gehört die Auswahl der Führungskraft. */
+  KARTE_MODALITAETEN_FEHLEN:
+    "Die Einstellungsmodalitäten sind noch nicht eingereicht. Bis zur Abgabe gehört die Auswahl der Führungskraft; danach kann die Personalabteilung ergänzen und ändern.",
+  /** 409 VERSAND_LAEUFT (F6): Die Karte nimmt dieselbe Sperre wie „Abteilungen informieren“. */
+  KARTE_VERSAND_LAEUFT:
+    "Gerade läuft ein Versand an die Stellen oder eine andere Änderung. Bitte in einem Moment erneut versuchen.",
+  /** 409 AUFGABE_ERLEDIGT (Regel 9) — zugleich der Sperrgrund der Karte. */
+  AUFGABE_ERLEDIGT:
+    "Mindestens eine Aufgabe dazu ist schon erledigt. Streichen, Abwählen und Umhängen gehen erst, wenn sie wieder geöffnet ist (Checkliste oder Aufgabenseite der Stelle).",
+  /** 409 GESTRICHEN: Eine gestrichene Position wird nicht mehr bearbeitet. */
+  POSITION_GESTRICHEN:
+    "Die Position ist gestrichen. Eine Position aus dem Katalog lässt sich über „Position hinzufügen…“ wieder aufnehmen.",
+  /** 409 OHNE_OFFENE_AUFGABE: Fälligkeit nur an einer offenen Aufgabe. */
+  OHNE_OFFENE_AUFGABE: "Dazu gibt es keine offene Aufgabe – die Fälligkeit lässt sich nicht ändern.",
+  /** 409 BEREITS_VORHANDEN: Die Position steht schon in diesem Vorgang. */
+  POSITION_BEREITS_GEWAEHLT: "Diese Position ist schon gewählt. Bitte sie bearbeiten statt erneut hinzufügen.",
+  /** 400: Die Position gehört nicht zum Katalogausschnitt dieses Vorgangs. */
+  POSITION_NICHT_IM_KATALOG:
+    "Die Position gehört nicht (mehr) zum Katalog dieses Vorgangs. Bitte die Seite neu laden.",
+  HINWEIS_NICHT_GEFUNDEN: "Hinweis nicht gefunden",
+  /** 400: Felder, die zur Art der Position nicht passen. */
+  KARTE_PASST_NICHT_ZUR_ART: "Die Änderung passt nicht zur Art der Position.",
+  KARTE_AUSWAHL_LEER: "Bitte mindestens eine Option wählen – sonst die Position streichen.",
+  KARTE_ANGABE_LEER: "Bitte die Angabe ausfüllen – sonst die Position streichen.",
+  KARTE_OPTION_UNBEKANNT: "Eine Option gehört nicht zu dieser Position. Bitte die Seite neu laden.",
+  KARTE_POSITION_ODER_FREI: "Bitte eine Position aus dem Katalog wählen oder eine freie Position beschreiben.",
+  KARTE_HINWEIS_ODER_FAELLIG: "Bitte einen Hinweis oder eine Fälligkeit angeben.",
+  KARTE_DATUM_UNGUELTIG: "Datum im Format JJJJ-MM-TT erforderlich.",
+  KARTE_FREI_ZU_LANG: `Die Bezeichnung einer freien Position darf höchstens ${GRENZEN.freieBezeichnung} Zeichen lang sein.`,
+  KARTE_ID_UNGUELTIG: "Ungültige Position. Bitte die Seite neu laden.",
+  // Erfolg (`meldung` der Antwort)
+  KARTE_HINZUGEFUEGT: "Position ergänzt.",
+  KARTE_WIEDER_AUFGENOMMEN: "Position wieder aufgenommen.",
+  KARTE_GEAENDERT: "Änderung gespeichert.",
+  KARTE_GESTRICHEN: "Position gestrichen – sie entfällt für die Stelle.",
+  KARTE_ENTFERNT: "Position entfernt.",
+  KARTE_HINWEIS_GESPEICHERT: "Hinweis gespeichert.",
+  KARTE_HINWEIS_ENTFERNT: "Hinweis entfernt.",
+  KARTE_HINWEIS_GESEHEN: "Hinweis als zur Kenntnis genommen markiert.",
+  KARTE_HINWEIS_UEBERNOMMEN: "Hinweis als Position übernommen.",
+  KARTE_UNVERAENDERT: "Keine Änderung.",
+  /** Hängt an die Erfolgsmeldung, wenn eine schon informierte Stelle Einträge in der Änderungsliste bekam (Regel 10). */
+  KARTE_NACHTRAG_FOLGT: "Die informierte Stelle erfährt davon erst mit „Nachtrag senden“.",
+  // ---- Portal-PATCH der Checkliste (S15; Regel 9, Regel 16) ----
+  /** 403: Aufgaben mit Herkunft (Ausstattung, Hinweis) ändert im Portal nur HR — nie SERVICE, Einrichtungsleitung oder Führungskraft. */
+  PORTAL_NUR_HR: "Ausstattungsaufgaben bearbeitet nur die Personalabteilung.",
+  /** 409: Zuständigkeit und Fälligkeit einer Ausstattungs- oder Hinweis-Aufgabe ändert nur die Karte. */
+  PORTAL_IN_DER_KARTE: "Zuständigkeit und Fälligkeit in der Karte ‚Ausstattung & Zugänge‘ ändern.",
 } as const;
 
 // =============================================
@@ -1877,7 +1978,12 @@ export type AusstattungsZustand = "ENTWURF" | "BEARBEITBAR" | "NUR_LESEN";
 export interface UebersichtVorgangStand {
   status: string;
   supervisorSubmittedAt?: Date | string | null;
-  supervisorData?: { isComplete?: boolean | null; mitAusstattung?: boolean | null } | null;
+  supervisorData?: {
+    isComplete?: boolean | null;
+    mitAusstattung?: boolean | null;
+    /** Seit S15: Bezug der Vorlauf-Warnung (Regel 14); gilt nur mit eingereichten Modalitaeten. */
+    vertragsbeginn?: Date | string | null;
+  } | null;
 }
 
 /**
@@ -1932,6 +2038,30 @@ export interface UebersichtZeileDaten {
   erfasstVonId?: string | null;
   gestrichenAm?: Date | string | null;
   createdAt?: Date | string | null;
+  /** Seit S15: Faelligkeit der Momentaufnahme (Tage zum Vertragsbeginn) — nur fuer die Vorlauf-Warnung, nie in der Antwort. */
+  relativeDueDays?: number | null;
+}
+
+/**
+ * Eine Ausstattungs- oder Hinweis-Aufgabe (`ChecklistItem` mit `herkunft`),
+ * wie die Karte sie liest (seit S15). Ein Haken ueber den Link setzt
+ * `completedById` nicht — die Karte braucht ihn auch nicht.
+ */
+export interface UebersichtAufgabeDaten {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+  completedAt?: Date | string | null;
+  dueDate?: Date | string | null;
+  eilt?: boolean | null;
+  entfaelltAm?: Date | string | null;
+}
+
+/** Verknuepfung Zeile/Option → Aufgabe (`OnboardingAusstattungAufgabe`). */
+export interface UebersichtVerknuepfung {
+  ausstattungId: string;
+  option: string;
+  checklistItemId: string;
 }
 
 /** Ein „Weitere Hinweise an …“ (`OnboardingStellenHinweis`), wie Uebersicht und PDF ihn lesen. */
@@ -1949,14 +2079,20 @@ export interface Erfasser {
   lastName: string | null;
 }
 
-/** Stand einer Aufgabe zu einer Zeile (je Option eine). Kommt mit S15; bis dahin leer. */
+/** Zustand einer Ausstattungs- oder Hinweis-Aufgabe (F2: „entfällt“ ist erledigt, zaehlt aber nie als erledigt). */
+export type AufgabenStatus = "offen" | "erledigt" | "entfaellt";
+
+/** Stand einer Aufgabe zu einer Zeile (je Option eine; seit S15 in der Uebersicht, im PDF leer). */
 export interface AusstattungsAufgabeStand {
+  /** "" = ganze Position, sonst die Option. */
   option: string;
   checklistItemId: string;
   titel: string;
-  status: "offen" | "erledigt" | "entfaellt";
+  status: AufgabenStatus;
+  /** Faelligkeit als ISO-Zeitpunkt (Mitternacht UTC des Berliner Kalendertags). */
   faelligAm: string | null;
   eilt: boolean;
+  /** Nur bei „erledigt“ (nie bei „entfällt“). */
   erledigtAm: string | null;
 }
 
@@ -1971,6 +2107,13 @@ export interface AusstattungsZeile {
   erfasst: string | null;
   /** Nur Auswahl: die gewaehlten Optionen in der gespeicherten Reihenfolge. */
   auswahl: string[];
+  /**
+   * Nur Auswahl: was der Dialog „Bearbeiten“ zur Wahl anbietet — die Optionen
+   * des Katalogs (solange die Position im Katalog dieses Vorgangs steht),
+   * dahinter die gewaehlten und die einer frueheren Aufgabe (F23: wieder
+   * anwaehlen oeffnet sie wieder). Der Server prueft dieselbe Liste.
+   */
+  optionen: string[];
   bemerkung: { text: string; label: string } | null;
   /**
    * Nur Angabe mit Inhalt. `sichtbarFuer`: Anzeigenamen ALLER Stellen, die die
@@ -1981,11 +2124,20 @@ export interface AusstattungsZeile {
   gestrichen: boolean;
   /** Die Position steht im Katalog dieses Vorgangs nicht mehr (ausgeschaltet, ausgeblendet, ohne Adresse). */
   nichtMehrImKatalog: boolean;
-  /** Kommt mit S12 (Regel 14); bis dahin `null`. */
+  /**
+   * Regel 14 (`vorlaufWarnung`): nur in der Uebersicht von HR, nur im Zustand
+   * BEARBEITBAR, solange eine Aufgabe offen ist (oder noch keine angelegt);
+   * im PDF und in `ausstattungsGruppen` `null`.
+   */
   vorlaufWarnung: string | null;
-  /** Kommt mit S15; bis dahin leer. */
+  /** Die Aufgaben der Zeile (je Option eine, auch entfallene); im PDF und in `ausstattungsGruppen` leer. */
   aufgaben: AusstattungsAufgabeStand[];
-  /** Kommt mit S15; bis dahin alles aus. */
+  /**
+   * Was HR an der Zeile tun darf (nur im Zustand BEARBEITBAR, sonst alles aus):
+   * `aendern` (Dialog „Bearbeiten“), `streichen`, dazu der Satz, warum etwas
+   * gesperrt ist (Regel 9: erledigte Aufgabe; gestrichene Position). Der Server
+   * prueft dieselbe Regel (`aenderungPruefen`).
+   */
   aktionen: { aendern: boolean; streichen: boolean; sperrGrund: string | null };
 }
 
@@ -1996,10 +2148,11 @@ export interface AusstattungsHinweis {
   /** HR hat ihn zur Kenntnis genommen (`gesehenAm`). */
   gesehen: boolean;
   checklistItemId: string | null;
-  /** Kommen mit S15; bis dahin leer. */
-  status: "offen" | "erledigt" | "entfaellt" | null;
+  /** Stand der Aufgabe „Hinweis der Führungskraft beachten“ (seit S15; ohne Aufgabe `null`). */
+  status: AufgabenStatus | null;
   faelligAm: string | null;
   eilt: boolean;
+  /** Text und Faelligkeit aendern (`hinweisAenderungPruefen`); nur im Zustand BEARBEITBAR. */
   aktionen: { aendern: boolean; sperrGrund: string | null };
 }
 
@@ -2022,9 +2175,24 @@ export interface AusstattungsHinzufuegbar {
 }
 
 /**
+ * Eine Stelle, die HR fuer eine freie Position, einen Hinweis oder einen
+ * Stellenwechsel waehlen kann (seit S15, nur im Zustand BEARBEITBAR): die
+ * festen Stellen, die unter Einstellungen → Abteilungen angelegten und die
+ * Personalabteilung — nie MITARBEITER oder VORGESETZTER (Regel 11).
+ */
+export interface AusstattungsStelle {
+  departmentKey: string;
+  /** Anzeigename am Arbeitsort (wie in den Gruppen). */
+  name: string;
+  /** Am Arbeitsort keine aktive Adresse (HR nie). */
+  adresseFehlt: boolean;
+}
+
+/**
  * Die Uebersicht fuer HR (Feinplan 1.6), fertig fuer die Karte — sie rechnet
- * nichts selbst. Erste Fassung (S10): Gruppen, Zeilen, Hinweise, Angaben,
- * Zustand und Saetze; Aufgabenstand und Aktionen kommen mit S15.
+ * nichts selbst. Seit S10: Gruppen, Zeilen, Hinweise, Angaben, Zustand und
+ * Saetze; seit S15 dazu Aufgabenstand, Aktionen, Vorlauf-Warnungen, die
+ * waehlbaren Optionen und Stellen.
  */
 export interface AusstattungsUebersicht {
   zustand: AusstattungsZustand;
@@ -2041,6 +2209,8 @@ export interface AusstattungsUebersicht {
   gruppen: AusstattungsGruppe[];
   /** Katalogpositionen, die HR ergaenzen kann; leer ausser im Zustand BEARBEITBAR. */
   hinzufuegbar: AusstattungsHinzufuegbar[];
+  /** Waehlbare Stellen (freie Position, Hinweis, Stellenwechsel); leer ausser im Zustand BEARBEITBAR. */
+  stellen: AusstattungsStelle[];
   /** Rolle in HR_EDIT_ROLES. */
   darfBearbeiten: boolean;
 }
@@ -2112,6 +2282,7 @@ export function ausstattungsGruppen(opts: {
           erfasst:
             quelle === "HR" ? `ergänzt von HR${wer ? ` (${wer})` : ""}${datum ? `, ${datum}` : ""}` : null,
           auswahl: z.art === "AUSWAHL" ? [...z.auswahl] : [],
+          optionen: z.art === "AUSWAHL" ? [...z.auswahl] : [],
           bemerkung: bemerkung ? { text: bemerkung, label: bemerkungLabel(z.bemerkungQuelle ?? z.quelle) } : null,
           angabe: wert
             ? {
@@ -2144,16 +2315,26 @@ export function ausstattungsGruppen(opts: {
 }
 
 /**
- * Baut die Uebersicht fuer HR (Feinplan 1.6, erste Fassung S10): Zustand und
- * Satz nach `ausstattungsZustand`, Gruppen nach `ausstattungsGruppen` mit
- * Stellen-Namen und Adresse am wirksamen Arbeitsort (`empfaengerAufloesen`,
- * dieselbe Regel wie der Versand), dazu `hinzufuegbar` (nur BEARBEITBAR):
- * der Katalogausschnitt dieses Vorgangs ohne die schon gewaehlten, nicht
+ * Baut die Uebersicht fuer HR (Feinplan 1.6): Zustand und Satz nach
+ * `ausstattungsZustand`, Gruppen nach `ausstattungsGruppen` mit Stellen-Namen
+ * und Adresse am wirksamen Arbeitsort (`empfaengerAufloesen`, dieselbe Regel
+ * wie der Versand), dazu `hinzufuegbar` (nur BEARBEITBAR): der
+ * Katalogausschnitt dieses Vorgangs ohne die schon gewaehlten, nicht
  * gestrichenen Positionen.
+ *
+ * Seit S15 (Karte im Reiter Checkliste) zusaetzlich, wenn der Aufrufer
+ * Aufgaben und Verknuepfungen mitgibt:
+ *   - je Zeile ihre Aufgaben (Option, Titel, offen/erledigt/entfällt,
+ *     Faelligkeit, „Eilt“), die waehlbaren Optionen einer Auswahl und — nur
+ *     BEARBEITBAR — die Aktionen nach Regel 9 (`aenderungPruefen`) und die
+ *     Vorlauf-Warnung (Regel 14, `vorlaufWarnung` mit `jetzt`);
+ *   - je Hinweis der Stand seiner Aufgabe samt Aktion (`hinweisAenderungPruefen`);
+ *   - die waehlbaren Stellen (`stellen`, nur BEARBEITBAR).
  *
  * `katalog` ist der Ausschnitt (`katalogAusschnittLaden`); `null` heisst
  * „nicht geladen“ — dann ist nichts hinzufuegbar und keine Zeile „nicht mehr
- * im Katalog“.
+ * im Katalog“. Ohne `jetzt` gibt es keine Vorlauf-Warnung (die Datei kennt
+ * keine Uhr).
  */
 export function ausstattungsUebersichtBauen(opts: {
   vorgang: UebersichtVorgangStand;
@@ -2165,6 +2346,12 @@ export function ausstattungsUebersichtBauen(opts: {
   konfigs: ReadonlyArray<AbteilungsKonfig>;
   katalog: ReadonlyArray<KatalogPosition> | null;
   erfasser?: Readonly<Record<string, Erfasser>>;
+  /** Seit S15: Ausstattungs- und Hinweis-Aufgaben des Vorgangs (`ChecklistItem` mit `herkunft`). */
+  aufgaben?: ReadonlyArray<UebersichtAufgabeDaten>;
+  /** Seit S15: Verknuepfungen der Zeilen mit ihren Aufgaben. */
+  verknuepfungen?: ReadonlyArray<UebersichtVerknuepfung>;
+  /** Seit S15: Zeitpunkt fuer die Vorlauf-Warnung. */
+  jetzt?: Date;
 }): AusstattungsUebersicht {
   const { zustand, satz } = ausstattungsZustand(opts.vorgang, opts.darfBearbeiten);
   const eingereicht = vorgesetzteAbgesendet(opts.vorgang);
@@ -2172,14 +2359,31 @@ export function ausstattungsUebersichtBauen(opts: {
 
   const empfaenger = (key: string) =>
     empfaengerAufloesen({ departmentKey: key, organizationId: opts.arbeitsortId, konfigs: opts.konfigs, fuehrungskraft: null });
-  const gruppen = ausstattungsGruppen({
-    zeilen: opts.zeilen,
-    hinweise: opts.hinweise,
-    stelleName: (key) => (key === DEPARTMENT_KEYS.HR ? abteilungLabel(key) : empfaenger(key).departmentName),
-    adresseFehlt: (key) => key !== DEPARTMENT_KEYS.HR && !empfaenger(key).ok,
-    imKatalog: opts.katalog ? new Set(opts.katalog.map((p) => p.id)) : null,
-    erfasser: opts.erfasser,
-  });
+  const stelleName = (key: string) => (key === DEPARTMENT_KEYS.HR ? abteilungLabel(key) : empfaenger(key).departmentName);
+  const adresseFehlt = (key: string) => key !== DEPARTMENT_KEYS.HR && !empfaenger(key).ok;
+  const gruppen = karteAnreichern(
+    ausstattungsGruppen({
+      zeilen: opts.zeilen,
+      hinweise: opts.hinweise,
+      stelleName,
+      adresseFehlt,
+      imKatalog: opts.katalog ? new Set(opts.katalog.map((p) => p.id)) : null,
+      erfasser: opts.erfasser,
+    }),
+    {
+      bearbeitbar: zustand === "BEARBEITBAR",
+      zeilen: opts.zeilen,
+      katalog: opts.katalog,
+      aufgaben: opts.aufgaben ?? [],
+      verknuepfungen: opts.verknuepfungen ?? [],
+      vertragsbeginn: eingereicht ? (opts.vorgang.supervisorData?.vertragsbeginn ?? null) : null,
+      jetzt: opts.jetzt ?? null,
+    },
+  );
+  const stellen: AusstattungsStelle[] =
+    zustand === "BEARBEITBAR"
+      ? waehlbareStellen(opts.konfigs).map((key) => ({ departmentKey: key, name: stelleName(key), adresseFehlt: adresseFehlt(key) }))
+      : [];
 
   const gewaehlt = new Set(
     opts.zeilen.filter((z) => z.positionId && !z.gestrichenAm).map((z) => z.positionId as string),
@@ -2222,8 +2426,1180 @@ export function ausstattungsUebersichtBauen(opts: {
     mitAusstattung,
     gruppen,
     hinzufuegbar,
+    stellen,
     darfBearbeiten: opts.darfBearbeiten,
   };
+}
+
+/**
+ * Die Stellen, die HR in der Karte waehlen kann: die festen Schluessel und
+ * die unter Einstellungen → Abteilungen angelegten (gueltige Form), ohne
+ * MITARBEITER und VORGESETZTER (Regel 11) — in der Reihenfolge der
+ * Abteilungskarte, die Personalabteilung dahinter. Dieselbe Menge prueft der
+ * Server (`abteilungsSchluesselBekannt` + `NICHT_ERLAUBTE_STELLEN`).
+ */
+export function waehlbareStellen(konfigs: ReadonlyArray<{ departmentKey: string }>): string[] {
+  const schluessel = [
+    ...(Object.values(DEPARTMENT_KEYS) as string[]),
+    ...konfigs.map((k) => k.departmentKey).filter((k) => ABTEILUNGS_SCHLUESSEL_MUSTER.test(k)),
+  ].filter((k) => !istNichtErlaubteStelle(k));
+  const rang = stellenRang(schluessel);
+  return [...new Set(schluessel)].sort((a, b) => (rang.get(a) ?? 0) - (rang.get(b) ?? 0));
+}
+
+/** Status einer Aufgabe (F2): entfallen vor erledigt — eine entfallene ist zugleich `isCompleted`. */
+export function aufgabenStatus(a: { isCompleted: boolean; entfaelltAm?: Date | string | null }): AufgabenStatus {
+  if (a.entfaelltAm != null) return "entfaellt";
+  return a.isCompleted ? "erledigt" : "offen";
+}
+
+/** Die Aufgaben einer Zeile, Option fuer Option: die gewaehlten in ihrer Reihenfolge, dahinter die uebrigen (entfallene). */
+function zeilenAufgaben(
+  zeile: Pick<UebersichtZeileDaten, "auswahl">,
+  verknuepfungen: ReadonlyArray<UebersichtVerknuepfung>,
+  aufgabeZu: ReadonlyMap<string, UebersichtAufgabeDaten>,
+): AusstattungsAufgabeStand[] {
+  const rang = (option: string) => {
+    const i = zeile.auswahl.indexOf(option);
+    return i < 0 ? zeile.auswahl.length : i;
+  };
+  return verknuepfungen
+    .flatMap((v) => {
+      const a = aufgabeZu.get(v.checklistItemId);
+      if (!a) return [];
+      const status = aufgabenStatus(a);
+      return [
+        {
+          option: v.option,
+          checklistItemId: a.id,
+          titel: a.title,
+          status,
+          faelligAm: alsIso(a.dueDate),
+          eilt: a.eilt === true,
+          erledigtAm: status === "erledigt" ? alsIso(a.completedAt) : null,
+        },
+      ];
+    })
+    .sort((x, y) => rang(x.option) - rang(y.option) || x.option.localeCompare(y.option, "de"));
+}
+
+/** Aktionen einer Zeile nach Regel 9 — dieselbe Pruefung wie der Server (`aenderungPruefen`). */
+function zeilenAktionen(
+  zeile: { art: string; gestrichen: boolean },
+  aufgaben: ReadonlyArray<{ option: string; status: AufgabenStatus }>,
+): AusstattungsZeile["aktionen"] {
+  if (zeile.gestrichen) return { aendern: false, streichen: false, sperrGrund: MELDUNGEN.POSITION_GESTRICHEN };
+  const stand = { art: zeile.art, gestrichenAm: null };
+  const streichen = aenderungPruefen(stand, aufgaben, { streichen: true }) === null;
+  // Eine Auswahl laesst sich immer ergaenzen, eine Angabe hat keine Aufgabe —
+  // beides ist immer „Bearbeiten“; ein Ja/Nein nur, solange Bemerkung oder Stelle aenderbar sind.
+  const aendern =
+    zeile.art !== "JA_NEIN" ||
+    aenderungPruefen(stand, aufgaben, { bemerkung: true }) === null ||
+    aenderungPruefen(stand, aufgaben, { stelle: true }) === null;
+  return { aendern, streichen, sperrGrund: streichen && aendern ? null : MELDUNGEN.AUFGABE_ERLEDIGT };
+}
+
+/**
+ * S15: Aufgabenstand, Optionen, Aktionen und Vorlauf-Warnung in die Gruppen
+ * eintragen (neue Objekte). Ohne Aufgaben und ohne BEARBEITBAR bleiben
+ * Aktionen und Warnungen aus.
+ */
+function karteAnreichern(
+  gruppen: AusstattungsGruppe[],
+  k: {
+    bearbeitbar: boolean;
+    zeilen: ReadonlyArray<UebersichtZeileDaten>;
+    katalog: ReadonlyArray<KatalogPosition> | null;
+    aufgaben: ReadonlyArray<UebersichtAufgabeDaten>;
+    verknuepfungen: ReadonlyArray<UebersichtVerknuepfung>;
+    vertragsbeginn: Date | string | null;
+    jetzt: Date | null;
+  },
+): AusstattungsGruppe[] {
+  const aufgabeZu = new Map(k.aufgaben.map((a) => [a.id, a]));
+  const datenZu = new Map(k.zeilen.map((z) => [z.id, z]));
+  const katalogZu = new Map((k.katalog ?? []).map((p) => [p.id, p]));
+  const verknuepftZu = new Map<string, UebersichtVerknuepfung[]>();
+  for (const v of k.verknuepfungen) verknuepftZu.set(v.ausstattungId, [...(verknuepftZu.get(v.ausstattungId) ?? []), v]);
+
+  return gruppen.map((g) => ({
+    ...g,
+    zeilen: g.zeilen.map((z) => {
+      const daten = datenZu.get(z.id);
+      const aufgaben = daten ? zeilenAufgaben(daten, verknuepftZu.get(z.id) ?? [], aufgabeZu) : [];
+      const katalog = z.positionId ? katalogZu.get(z.positionId) : undefined;
+      const optionen =
+        z.art === "AUSWAHL"
+          ? [
+              ...new Set([
+                ...(katalog?.art === "AUSWAHL" ? katalog.optionen : []),
+                ...z.auswahl,
+                ...aufgaben.map((a) => a.option).filter((o) => o !== ""),
+              ]),
+            ]
+          : [];
+      const offen = aufgaben.length === 0 || aufgaben.some((a) => a.status === "offen");
+      const vorlauf =
+        k.bearbeitbar && k.jetzt && !z.gestrichen && z.art !== "ANGABE" && offen
+          ? vorlaufWarnung(daten?.relativeDueDays, k.vertragsbeginn, k.jetzt)
+          : null;
+      return {
+        ...z,
+        optionen,
+        aufgaben,
+        vorlaufWarnung: vorlauf,
+        aktionen: k.bearbeitbar ? zeilenAktionen(z, aufgaben) : z.aktionen,
+      };
+    }),
+    hinweis: g.hinweis ? hinweisAnreichern(g.hinweis, k.bearbeitbar, aufgabeZu) : null,
+  }));
+}
+
+function hinweisAnreichern(
+  h: AusstattungsHinweis,
+  bearbeitbar: boolean,
+  aufgabeZu: ReadonlyMap<string, UebersichtAufgabeDaten>,
+): AusstattungsHinweis {
+  const a = h.checklistItemId ? aufgabeZu.get(h.checklistItemId) : undefined;
+  const status = a ? aufgabenStatus(a) : null;
+  const grund = bearbeitbar ? hinweisAenderungPruefen({ text: h.text }, status ? { status } : null, { text: true }) : null;
+  return {
+    ...h,
+    status,
+    faelligAm: alsIso(a?.dueDate),
+    eilt: a?.eilt === true,
+    aktionen: bearbeitbar
+      ? { aendern: grund === null, sperrGrund: grund ? aenderungsGrundText(grund) : null }
+      : h.aktionen,
+  };
+}
+
+// =============================================
+// HR-Karte: Aendern, Streichen, Aenderungsliste (S15; Regel 9, Regel 10, F2, F23)
+// =============================================
+//
+// Nach der Abgabe der Modalitaeten bearbeitet HR die Ausstattung in der Karte
+// „Ausstattung & Zugänge“ (Reiter Checkliste). Die Regeln, WANN etwas geht
+// (Regel 9: keine erledigte Aufgabe streichen, abwaehlen oder umhaengen) und
+// WAS die informierte Stelle davon erfaehrt (Regel 10: Eintraege NEU,
+// GEAENDERT, ENTFAELLT in der Aenderungsliste), stehen hier rein; Server
+// src/lib/ausstattung-dienst.ts (`ausstattungAktionAusfuehren`), Schreiben in
+// fremder Transaktion src/lib/ausstattung-aufgaben.ts.
+
+/** Warum eine Aenderung abgewiesen wird (409, `grund` der Antwort). */
+export type AenderungsGrund = "AUFGABE_ERLEDIGT" | "GESTRICHEN" | "OHNE_OFFENE_AUFGABE";
+
+/** Text zu einem `AenderungsGrund` (Antwort des Servers und Sperrgrund der Karte). */
+export function aenderungsGrundText(grund: AenderungsGrund): string {
+  switch (grund) {
+    case "AUFGABE_ERLEDIGT":
+      return MELDUNGEN.AUFGABE_ERLEDIGT;
+    case "GESTRICHEN":
+      return MELDUNGEN.POSITION_GESTRICHEN;
+    case "OHNE_OFFENE_AUFGABE":
+      return MELDUNGEN.OHNE_OFFENE_AUFGABE;
+    default: {
+      const unbekannt: never = grund;
+      return String(unbekannt);
+    }
+  }
+}
+
+/**
+ * Was HR an einer Zeile aendern will (aus der Aktion `aendern` bzw.
+ * `streichen` abgeleitet). Fehlende Felder heissen „unveraendert“.
+ */
+export interface AenderungsWunsch {
+  /** Optionen, die wegfallen (Auswahl). */
+  abwaehlen?: ReadonlyArray<string>;
+  /** Optionen, die dazukommen — auch eine frueher abgewaehlte (F23). */
+  hinzu?: ReadonlyArray<string>;
+  bemerkung?: boolean;
+  angabe?: boolean;
+  /** Stellenwechsel. */
+  stelle?: boolean;
+  /** Die ganze Position streichen. */
+  streichen?: boolean;
+  /** Faelligkeit der Aufgaben dieser Optionen ("" = ganze Position). */
+  faelligkeiten?: ReadonlyArray<string>;
+}
+
+/**
+ * Regel 9, fuer Auswahl-Positionen ausgelegt (E-A12): Darf HR die Zeile so
+ * aendern? `null` = ja, sonst der Grund (409).
+ *
+ *   - Eine gestrichene Zeile wird nicht mehr bearbeitet (GESTRICHEN); wieder
+ *     aufgenommen wird sie ueber „Position hinzufügen…“.
+ *   - Streichen und Stellenwechsel nur, wenn KEINE Aufgabe erledigt ist.
+ *   - Eine Option mit erledigter Aufgabe laesst sich nicht abwaehlen.
+ *   - Bemerkung aendern nur, wenn mindestens eine Aufgabe offen ist oder die
+ *     Zeile keine (nicht entfallene) Aufgabe hat — eine Angabe, eine
+ *     Position vor dem Anlegen ihrer Aufgaben.
+ *   - Eine Angabe hat keine Aufgabe: aendern geht immer.
+ *   - Optionen hinzufuegen geht immer (auch eine frueher abgewaehlte, F23).
+ *   - Faelligkeit nur an einer offenen Aufgabe: erledigt → AUFGABE_ERLEDIGT,
+ *     sonst (entfallen, noch keine) → OHNE_OFFENE_AUFGABE.
+ *
+ * Entfallene Aufgaben zaehlen nie als erledigt.
+ */
+export function aenderungPruefen(
+  zeile: { art: string; gestrichenAm?: Date | string | null },
+  aufgaben: ReadonlyArray<{ option: string; status: AufgabenStatus }>,
+  aenderung: AenderungsWunsch,
+): AenderungsGrund | null {
+  if (zeile.gestrichenAm != null) return "GESTRICHEN";
+  const erledigt = aufgaben.some((a) => a.status === "erledigt");
+  if ((aenderung.streichen || aenderung.stelle) && erledigt) return "AUFGABE_ERLEDIGT";
+  for (const option of aenderung.abwaehlen ?? []) {
+    if (aufgaben.some((a) => a.option === option && a.status === "erledigt")) return "AUFGABE_ERLEDIGT";
+  }
+  if (aenderung.bemerkung) {
+    const zaehlend = aufgaben.filter((a) => a.status !== "entfaellt");
+    if (zaehlend.length > 0 && !zaehlend.some((a) => a.status === "offen")) return "AUFGABE_ERLEDIGT";
+  }
+  for (const option of aenderung.faelligkeiten ?? []) {
+    const status = aufgaben.find((a) => a.option === option)?.status;
+    if (status === "erledigt") return "AUFGABE_ERLEDIGT";
+    if (status !== "offen") return "OHNE_OFFENE_AUFGABE";
+  }
+  return null;
+}
+
+/**
+ * Regel 9 auf Hinweise uebertragen (Feinplan 1.10, „Hinweis-Aufgabe“):
+ *
+ *   - Ein neuer Hinweis (keine Zeile oder Text "") geht immer.
+ *   - Text aendern oder entfernen nur, solange die Hinweis-Aufgabe offen ist
+ *     oder es keine gibt; ist sie erledigt, AUFGABE_ERLEDIGT.
+ *   - Faelligkeit nur an einer offenen Aufgabe (erledigt → AUFGABE_ERLEDIGT,
+ *     keine oder entfallen → OHNE_OFFENE_AUFGABE).
+ */
+export function hinweisAenderungPruefen(
+  hinweis: { text: string | null } | null,
+  aufgabe: { status: AufgabenStatus } | null,
+  aenderung: { text?: boolean; dueDate?: boolean },
+): AenderungsGrund | null {
+  if (aenderung.text && hinweis && !leer(hinweis.text) && aufgabe?.status === "erledigt") return "AUFGABE_ERLEDIGT";
+  if (aenderung.dueDate) {
+    if (aufgabe?.status === "erledigt") return "AUFGABE_ERLEDIGT";
+    if (aufgabe?.status !== "offen") return "OHNE_OFFENE_AUFGABE";
+  }
+  return null;
+}
+
+/**
+ * Der Inhalt einer Zeile bzw. eines Hinweises, wie ihn die Aenderungsliste
+ * vergleicht (Regel 10). Nur Inhaltsfelder: Titel der Aufgaben (also Auswahl
+ * und Stelle), Bemerkung, Angabe, Hinweis — nie Faelligkeit, Verknuepfung
+ * oder Ausgabevermerk.
+ */
+export interface AenderungsStand {
+  departmentKey: string;
+  /** Weitere Stellen, die den Inhalt sehen (nur Angaben: „sichtbar für“). */
+  sichtbarFuer?: ReadonlyArray<string>;
+  /** Die Aufgaben (Option → Titel); leer bei einer Angabe. */
+  aufgaben: ReadonlyArray<{ option: string; titel: string }>;
+  /** Titel ohne eigene Aufgabe (Angabe: ihr Label). */
+  titel: string;
+  bemerkung?: string | null;
+  angabe?: string | null;
+  hinweis?: string | null;
+}
+
+/** Ein Eintrag der Aenderungsliste (`OnboardingAusstattungAenderung`, ohne Zeitstempel). */
+export interface AenderungsEintrag {
+  departmentKey: string;
+  art: AenderungsArt;
+  /** Nur Katalog- bzw. Aufgabentitel, nie Freitext. */
+  titel: string;
+}
+
+/**
+ * Der Inhalt einer Zeile fuer `aenderungsEintraege` — `null` fuer eine
+ * gestrichene Zeile und eine Angabe ohne Wert (beides ist „nicht da“). Die
+ * Titel kommen aus `sollAufgaben` (Momentaufnahme), wie die der Aufgaben.
+ */
+export function zeilenAenderungsStand(
+  z: SollAufgabenZeile & {
+    angabeSchluessel?: string | null;
+    bemerkung?: string | null;
+    angabe?: string | null;
+    sichtbarFuer?: ReadonlyArray<string> | null;
+  },
+): AenderungsStand | null {
+  if (z.gestrichenAm != null || istNichtErlaubteStelle(z.departmentKey)) return null;
+  if (z.art === "ANGABE") {
+    if (leer(z.angabe)) return null;
+    return {
+      departmentKey: z.departmentKey,
+      sichtbarFuer: [...(z.sichtbarFuer ?? [])],
+      aufgaben: [],
+      titel: istAngabeSchluessel(z.angabeSchluessel) ? ANGABEN_KATALOG[z.angabeSchluessel].label : z.bezeichnung,
+      angabe: (z.angabe ?? "").trim(),
+    };
+  }
+  return {
+    departmentKey: z.departmentKey,
+    aufgaben: sollAufgaben(z).map((a) => ({ option: a.option, titel: a.titel })),
+    titel: z.bezeichnung,
+    bemerkung: textOderNull(z.bemerkung),
+  };
+}
+
+/** Der Inhalt eines Hinweises fuer `aenderungsEintraege` — `null` ohne Text (entfernt oder geleert). */
+export function hinweisAenderungsStand(departmentKey: string, text: string | null | undefined): AenderungsStand | null {
+  if (leer(text) || istNichtErlaubteStelle(departmentKey)) return null;
+  return {
+    departmentKey,
+    aufgaben: [{ option: "", titel: HINWEIS_AUFGABE_TITEL }],
+    titel: HINWEIS_AUFGABE_TITEL,
+    hinweis: (text ?? "").trim(),
+  };
+}
+
+/**
+ * Regel 10: die Eintraege der Aenderungsliste zu EINER Aenderung — nur fuer
+ * Stellen in `informiert` (Link mit `sentAt ?? lastSentAt`); eine Stelle, die
+ * noch nichts bekommen hat, erfaehrt alles mit der ersten Mail.
+ *
+ *   - Aufgabe (Option) nur vorher → ENTFAELLT, nur nachher → NEU.
+ *   - Bemerkung, Angabe oder Hinweis geaendert → GEAENDERT fuer jede Aufgabe,
+ *     die es vorher und nachher gibt (bei Angaben: das Label).
+ *   - Stellenwechsel: ENTFAELLT fuer die alte, NEU fuer die neue Stelle.
+ *   - Angaben gehen an die eigene Stelle UND die Stellen unter „sichtbar für“.
+ *
+ * Eine reine Faelligkeitsaenderung ist kein Inhalt und ergibt nichts. Doppelte
+ * gegen noch nicht gesendete Eintraege gleicht `aenderungenSchreibenIn` ab.
+ */
+export function aenderungsEintraege(
+  vorher: AenderungsStand | null,
+  nachher: AenderungsStand | null,
+  informiert: ReadonlySet<string>,
+): AenderungsEintrag[] {
+  const stellenVon = (s: AenderungsStand | null): string[] =>
+    s ? [...new Set([s.departmentKey, ...(s.sichtbarFuer ?? [])])].filter((k) => !istNichtErlaubteStelle(k)) : [];
+  const titelVon = (s: AenderungsStand) => (s.aufgaben.length > 0 ? s.aufgaben : [{ option: "\u0000", titel: s.titel }]);
+  const anders = (a: string | null | undefined, b: string | null | undefined) => (textOderNull(a) ?? "") !== (textOderNull(b) ?? "");
+  const inhaltGeaendert =
+    !!vorher &&
+    !!nachher &&
+    (anders(vorher.bemerkung, nachher.bemerkung) ||
+      anders(vorher.angabe, nachher.angabe) ||
+      anders(vorher.hinweis, nachher.hinweis));
+
+  const eintraege: AenderungsEintrag[] = [];
+  for (const key of [...new Set([...stellenVon(vorher), ...stellenVon(nachher)])]) {
+    if (!informiert.has(key)) continue;
+    const v = vorher && stellenVon(vorher).includes(key) ? titelVon(vorher) : [];
+    const n = nachher && stellenVon(nachher).includes(key) ? titelVon(nachher) : [];
+    for (const a of v) {
+      if (!n.some((b) => b.option === a.option)) eintraege.push({ departmentKey: key, art: "ENTFAELLT", titel: a.titel });
+    }
+    for (const b of n) {
+      if (!v.some((a) => a.option === b.option)) eintraege.push({ departmentKey: key, art: "NEU", titel: b.titel });
+    }
+    if (inhaltGeaendert) {
+      for (const b of n) {
+        if (v.some((a) => a.option === b.option)) eintraege.push({ departmentKey: key, art: "GEAENDERT", titel: b.titel });
+      }
+    }
+  }
+  return eintraege;
+}
+
+// =============================================
+// Nachtrag senden (S17; Regel 10, F7)
+// =============================================
+//
+// Die Aenderungsliste (`OnboardingAusstattungAenderung`) haelt jede Aenderung
+// nach der Information einer Stelle als Eintrag NEU, GEAENDERT oder ENTFAELLT
+// fest — auch Folgen, die sich aufheben (`aenderungenSchreibenIn` laesst sie
+// bewusst stehen). Was die Stelle davon erfaehrt, rechnet `nachtragListe`
+// beim Senden zusammen; `nachtragMailFelder` macht daraus die Mailfelder.
+// Gesendet wird mit „Nachtrag senden“ (gleicher Link) und mit JEDER anderen
+// Zuweisungsmail an die Stelle (F7); bei SENT werden genau die gelesenen
+// Eintraege als gesendet markiert (Versandkern, abteilungsaufgaben-dienst.ts).
+
+/** Ein noch nicht gesendeter Eintrag der Aenderungsliste EINER Stelle. */
+export interface NachtragEintrag {
+  art: string;
+  /** Nur Katalog- bzw. Aufgabentitel, nie Freitext. */
+  titel: string;
+  erfasstAm?: Date | string | null;
+}
+
+/** Keine Aenderung. */
+export const LEERER_NACHTRAG: Readonly<NachtragListe> = Object.freeze({ neu: [], geaendert: [], entfaellt: [] });
+
+/** Ein Titel, wie Aenderungsliste und Anhebung (F22) ihn vergleichen: Leerraum zusammengezogen. */
+function titelSchluessel(titel: string): string {
+  return titel.replace(/\s+/g, " ").trim();
+}
+
+/** Eintraege in der Reihenfolge der Erfassung (`erfasstAm`, bei Gleichstand wie uebergeben). */
+function nachErfassung<T extends NachtragEintrag>(eintraege: ReadonlyArray<T>): T[] {
+  const zeit = (e: NachtragEintrag) => {
+    const d = e.erfasstAm == null ? null : e.erfasstAm instanceof Date ? e.erfasstAm : new Date(e.erfasstAm);
+    return d && !Number.isNaN(d.getTime()) ? d.getTime() : 0;
+  };
+  return eintraege
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => zeit(a.e) - zeit(b.e) || a.i - b.i)
+    .map((x) => x.e);
+}
+
+/**
+ * F22: die Titel, deren LETZTER noch nicht gesendeter Eintrag EINER Stelle NEU
+ * ist — diese Aufgaben bekommt die Stelle mit der naechsten Zuweisungsmail zum
+ * ersten Mal (wieder): nach einem Stellenwechsel zu ihr oder nach der
+ * Wiederaufnahme (F23). Die Aufgabe selbst ist dann aelter als der letzte
+ * Versand an die Stelle; `anzuhebendeAufgaben` hebt sie trotzdem an. Titel
+ * normalisiert wie in `nachtragListe`, leere fallen weg.
+ */
+export function neuGemeldeteTitel(eintraege: ReadonlyArray<NachtragEintrag>): Set<string> {
+  const letzte = new Map<string, string>();
+  for (const e of nachErfassung(eintraege)) {
+    const titel = titelSchluessel(e.titel);
+    if (titel) letzte.set(titel, e.art);
+  }
+  return new Set([...letzte].filter(([, art]) => art === "NEU").map(([titel]) => titel));
+}
+
+export type { NachtragListe };
+
+/**
+ * Regel 10: die Eintraege EINER Stelle zusammenfassen, je Titel in der
+ * Reihenfolge der Erfassung (`erfasstAm`, bei Gleichstand wie uebergeben).
+ * Entscheidend sind nur der erste und der letzte Eintrag eines Titels:
+ *
+ *   - Beginnt die Folge mit NEU, kannte die Stelle den Titel noch nicht;
+ *     sonst (GEAENDERT, ENTFAELLT) kannte sie ihn.
+ *   - Endet sie mit ENTFAELLT, ist er weg; sonst ist er da.
+ *
+ *   kannte nicht, jetzt da    → NEU          (NEU, NEU+GEAENDERT)
+ *   kannte nicht, jetzt weg   → nichts       (NEU+ENTFAELLT)
+ *   kannte, jetzt weg         → ENTFAELLT    (ENTFAELLT, GEAENDERT+ENTFAELLT)
+ *   kannte, jetzt da          → GEAENDERT    (GEAENDERT, ENTFAELLT+NEU: wieder
+ *                                             aufgenommen, die Stelle soll
+ *                                             noch einmal hinsehen)
+ *
+ * Unbekannte Arten zaehlen wie GEAENDERT. Titel ohne Text fallen weg.
+ */
+export function nachtragListe(eintraege: ReadonlyArray<NachtragEintrag>): NachtragListe {
+  const jeTitel = new Map<string, { erste: string; letzte: string }>();
+  for (const e of nachErfassung(eintraege)) {
+    const titel = titelSchluessel(e.titel);
+    if (!titel) continue;
+    const stand = jeTitel.get(titel);
+    if (stand) stand.letzte = e.art;
+    else jeTitel.set(titel, { erste: e.art, letzte: e.art });
+  }
+
+  const liste = { neu: [] as string[], geaendert: [] as string[], entfaellt: [] as string[] };
+  for (const [titel, { erste, letzte }] of jeTitel) {
+    const kannte = erste !== "NEU";
+    const da = letzte !== "ENTFAELLT";
+    if (!kannte && da) liste.neu.push(titel);
+    else if (kannte && !da) liste.entfaellt.push(titel);
+    else if (kannte && da) liste.geaendert.push(titel);
+  }
+  return liste;
+}
+
+/** Beschriftung je Art in Mail und Text („Neu: …“). */
+const NACHTRAG_ART_TEXT = { neu: "Neu", geaendert: "Geändert", entfaellt: "Entfällt" } as const;
+
+/**
+ * Mailfelder des Nachtrags (Zuweisungsmail an die Stelle):
+ *
+ *   nachtrag             Merker "ja" bzw. "" (fuer {{#nachtrag}}…{{/nachtrag}};
+ *                        renderTemplate kennt nur „nicht leer“)
+ *   nachtrag_liste       Klartext, eine flache Zeile je Titel: „Neu: …“,
+ *                        „Geändert: …“, „Entfällt: …“ — ROH, nur fuer den
+ *                        Textteil (der Mailer maskiert es im HTML trotzdem,
+ *                        FREITEXT_VARIABLEN)
+ *   nachtrag_liste_html  dieselben Zeilen als fertige, maskierte HTML-Liste
+ *
+ * Bewusst keine Bloecke je Art: renderTemplate loest nur eine Ebene auf, ein
+ * {{#neu}} im {{#nachtrag}} bliebe woertlich in der Mail stehen. Ohne
+ * Eintraege sind alle drei "".
+ */
+export function nachtragMailFelder(liste: Readonly<NachtragListe>): {
+  nachtrag: string;
+  nachtrag_liste: string;
+  nachtrag_liste_html: string;
+} {
+  const zeilen = (["neu", "geaendert", "entfaellt"] as const).flatMap((art) =>
+    liste[art].map((titel) => ({ art: NACHTRAG_ART_TEXT[art], titel: titel.replace(/\s+/g, " ").trim() })),
+  );
+  if (zeilen.length === 0) return { nachtrag: "", nachtrag_liste: "", nachtrag_liste_html: "" };
+  return {
+    nachtrag: "ja",
+    nachtrag_liste: zeilen.map((z) => `${z.art}: ${z.titel}`).join("\n"),
+    nachtrag_liste_html:
+      `<ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">` +
+      zeilen.map((z) => `<li style="margin:0 0 4px;"><strong>${z.art}:</strong> ${escapeHtml(z.titel)}</li>`).join("") +
+      `</ul>`,
+  };
+}
+
+// =============================================
+// Karte und Checkliste im Portal (S16; Mockup 6.3)
+// =============================================
+//
+// Die Karte „Ausstattung & Zugänge“ im Reiter Checkliste
+// (src/components/ausstattung/ausstattung-karte.tsx) und der Zusatz unter
+// einem Checklistenpunkt (aufgabe-zusatz.tsx) rechnen nichts selbst: Was sie
+// ueber die Uebersicht hinaus brauchen — der Stand einer Aufgabe als Text,
+// die Optionszeilen einer Auswahl, die Bemerkung je Aufgabe —, steht hier.
+
+/**
+ * Der Stand einer Aufgabe als kurzer Text (Karte, Mockup 6.3):
+ * „offen · fällig 27.01.2027“ bzw. „offen“ ohne Faelligkeit,
+ * „erledigt 20.01.2027“ bzw. „erledigt“, „entfällt“. Datum in deutscher Zeit.
+ */
+export function aufgabenStandText(a: {
+  status: AufgabenStatus;
+  faelligAm?: Date | string | null;
+  erledigtAm?: Date | string | null;
+}): string {
+  if (a.status === "entfaellt") return "entfällt";
+  if (a.status === "erledigt") {
+    const am = formatDatumDE(a.erledigtAm);
+    return am ? `erledigt ${am}` : "erledigt";
+  }
+  const faellig = formatDatumDE(a.faelligAm);
+  return faellig ? `offen · fällig ${faellig}` : "offen";
+}
+
+/** Eine Zeile unter einer Auswahl-Position der Karte: die Option und ihre Aufgabe (`null` = noch keine). */
+export interface OptionsZeile {
+  option: string;
+  aufgabe: AusstattungsAufgabeStand | null;
+}
+
+/**
+ * Die Optionen einer Auswahl-Zeile, je Option eine Zeile mit eigenem Stand
+ * (Mockup 6.3, E-A12): erst die gewaehlten in ihrer gespeicherten
+ * Reihenfolge — mit ihrer Aufgabe, solange das Nachholen sie noch nicht
+ * angelegt hat ohne —, dahinter die Aufgaben frueher gewaehlter Optionen
+ * (entfallen bzw. erledigt und abgewaehlt). Ja/Nein und Angabe: leer.
+ */
+export function optionsZeilen(z: Pick<AusstattungsZeile, "art" | "auswahl" | "aufgaben">): OptionsZeile[] {
+  if (z.art !== "AUSWAHL") return [];
+  const zu = new Map(z.aufgaben.map((a) => [a.option, a]));
+  const gewaehlt = z.auswahl.map((option) => ({ option, aufgabe: zu.get(option) ?? null }));
+  const frueher = z.aufgaben
+    .filter((a) => a.option !== "" && !z.auswahl.includes(a.option))
+    .map((a) => ({ option: a.option, aufgabe: a }));
+  return [...gewaehlt, ...frueher];
+}
+
+/**
+ * Die Bemerkung je Aufgabe (`checklistItemId` → Text und Beschriftung nach
+ * Herkunft, Regel 8) — fuer den Zusatz unter einem Checklistenpunkt. Die
+ * Bemerkung gehoert zur Position; jede ihrer Aufgaben zeigt sie. Quelle ist
+ * die Uebersicht, die nur HR_EDIT_ROLES bekommen (Regel 16) — ohne sie ein
+ * leeres Objekt, die Checkliste zeigt dann keine Bemerkung.
+ */
+export function bemerkungJeAufgabe(
+  u: Pick<AusstattungsUebersicht, "gruppen"> | null | undefined,
+): Record<string, { text: string; label: string }> {
+  const ergebnis: Record<string, { text: string; label: string }> = {};
+  for (const g of u?.gruppen ?? []) {
+    for (const z of g.zeilen) {
+      if (!z.bemerkung || leer(z.bemerkung.text)) continue;
+      for (const a of z.aufgaben) ergebnis[a.checklistItemId] = { text: z.bemerkung.text, label: z.bemerkung.label };
+    }
+  }
+  return ergebnis;
+}
+
+// =============================================
+// Aufgaben je Option, Faelligkeit, „Eilt“ (S12; Regel 6, Regel 14, E-A12, F22)
+// =============================================
+//
+// Aus der Wahl werden nach der Abgabe der Modalitaeten Checklisten-Aufgaben
+// der zustaendigen Stelle — bei einer Auswahl je gewaehlter Option eine
+// (E-A12), zu jedem ausgefuellten Hinweis an eine Stelle eine Aufgabe
+// „Hinweis der Führungskraft beachten“ (E-A14). Was fehlt, rechnet
+// `fehlendeAusstattungsAufgaben` gegen die vorhandenen Verknuepfungen; das
+// Anlegen selbst (Sperren, Schreiben, Aenderungsliste) steht in
+// src/lib/ausstattung-aufgaben.ts, das Nachholen im Onboarding-Adapter
+// (`onboardingAusstattungNachholenIn`). Die Titel stammen nur aus dem Katalog
+// (Momentaufnahme der Zeile), nie aus Freitext — sie stehen im Betreff von
+// onboarding-task-completed.
+//
+// Faelligkeit (Regel 14): Vertragsbeginn + Tage, aber nie vor dem heutigen
+// Berliner Kalendertag; liegt die Frist schon zurueck, gilt heute und die
+// Aufgabe „eilt“. Das gilt beim Anlegen (`ausstattungsFaelligkeit`) und noch
+// einmal beim Versand an die Stelle (F22, `anzuhebendeAufgaben`).
+
+/** Was `sollAufgaben` von einer Zeile (`OnboardingAusstattung`) braucht. */
+export interface SollAufgabenZeile {
+  departmentKey: string;
+  art: string;
+  bezeichnung: string;
+  /** Grundtitel der Momentaufnahme (ohne Option); leer = „<Bezeichnung> bereitstellen“. */
+  aufgabeTitel?: string | null;
+  /** Hinweis fuer die Stelle aus dem Katalog — wird `ChecklistItem.description`, nie eine Bemerkung. */
+  hinweisStelle?: string | null;
+  relativeDueDays?: number | null;
+  /** orderIndex der Position beim Speichern. */
+  reihenfolge: number;
+  auswahl: readonly string[];
+  gestrichenAm?: Date | string | null;
+}
+
+/** Eine Aufgabe, die zu einer Zeile (bzw. einem Hinweis) gehoert. */
+export interface SollAufgabe {
+  /** "" = ganze Position (Ja/Nein, Hinweis); sonst die gewaehlte Option. */
+  option: string;
+  titel: string;
+  /** Negativ: Ausstattungsaufgaben stehen vor den Hinweis-Aufgaben und vor allen Vorlagenpunkten. */
+  orderIndex: number;
+  relativeDueDays: number | null;
+  description: string | null;
+}
+
+/**
+ * Die Aufgaben einer Zeile (E-A12):
+ *
+ *   - Ja/Nein: genau eine, `option ""`.
+ *   - Auswahl: eine je gewaehlter Option, in der gespeicherten Reihenfolge
+ *     (Doppelte und leere Optionen fallen weg — die Verknuepfung
+ *     `(ausstattungId, option)` ist Primaerschluessel).
+ *   - Angabe und gestrichene Zeilen: keine.
+ *   - Eine Stelle aus NICHT_ERLAUBTE_STELLEN bekommt keine (Regel 11; die
+ *     Pruefungen davor lassen sie gar nicht erst entstehen).
+ *
+ * `orderIndex = ORDER_BASIS + reihenfolge * 100 + Index der Option`,
+ * `description` = Hinweis fuer die Stelle aus dem Katalog.
+ */
+export function sollAufgaben(zeile: SollAufgabenZeile): SollAufgabe[] {
+  if (zeile.gestrichenAm != null || istNichtErlaubteStelle(zeile.departmentKey)) return [];
+  if (zeile.art !== "JA_NEIN" && zeile.art !== "AUSWAHL") return [];
+  const optionen =
+    zeile.art === "AUSWAHL" ? [...new Set(zeile.auswahl.map((o) => o.trim()).filter((o) => o !== ""))] : [""];
+  return optionen.map((option, index) => ({
+    option,
+    titel: aufgabenTitel(zeile, option),
+    orderIndex: ORDER_BASIS + zeile.reihenfolge * 100 + index,
+    relativeDueDays: zeile.relativeDueDays ?? null,
+    description: textOderNull(zeile.hinweisStelle),
+  }));
+}
+
+/**
+ * Die Aufgabe zu einem Hinweis an eine Stelle (E-A14, F20): Titel
+ * HINWEIS_AUFGABE_TITEL, ortsneutrale Beschreibung, Faelligkeit
+ * HINWEIS_FAELLIG_TAGE vor dem Vertragsbeginn, `orderIndex` =
+ * HINWEIS_ORDER_BASIS + Index der Stelle (Reihenfolge der Abteilungskarte
+ * ueber `stellen`, die Stellen aller Hinweise des Vorgangs).
+ */
+export function hinweisSollAufgabe(departmentKey: string, stellen: Iterable<string>): SollAufgabe {
+  const rang = stellenRang([...stellen, departmentKey]);
+  return {
+    option: "",
+    titel: HINWEIS_AUFGABE_TITEL,
+    orderIndex: HINWEIS_ORDER_BASIS + (rang.get(departmentKey) ?? 0),
+    relativeDueDays: HINWEIS_FAELLIG_TAGE,
+    description: HINWEIS_AUFGABE_BESCHREIBUNG,
+  };
+}
+
+/** Der Stand eines Vorgangs, gegen den das Nachholen rechnet (`ausstattungsStandLaden`). */
+export interface AusstattungsStand {
+  zeilen: ReadonlyArray<SollAufgabenZeile & { id: string }>;
+  /** Vorhandene Verknuepfungen Zeile/Option → Aufgabe (auch entfallene). */
+  verknuepfungen: ReadonlyArray<{ ausstattungId: string; option: string }>;
+  hinweise: ReadonlyArray<{
+    departmentKey: string;
+    text: string | null;
+    checklistItemId: string | null;
+    inhaltGeleertAm?: Date | string | null;
+  }>;
+}
+
+/** Eine Aufgabe, die angelegt werden muss — mit Herkunft und Stelle. */
+export type FehlendeAufgabe = SollAufgabe & { departmentKey: string } & (
+    | { herkunft: "AUSSTATTUNG"; ausstattungId: string }
+    | { herkunft: "HINWEIS"; ausstattungId: null }
+  );
+
+/**
+ * Was dem Vorgang an Aufgaben fehlt (Regel 6): je Zeile `sollAufgaben` ohne
+ * die Optionen, zu denen es schon eine Verknuepfung gibt — auch eine
+ * entfallene Aufgabe zaehlt als vorhanden (sie wird wieder geoeffnet, nie
+ * doppelt angelegt, F23) —, dazu je Hinweis ohne Aufgabe eine
+ * Hinweis-Aufgabe. Ein Hinweis mit leerem Text (entfernt oder geleert) und
+ * einer an eine nicht erlaubte Stelle erzeugen keine. Reihenfolge: Zeilen wie
+ * gespeichert, dann die Hinweise in der Reihenfolge der Abteilungskarte.
+ */
+export function fehlendeAusstattungsAufgaben(stand: AusstattungsStand): FehlendeAufgabe[] {
+  const vorhanden = new Set(stand.verknuepfungen.map((v) => `${v.ausstattungId}\u0000${v.option}`));
+  const fehlend: FehlendeAufgabe[] = [];
+  for (const zeile of stand.zeilen) {
+    for (const soll of sollAufgaben(zeile)) {
+      if (vorhanden.has(`${zeile.id}\u0000${soll.option}`)) continue;
+      fehlend.push({ ...soll, departmentKey: zeile.departmentKey, herkunft: "AUSSTATTUNG", ausstattungId: zeile.id });
+    }
+  }
+  const hinweise = stand.hinweise.filter(
+    (h) => !leer(h.text) && h.inhaltGeleertAm == null && !istNichtErlaubteStelle(h.departmentKey),
+  );
+  const stellen = hinweise.map((h) => h.departmentKey);
+  const rang = stellenRang(stellen);
+  for (const h of [...hinweise].sort((a, b) => (rang.get(a.departmentKey) ?? 0) - (rang.get(b.departmentKey) ?? 0))) {
+    if (h.checklistItemId != null) continue;
+    fehlend.push({
+      ...hinweisSollAufgabe(h.departmentKey, stellen),
+      departmentKey: h.departmentKey,
+      herkunft: "HINWEIS",
+      ausstattungId: null,
+    });
+  }
+  return fehlend;
+}
+
+/** Millisekunden eines Zeitpunkts; `null` fuer fehlende oder unlesbare Werte. */
+function zeitwert(wert: Date | string | null | undefined): number | null {
+  if (wert == null || wert === "") return null;
+  const t = (wert instanceof Date ? wert : new Date(wert)).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * Faelligkeit einer Ausstattungs- oder Hinweis-Aufgabe beim Anlegen
+ * (Regel 14): `max(Vertragsbeginn + tage, heute)` in Berliner Kalendertagen
+ * (`faelligkeitAus`, Mitternacht UTC des Kalendertags wie bei allen
+ * Faelligkeiten der Checkliste). `eilt`, wenn die regulaere Frist vor heute
+ * laege und deshalb auf heute angehoben ist. Ohne Vertragsbeginn oder ohne
+ * Tagesangabe `null` — die Aufgabe bleibt ohne Faelligkeit (null heisst nicht 0).
+ */
+export function ausstattungsFaelligkeit(
+  beginn: Date | string | null | undefined,
+  tage: number | null | undefined,
+  jetzt: Date,
+): { dueDate: Date; eilt: boolean } | null {
+  const regulaer = faelligkeitAus(beginn, tage);
+  const heute = faelligkeitAus(jetzt, 0);
+  if (!regulaer || !heute) return null;
+  return regulaer.getTime() < heute.getTime() ? { dueDate: heute, eilt: true } : { dueDate: regulaer, eilt: false };
+}
+
+/**
+ * F22: Welche Aufgaben einer Stelle vor einer Zuweisungsmail (Informieren,
+ * Erneut senden, Link erneuern, Nachtrag — nie „Erinnern“) auf heute
+ * angehoben werden. Nur offene, nicht entfallene Aufgaben, die die Stelle
+ * noch mit keiner Mail bekommen hat, und deren Faelligkeit vor dem heutigen
+ * Berliner Kalendertag liegt. „Noch nicht bekommen“ heisst: ohne Versand
+ * jede; sonst `createdAt` nach `letzterVersand` ODER ihr Titel steht in
+ * `neuGemeldet` (`neuGemeldeteTitel` der offenen Aenderungsliste DIESER
+ * Stelle) — eine per Stellenwechsel zugezogene oder nach F23 wieder
+ * aufgenommene Aufgabe ist aelter als der letzte Versand, die Stelle bekommt
+ * sie trotzdem erst jetzt. Ohne Faelligkeit bleibt eine Aufgabe ohne. Eine
+ * schon zugestellte Aufgabe behaelt ihre Frist — sonst setzte „Erneut senden“
+ * eine ueberfaellige Aufgabe still auf „heute“ zurueck. Der Aufrufer reicht
+ * nur Ausstattungs- und Hinweis-Aufgaben herein (Vorlagenaufgaben werden nie
+ * angehoben).
+ */
+export function anzuhebendeAufgaben(
+  aufgaben: ReadonlyArray<{
+    id: string;
+    dueDate: Date | string | null;
+    createdAt: Date | string;
+    isCompleted: boolean;
+    entfaelltAm?: Date | string | null;
+    /** Titel der Aufgabe — nur fuer den Abgleich mit `neuGemeldet`. */
+    title?: string | null;
+  }>,
+  letzterVersand: Date | string | null,
+  jetzt: Date,
+  neuGemeldet: ReadonlySet<string> = new Set(),
+): string[] {
+  const heute = faelligkeitAus(jetzt, 0)?.getTime();
+  if (heute == null) return [];
+  const versand = zeitwert(letzterVersand);
+  return aufgaben
+    .filter((a) => {
+      if (a.isCompleted || a.entfaelltAm != null) return false;
+      const faellig = zeitwert(a.dueDate);
+      if (faellig == null || faellig >= heute) return false;
+      if (versand == null) return true;
+      const angelegt = zeitwert(a.createdAt);
+      if (angelegt != null && angelegt > versand) return true;
+      return a.title != null && neuGemeldet.has(titelSchluessel(a.title));
+    })
+    .map((a) => a.id);
+}
+
+/**
+ * Warnung der Karte vor dem Versand (Regel 14): Liegt der Vertragsbeginn
+ * naeher als der Vorlauf einer Position (Tage VOR dem Beginn), ist die Frist
+ * heute schon verstrichen — „bis Dienstbeginn voraussichtlich nicht verfügbar
+ * – Übergangslösung klären“. Ohne Vorlauf (keine Tagesangabe oder eine Frist
+ * am bzw. nach dem Beginn) und ohne Vertragsbeginn keine Warnung.
+ */
+export function vorlaufWarnung(
+  tage: number | null | undefined,
+  beginn: Date | string | null | undefined,
+  jetzt: Date,
+): string | null {
+  if (tage == null || !Number.isFinite(tage) || tage >= 0) return null;
+  const regulaer = faelligkeitAus(beginn, tage);
+  const heute = faelligkeitAus(jetzt, 0);
+  if (!regulaer || !heute) return null;
+  return regulaer.getTime() < heute.getTime() ? MELDUNGEN.VORLAUF_WARNUNG : null;
+}
+
+// =============================================
+// Sammelmail an HR am Werktag vor Dienstbeginn (S18; E-A18)
+// =============================================
+//
+// Der Lauf „Onboarding-Erinnerungen“ (Abschnitt 4, src/lib/ausstattung-lauf.ts)
+// schickt dem HR-Postfach je Vorgang EINE Mail mit allen noch offenen
+// Ausstattungs- und Hinweis-Aufgaben — nur Titel und Stelle, nie Bemerkung,
+// Angabe oder Hinweistext. Gerechnet wird in Berliner Kalendertagen
+// (`faelligkeitAus`, Mitternacht UTC des Kalendertags), Werktage sind Mo–Fr.
+// Feiertage kennt die Rechnung nicht (Feinplan, Abschnitt 5, Frage 1): Das
+// Fenster reicht deshalb bis EINSCHLIESSLICH Dienstbeginn — ein Feiertag oder
+// ein ausgefallener Lauf verschiebt die Mail nur, verhindert sie nicht.
+
+/** Ereignis der Sammelmail (Katalog src/lib/events.ts, ohne Webhook: EVENTS_OHNE_WEBHOOK). */
+export const SAMMELMAIL_EVENT = "onboarding-ausstattung-offen";
+
+/** Sonntag und Samstag (`getUTCDay` eines Kalendertags in Mitternacht UTC). */
+const WOCHENENDE = new Set([0, 6]);
+
+/**
+ * Der letzte Werktag (Mo–Fr) VOR dem Berliner Kalendertag von `datum`, als
+ * Mitternacht UTC dieses Tages: Montag → Freitag, Dienstag → Montag, Samstag
+ * und Sonntag → Freitag. Feiertage zaehlen als Werktag. Ein unlesbares Datum
+ * ergibt ein ungueltiges `Date` (`getTime()` ist NaN).
+ */
+export function letzterWerktagVor(datum: Date | string): Date {
+  const tag = faelligkeitAus(datum, -1);
+  if (!tag) return new Date(Number.NaN);
+  while (WOCHENENDE.has(tag.getUTCDay())) tag.setUTCDate(tag.getUTCDate() - 1);
+  return tag;
+}
+
+/**
+ * Ist heute der Tag der Sammelmail? Fällig, wenn
+ * `letzterWerktagVor(beginn) <= heute <= beginn` (Berliner Kalendertage). Ohne
+ * Vertragsbeginn nie. Beispiel: Dienstbeginn Montag → fällig Freitag,
+ * Samstag, Sonntag und Montag (der Merker am Vorgang sorgt dafuer, dass sie
+ * nur einmal hinausgeht).
+ */
+export function sammelmailFaellig(vertragsbeginn: Date | string | null | undefined, jetzt: Date): boolean {
+  const beginn = faelligkeitAus(vertragsbeginn, 0);
+  const heute = faelligkeitAus(jetzt, 0);
+  if (!beginn || !heute) return false;
+  const ab = letzterWerktagVor(beginn).getTime();
+  return Number.isFinite(ab) && ab <= heute.getTime() && heute.getTime() <= beginn.getTime();
+}
+
+/**
+ * Anzeigename einer Stelle wie in der Karte: am wirksamen Arbeitsort
+ * (`empfaengerAufloesen`, Eintrag der Einrichtung vor dem zentralen), HR als
+ * „Personalabteilung“, sonst `abteilungLabel` — nie der Rohschluessel einer
+ * bekannten Stelle. Ohne Schluessel "". Sammelmail (E-A18) und Rueckfrage beim
+ * Abschluss (E-A19) nennen die Stelle so.
+ */
+export function stelleAmArbeitsort(
+  key: string | null | undefined,
+  arbeitsortId: string,
+  konfigs: ReadonlyArray<AbteilungsKonfig>,
+): string {
+  if (!key) return "";
+  if (key === DEPARTMENT_KEYS.HR) return abteilungLabel(key);
+  return empfaengerAufloesen({ departmentKey: key, organizationId: arbeitsortId, konfigs, fuehrungskraft: null })
+    .departmentName;
+}
+
+/** Titel einer Aufgabe in EINER Zeile (Zeilenumbrueche werden Leerzeichen). */
+function einzeiligerTitel(titel: string): string {
+  return titel.replace(/\s*(\r\n|\r|\n)\s*/g, " ").trim();
+}
+
+/** Eine offene Ausstattungs- oder Hinweis-Aufgabe, soweit die Sammelmail sie liest. */
+export interface SammelmailAufgabe {
+  title: string;
+  /** Zustaendige Stelle (Schluessel). */
+  assignee: string | null;
+}
+
+/**
+ * Die Liste der Sammelmail („Titel – Stelle“ je Zeile, keine Bemerkungen):
+ *
+ *   anzahl_offen       Zahl der Zeilen
+ *   offene_liste       Klartext, eine Zeile je Aufgabe — ROH, nur fuer den
+ *                      Textteil (der Mailer maskiert ihn im HTML-Teil
+ *                      zusaetzlich, FREITEXT_VARIABLEN)
+ *   offene_liste_html  dieselben Zeilen als fertige `<ul>` im Stil der
+ *                      Aufgabenliste, maskiert
+ *
+ * Name der Stelle wie in der Karte: am wirksamen Arbeitsort
+ * (`empfaengerAufloesen`, Eintrag der Einrichtung vor dem zentralen), HR als
+ * „Personalabteilung“, sonst `abteilungLabel` — nie der Rohschluessel einer
+ * bekannten Stelle. Ein Titel ist einzeilig (Zeilenumbrueche werden Leerzeichen).
+ * Ohne Aufgabe beide Listen "".
+ */
+export function sammelmailListenFelder(opts: {
+  aufgaben: ReadonlyArray<SammelmailAufgabe>;
+  /** Wirksamer Arbeitsort (`onboardingEmpfaengerEinrichtung`). */
+  arbeitsortId: string;
+  konfigs: ReadonlyArray<AbteilungsKonfig>;
+}): { anzahl_offen: number; offene_liste: string; offene_liste_html: string } {
+  const zeilen = opts.aufgaben.map((a) => {
+    const titel = einzeiligerTitel(a.title);
+    const stelle = stelleAmArbeitsort(a.assignee, opts.arbeitsortId, opts.konfigs);
+    return stelle ? `${titel} – ${stelle}` : titel;
+  });
+  if (zeilen.length === 0) return { anzahl_offen: 0, offene_liste: "", offene_liste_html: "" };
+  return {
+    anzahl_offen: zeilen.length,
+    offene_liste: zeilen.map((z) => `- ${z}`).join("\n"),
+    offene_liste_html:
+      '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+      zeilen.map((z) => `<li style="margin:0 0 4px;">${escapeHtml(z)}</li>`).join("") +
+      "</ul>",
+  };
+}
+
+// =============================================
+// Abschluss mit offener Ausstattung (S19; E-A19)
+// =============================================
+//
+// „Vorgang abschließen“ friert die Aufgaben ein: Nach COMPLETED ist der Link
+// der Stelle nur noch lesbar, abhaken geht nicht mehr. Sind noch Ausstattungs-
+// oder Hinweis-Aufgaben offen (entfallene zaehlen nicht — sie sind
+// `isCompleted`, F2), schliesst PATCH /api/onboarding/[id] deshalb nur mit
+// `bestaetigt: true` ab; sonst 409 `{ error, grund: "AUSSTATTUNG_OFFEN", offen }`.
+// Gezaehlt wird in der Transaktion NACH dem bedingten Statuswechsel (der den
+// Vorgang zuerst sperrt). Die Rueckfrage zeigt die Liste
+// (src/components/ausstattung/abschluss-dialog.tsx). Offene Aufgaben aus der
+// Checklisten-Vorlage blockieren den Abschluss weiterhin nicht.
+
+/** `grund` der 409 beim Abschluss mit offener Ausstattung. */
+export const ABSCHLUSS_AUSSTATTUNG_OFFEN = "AUSSTATTUNG_OFFEN";
+
+/** Eine offene Aufgabe in der Rueckfrage beim Abschluss: Titel und Stelle (wie in der Karte). */
+export interface AbschlussOffeneAufgabe {
+  titel: string;
+  stelle: string;
+}
+
+/**
+ * Die offenen Ausstattungs- und Hinweis-Aufgaben fuer die 409 beim Abschluss —
+ * Titel einzeilig, Stelle wie in Karte und Sammelmail (`stelleAmArbeitsort`).
+ * Nie Bemerkung, Angabe oder Hinweistext; Reihenfolge wie uebergeben.
+ */
+export function abschlussOffeneAufgaben(opts: {
+  aufgaben: ReadonlyArray<SammelmailAufgabe>;
+  /** Wirksamer Arbeitsort (`onboardingEmpfaengerEinrichtung`). */
+  arbeitsortId: string;
+  konfigs: ReadonlyArray<AbteilungsKonfig>;
+}): AbschlussOffeneAufgabe[] {
+  return opts.aufgaben.map((a) => ({
+    titel: einzeiligerTitel(a.title),
+    stelle: stelleAmArbeitsort(a.assignee, opts.arbeitsortId, opts.konfigs),
+  }));
+}
+
+/** Text der 409 beim Abschluss: wie viele offen sind und was der Abschluss mit ihnen macht. */
+export function abschlussOffenMeldung(anzahl: number): string {
+  const was = anzahl === 1 ? "ist noch 1 Aufgabe" : `sind noch ${anzahl} Aufgaben`;
+  return `Aus „Ausstattung & Zugänge“ ${was} offen. Nach dem Abschluss können die Stellen sie nicht mehr abhaken – abschließen nur mit Bestätigung.`;
+}
+
+// =============================================
+// Mail an die Stelle: Angaben und Hinweis (S13; Regel 7)
+// =============================================
+//
+// Was eine Stelle ausser ihren Aufgaben erfaehrt: die Angaben (Art „Angabe“,
+// nur aus ANGABEN_KATALOG — E-A13), die ihr selbst gehoeren oder fuer sie
+// freigegeben sind (`sichtbarFuer`), und der Hinweis der Fuehrungskraft an
+// genau diese Stelle. Beides steht im Infokasten der Zuweisungsmail
+// (`{{#angaben_html}}`) und — ab S14 — im Block „Nur für …“ der Link-Seite.
+// Erinnerung und Sammelmail tragen es bewusst nicht. Bemerkungen gehoeren
+// dagegen zur Aufgabe (Aufgabenliste, `aufgabenlisteMailFelder`).
+//
+// Datenschutz: Angaben und Hinweis sind Freitext. Im Klartext stehen sie roh
+// (der Mailer maskiert `angaben` im HTML-Teil zusaetzlich, FREITEXT_VARIABLEN),
+// im HTML-Teil baut `angabenMailFelder` fertige, maskierte Zeilen. Nie im
+// Betreff (`betreffOhne` der Onboarding-Abteilungsereignisse).
+
+/** Beschriftung des Hinweises im Infokasten — wie der Titel seiner Aufgabe („Hinweis der Führungskraft beachten“). */
+export const HINWEIS_ANGABE_LABEL = "Hinweis der Führungskraft";
+
+/** Eine Zeile von `OnboardingAusstattung`, soweit `angabenFuer` sie liest. */
+export interface AngabenZeile {
+  departmentKey: string;
+  art: string;
+  angabeSchluessel?: string | null;
+  bezeichnung: string;
+  angabe?: string | null;
+  sichtbarFuer?: readonly string[] | null;
+  reihenfolge?: number | null;
+  gestrichenAm?: Date | string | null;
+  inhaltGeleertAm?: Date | string | null;
+}
+
+/** Ein Hinweis an eine Stelle (`OnboardingStellenHinweis`), soweit `angabenFuer` ihn liest. */
+export interface AngabenHinweis {
+  departmentKey: string;
+  text: string | null;
+  inhaltGeleertAm?: Date | string | null;
+}
+
+/** Was eine Stelle zu lesen bekommt. */
+export interface AngabenFuerStelle {
+  angaben: { label: string; wert: string }[];
+  hinweis: string | null;
+}
+
+/** Ohne Angaben und ohne Hinweis. */
+export const KEINE_ANGABEN: Readonly<AngabenFuerStelle> = Object.freeze({ angaben: [], hinweis: null });
+
+/**
+ * Angaben und Hinweis fuer EINE Stelle (Regel 7):
+ *
+ *   - Angaben: Zeilen der Art ANGABE, die der Stelle gehoeren oder deren
+ *     `sichtbarFuer` sie nennt — nicht gestrichen, nicht geleert (E-A22), mit
+ *     Inhalt. Label aus ANGABEN_KATALOG (sonst die Bezeichnung der
+ *     Momentaufnahme). Die eigenen zuerst, dann die freigegebenen, je nach
+ *     `reihenfolge` und Bezeichnung.
+ *   - Hinweis: nur der an genau diese Stelle, getrimmt; leer oder geleert →
+ *     `null`.
+ */
+export function angabenFuer(
+  departmentKey: string,
+  zeilen: ReadonlyArray<AngabenZeile>,
+  hinweise: ReadonlyArray<AngabenHinweis>,
+): AngabenFuerStelle {
+  const sichtbar = zeilen
+    .filter(
+      (z) =>
+        z.art === "ANGABE" &&
+        z.gestrichenAm == null &&
+        z.inhaltGeleertAm == null &&
+        !leer(z.angabe) &&
+        (z.departmentKey === departmentKey || (z.sichtbarFuer ?? []).includes(departmentKey)),
+    )
+    .sort(
+      (a, b) =>
+        Number(b.departmentKey === departmentKey) - Number(a.departmentKey === departmentKey) ||
+        (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0) ||
+        a.bezeichnung.localeCompare(b.bezeichnung, "de"),
+    );
+  const hinweis = hinweise.find(
+    (h) => h.departmentKey === departmentKey && h.inhaltGeleertAm == null && !leer(h.text),
+  );
+  return {
+    angaben: sichtbar.map((z) => ({
+      label: istAngabeSchluessel(z.angabeSchluessel) ? ANGABEN_KATALOG[z.angabeSchluessel].label : z.bezeichnung,
+      wert: (z.angabe ?? "").trim(),
+    })),
+    hinweis: hinweis ? (hinweis.text ?? "").trim() : null,
+  };
+}
+
+/**
+ * Mailfelder der Angaben (Zuweisungsmail an die Stelle):
+ *
+ *   angaben       Klartext, eine Zeile je Angabe („Unterrichtsfächer: Chemie,
+ *                 Sport“), der Hinweis als letzte Zeile (mehrzeilig
+ *                 eingerueckt) — ROH, nur fuer den Textteil
+ *   angaben_html  dieselben Zeilen als fertige Tabellenzeilen im Stil des
+ *                 Infokastens (`<tr><td …>Label / Wert</td></tr>`), Label und
+ *                 Wert mit escapeHtml, Zeilenumbrueche als <br>
+ *
+ * Beide "", wenn es nichts gibt — der Block `{{#angaben_html}}` entfaellt.
+ */
+export function angabenMailFelder(a: Readonly<AngabenFuerStelle>): { angaben: string; angaben_html: string } {
+  const zeilen = [
+    ...a.angaben.map((x) => ({ label: x.label, wert: x.wert.trim() })),
+    ...(a.hinweis && a.hinweis.trim() ? [{ label: HINWEIS_ANGABE_LABEL, wert: a.hinweis.trim() }] : []),
+  ].filter((z) => z.wert !== "");
+  if (zeilen.length === 0) return { angaben: "", angaben_html: "" };
+  const umbruch = /\r\n|\r|\n/g;
+  return {
+    angaben: zeilen.map((z) => `${z.label}: ${z.wert.replace(umbruch, "\n  ")}`).join("\n"),
+    angaben_html: zeilen
+      .map(
+        (z) =>
+          `<tr><td style="padding:0 16px 16px;">` +
+          `<p style="margin:0 0 4px;color:#6b7280;font-size:12px;">${escapeHtml(z.label)}</p>` +
+          `<p style="margin:0;color:#374151;font-size:14px;">${escapeHtml(z.wert).replace(umbruch, "<br>")}</p>` +
+          `</td></tr>`,
+      )
+      .join(""),
+  };
+}
+
+// =============================================
+// Fortschritt ohne Entfallene, Vorschau im Dialog (S14; F2, Mockups 6.4 und 6.5)
+// =============================================
+//
+// Eine von HR gestrichene Aufgabe bleibt als Zeile stehen, „entfällt“ und gilt
+// als erledigt (`isCompleted`, F2) — damit sie keine Erinnerung ausloest und
+// keinen Link offen haelt. Gezaehlt wird sie trotzdem NIRGENDS: weder im
+// Zaehler noch im Nenner. Sonst stuende „6/6 erledigt“, obwohl zwei davon
+// gestrichen sind, und Link-Seite, Kopfzeile, Balken und Reiter zeigten
+// verschiedene Zahlen. Deshalb gibt es genau EINE Rechnung.
+
+/** Fortschritt einer Checkliste (bzw. der Aufgaben einer Stelle). */
+export interface ChecklistFortschritt {
+  /** Aufgaben ohne die entfallenen. */
+  gesamt: number;
+  /** Davon erledigt (entfallene nie). */
+  erledigt: number;
+  /** Ganze Prozent; ohne zaehlende Aufgabe 0. */
+  prozent: number;
+  /** Alles erledigt — nur, wenn es mindestens eine zaehlende Aufgabe gibt. */
+  alleErledigt: boolean;
+}
+
+/**
+ * Der Fortschritt OHNE entfallene Aufgaben (F2) — die einzige Rechnung fuer
+ * Link-Seite, Portal, Stepper, PDF und `progress` des Portal-PATCH. Entfallen
+ * ist eine Aufgabe mit `entfaelltAm` (Datenbankzeile) oder `entfaellt: true`
+ * (Antwort der Link-Seite). Nur entfallene Aufgaben: `gesamt 0`,
+ * `alleErledigt false` — eine Stelle, deren Aufgaben alle gestrichen sind,
+ * hat nichts „erledigt“.
+ */
+export function checklistFortschritt(
+  items: ReadonlyArray<{ isCompleted: boolean; entfaelltAm?: Date | string | null; entfaellt?: boolean }>,
+): ChecklistFortschritt {
+  const zaehlend = items.filter((i) => i.entfaelltAm == null && i.entfaellt !== true);
+  const gesamt = zaehlend.length;
+  const erledigt = zaehlend.filter((i) => i.isCompleted).length;
+  return {
+    gesamt,
+    erledigt,
+    prozent: gesamt > 0 ? Math.round((erledigt / gesamt) * 100) : 0,
+    alleErledigt: gesamt > 0 && erledigt === gesamt,
+  };
+}
+
+/**
+ * Die Zeile unter einer Stelle im Dialog „Abteilungen informieren“
+ * (Mockup 6.4): „davon 5 aus „Ausstattung & Zugänge“, 2 mit Bemerkung“.
+ * Gezaehlt sind die offenen Aufgaben, die die Mail tragen wird
+ * (`ZeilenVorschau.ausstattung`/`mitBemerkung` aus `abteilungsZeilenBauen`),
+ * nicht nur die drei sichtbaren. Ohne Ausstattungsaufgabe `null` — die Zeile
+ * entfaellt.
+ */
+export function ausstattungVorschauSatz(
+  vorschau: { ausstattung?: number | null; mitBemerkung?: number | null } | null | undefined,
+): string | null {
+  const anzahl = vorschau?.ausstattung ?? 0;
+  if (anzahl <= 0) return null;
+  const bemerkung = vorschau?.mitBemerkung ?? 0;
+  return `davon ${anzahl} aus „${AUSSTATTUNG_KATEGORIE}“${bemerkung > 0 ? `, ${bemerkung} mit Bemerkung` : ""}`;
 }
 
 // =============================================
@@ -3016,4 +4392,78 @@ export function arbeitsortSperrGrund(v: { linkErzeugt: boolean; hrStatus: boolea
   if (v.hrStatus) return MELDUNGEN.ARBEITSORT_VORGANG_GEPRUEFT;
   if (v.linkErzeugt) return MELDUNGEN.ARBEITSORT_LINK_ERZEUGT;
   return null;
+}
+
+// =============================================
+// Loeschfrist der Freitexte (S20; E-A22)
+// =============================================
+//
+// Onboarding-Vorgaenge werden nie geloescht. Bemerkungen, Angaben und
+// Hinweise sind aber Freitext der Fuehrungskraft bzw. von HR und gehoeren
+// nicht dauerhaft in die Datenbank: Der Lauf „Aufbewahrung erzeugter
+// Dokumente“ leert sie FREITEXT_AUFBEWAHRUNG_MONATE nach Abschluss
+// (`completedAt`) oder Abbruch (`expiredAt`, F12) — die Zeilen bleiben als
+// Nachweis stehen (`inhaltGeleertAm`, src/lib/ausstattung-lauf.ts). Die Frist
+// bestaetigt der DSB (A0).
+
+/**
+ * Stichtag der Loeschfrist: Beginn des Berliner Kalendertags, der
+ * FREITEXT_AUFBEWAHRUNG_MONATE vor dem heutigen liegt. Was davor
+ * abgeschlossen bzw. abgebrochen wurde (`< grenze`), wird geleert.
+ *
+ * Kalendarisch, nicht in Tagen: Monate mit Monatsende gekappt (31.08. →
+ * 28.02., im Schaltjahr 29.02.; `monateSpaeter`). Der Tag ist der Berliner
+ * Kalendertag von `jetzt` (der Container laeuft in UTC — am 01.09. um 0:30 Uhr
+ * deutscher Zeit ist es dort noch der 31.08.), die Grenze dessen Mitternacht
+ * in deutscher Zeit (`beginnDesBerlinerTages`). So bleibt jeder Freitext
+ * mindestens sechs volle Monate stehen, und ein Lauf am selben Tag rechnet
+ * immer dieselbe Grenze.
+ */
+export function freitextGrenze(jetzt: Date): Date {
+  return beginnDesBerlinerTages(monateSpaeter(heuteInBerlin(jetzt), -FREITEXT_AUFBEWAHRUNG_MONATE));
+}
+
+// =============================================
+// Brief-Platzhalter {ausstattung_liste} (S20; E-A25)
+// =============================================
+//
+// Die neue Person erfaehrt vor Dienstbeginn, was fuer sie bereitsteht — ueber
+// eine Brief-Vorlage („Was Sie am ersten Tag erhalten“), die HR selbst unter
+// Brief-Vorlagen anlegt und im Dokumentenpaket verschickt; keine neue Mail.
+// Der Platzhalter nennt nur Katalogtitel und gewaehlte Optionen: NIE
+// Bemerkungen, Angaben oder Hinweise (Freitext, Regel 16) und nie Erstzugaenge
+// (Passwoerter gehen nie ueber das Portal).
+
+/** Eine Zeile von `OnboardingAusstattung`, soweit `ausstattungListe` sie liest. */
+export interface BriefListenZeile {
+  departmentKey: string;
+  art: string;
+  bezeichnung: string;
+  auswahl: ReadonlyArray<string>;
+  reihenfolge: number;
+  gestrichenAm?: Date | string | null;
+}
+
+/**
+ * Der Wert von `{ausstattung_liste}`: je gewaehlter, nicht gestrichener
+ * Position eine Zeile — „Bezeichnung“ (Ja/Nein) bzw. „Bezeichnung: Option,
+ * Option“ (Auswahl, in der gewaehlten Reihenfolge). Angaben fehlen (sie sind
+ * Freitext fuer die Stellen), eine Auswahl ohne Option ebenso. Reihenfolge wie
+ * im Formular: nach Stelle, dann Katalogreihenfolge, dann Bezeichnung.
+ * Zeilenumbrueche im Titel werden zu Leerzeichen (eine Zeile je Position —
+ * die Brief-Vorlage setzt die Umbrueche, `linebreaks: true`). Nichts gewaehlt:
+ * "" (der Resolver setzt den Platzhalter dann nicht).
+ */
+export function ausstattungListe(zeilen: ReadonlyArray<BriefListenZeile>): string {
+  const eintraege = zeilen.flatMap((z) => {
+    if (z.gestrichenAm != null || leer(z.bezeichnung)) return [];
+    const bezeichnung = einzeiligerTitel(z.bezeichnung);
+    if (z.art === "JA_NEIN") return [{ ...z, text: bezeichnung }];
+    if (z.art !== "AUSWAHL") return [];
+    const optionen = [...new Set(z.auswahl.map(einzeiligerTitel).filter((o) => o !== ""))];
+    return optionen.length > 0 ? [{ ...z, text: `${bezeichnung}: ${optionen.join(", ")}` }] : [];
+  });
+  return nachStelleSortiert(eintraege.map((e) => ({ ...e, orderIndex: e.reihenfolge })))
+    .map((e) => e.text)
+    .join("\n");
 }

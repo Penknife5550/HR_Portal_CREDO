@@ -30,20 +30,25 @@
  * dessen Haken (READ COMMITTED). Wer zuletzt committet, setzt "fertig" — genau
  * einmal. Reihenfolge der Sperren immer: Links (nach Schluessel sortiert),
  * dann Aufgaben — alle Wege gleich (Link, Portal, faelligkeitenVerschieben und
- * faelligkeitenSetzen), sonst droht eine Verklemmung. Nach der Sperre prueft
+ * faelligkeitenSetzen), sonst droht eine Verklemmung. Im Onboarding sperrt der
+ * Link-Weg davor den Vorgang (bedingt auf „laufend“, Ausstattung & Zugaenge,
+ * E-A19) — wie Karte und Nachholen: Vorgang → Links → Aufgaben. Nach der Sperre prueft
  * der Link-Weg erneut, ob die Aufgabe noch seiner Abteilung gehoert (HR kann
  * sie in der Zwischenzeit umgehaengt haben).
  * Wie bei statusAbgleichen (onboarding-status-abgleich.ts) ist die
  * Aufrufreihenfolge mit Mocks getestet, nicht das Sperrverhalten von Postgres.
  *
  * Mails gehen NACH dem Commit hinaus und nur bei einem echten Wechsel:
- *   - *-task-completed (an HR, An-Feld in der Vorlage): Aufgabe offen →
- *     erledigt ueber den Link. Im Offboarding-Portal nur fuer Aufgaben einer
- *     Link-Abteilung (das eigene Haekchen einer HR-Aufgabe meldet HR nicht an
- *     sich selbst); im Onboarding-Portal NIE (Entscheidung Paket 5).
+ *   - *-task-completed (an HR): Aufgabe offen → erledigt ueber den Link. Im
+ *     Offboarding-Portal nur fuer Aufgaben einer Link-Abteilung (das eigene
+ *     Haekchen einer HR-Aufgabe meldet HR nicht an sich selbst); im
+ *     Onboarding-Portal NIE (Entscheidung Paket 5). Offboarding: An-Feld der
+ *     Vorlage. Onboarding (Paket A3, E-A17): an das HR-Postfach
+ *     (`{{hr_postfach}}`) und AUCH bei einem neuen, nicht leeren Kommentar
+ *     ueber den Link — abhaken plus Kommentar gibt genau eine Mail.
  *   - *-department-completed (an die Abteilung): Abteilung offen → fertig, nur
  *     ueber den Link (hakt HR im Portal ab, bestaetigt HR nichts).
- * Nur-Kommentar-Aenderungen loesen keine Mail aus.
+ * Im Offboarding loesen Nur-Kommentar-Aenderungen keine Mail aus.
  */
 
 import type { Prisma } from "@prisma/client";
@@ -52,12 +57,13 @@ import { triggerWebhooks } from "@/lib/webhooks";
 import { offboardingMailFelder } from "@/lib/offboarding-mail";
 import { onboardingAbteilungsMailFelder } from "@/lib/onboarding-abteilung-mail";
 import { mitarbeiterName } from "@/lib/onboarding-spuren";
-import { canAccessProcess, CHECKLIST_ROLES, type SessionPayload } from "@/lib/permissions";
+import { canAccessProcess, CHECKLIST_ROLES, HR_EDIT_ROLES, type SessionPayload } from "@/lib/permissions";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { abteilungLabel } from "@/lib/constants";
 import {
   ABTEILUNGS_AUDIT,
   MELDUNGEN,
+  ONBOARDING_ENDSTATUS,
   abteilungsSchluesselBekannt,
   erledigtVonBestimmen,
   istFuehrungskraft,
@@ -67,6 +73,7 @@ import {
   zusatzWerte,
   type AbteilungsModul,
   type DienstAntwort,
+  type Grund,
   type ZusatzFeld,
 } from "@/lib/abteilungsaufgaben";
 import {
@@ -74,6 +81,13 @@ import {
   onboardingPortalAufgabePatchSchema,
   portalAufgabePatchSchema,
 } from "@/lib/validations/abteilungsaufgaben";
+import {
+  KEINE_ANGABEN,
+  MELDUNGEN as AUSSTATTUNGS_MELDUNGEN,
+  checklistFortschritt,
+  type AngabenFuerStelle,
+} from "@/lib/ausstattung";
+import { angabenJeStelleLaden, ausstattungZuAufgabenLaden, bemerkungFuerStelle } from "@/lib/ausstattung-daten";
 
 // =============================================
 // Anfragebremse je Link
@@ -138,11 +152,16 @@ async function aufgabenZaehlen(
   nurOffen: boolean,
 ): Promise<number> {
   const offen = nurOffen ? { isCompleted: false } : {};
+  // Onboarding (Ausstattung & Zugaenge, F2): Entfallene zaehlen nirgends mit —
+  // auch nicht in `gesamt` (anzahl_aufgaben der Abschlussmail). Offen sind sie
+  // ohnehin nie (`isCompleted`), der Filter wirkt also nur auf `gesamt`.
   return b.modul === "OFFBOARDING"
     ? tx.offboardingChecklistItem.count({
         where: { offboardingId: b.vorgangId, assigneeDepartment: departmentKey, ...offen },
       })
-    : tx.checklistItem.count({ where: { onboardingId: b.vorgangId, assignee: departmentKey, ...offen } });
+    : tx.checklistItem.count({
+        where: { onboardingId: b.vorgangId, assignee: departmentKey, entfaelltAm: null, ...offen },
+      });
 }
 
 /** Offene Aufgaben im ganzen Vorgang (Mail an HR: „Noch offen im Vorgang"). */
@@ -152,21 +171,29 @@ async function offeneImVorgang(b: LinkBereich): Promise<number> {
     : prisma.checklistItem.count({ where: { onboardingId: b.vorgangId, isCompleted: false } });
 }
 
-/** Zustaendigkeit einer Aufgabe (null, wenn es sie nicht gibt). */
+/**
+ * Zustaendigkeit einer Aufgabe (null, wenn es sie nicht gibt) — gelesen NACH
+ * der Linksperre. Im Onboarding dazu, ob die Aufgabe entfaellt (Ausstattung &
+ * Zugaenge, F2, Feinplan 1.11): Streicht HR sie gleichzeitig, sperrt die Karte
+ * denselben Link; was hier steht, ist also der Stand nach deren Commit.
+ */
 async function aufgabenZustaendigkeit(
   tx: Prisma.TransactionClient,
   modul: AbteilungsModul,
   itemId: string,
-): Promise<{ vorhanden: boolean; departmentKey: string | null }> {
+): Promise<{ vorhanden: boolean; departmentKey: string | null; entfaellt: boolean }> {
   if (modul === "OFFBOARDING") {
     const a = await tx.offboardingChecklistItem.findUnique({
       where: { id: itemId },
       select: { assigneeDepartment: true },
     });
-    return { vorhanden: !!a, departmentKey: a?.assigneeDepartment ?? null };
+    return { vorhanden: !!a, departmentKey: a?.assigneeDepartment ?? null, entfaellt: false };
   }
-  const a = await tx.checklistItem.findUnique({ where: { id: itemId }, select: { assignee: true } });
-  return { vorhanden: !!a, departmentKey: a?.assignee ?? null };
+  const a = await tx.checklistItem.findUnique({
+    where: { id: itemId },
+    select: { assignee: true, entfaelltAm: true },
+  });
+  return { vorhanden: !!a, departmentKey: a?.assignee ?? null, entfaellt: a?.entfaelltAm != null };
 }
 
 // =============================================
@@ -295,6 +322,11 @@ export async function linkStatusNeuBerechnen(
  * ist (bedingtes updateMany). `true` = DIESER Aufruf hat gewechselt. Ueber den
  * Link bleibt completedById immer null (daran erkennt die Anzeige "per Link").
  * `modul` fehlt = Offboarding (Paket 1b).
+ *
+ * Onboarding: zusaetzlich nur, solange die Aufgabe NICHT entfaellt
+ * (`entfaelltAm: null` im WHERE, Feinplan 1.11). Eine gestrichene Aufgabe ist
+ * `isCompleted` (F2) — „wieder öffnen“ setzte sie sonst auf offen, waehrend
+ * `entfaelltAm` stehen bliebe. Die Spalte gibt es nur im Onboarding.
  */
 export async function aufgabeUmschaltenPerLink(
   tx: Prisma.TransactionClient,
@@ -309,7 +341,7 @@ export async function aufgabeUmschaltenPerLink(
   const r =
     (opts.modul ?? "OFFBOARDING") === "OFFBOARDING"
       ? await tx.offboardingChecklistItem.updateMany({ where, data })
-      : await tx.checklistItem.updateMany({ where, data });
+      : await tx.checklistItem.updateMany({ where: { ...where, entfaelltAm: null }, data });
   return r.count === 1;
 }
 
@@ -364,9 +396,47 @@ async function nachDemCommit(event: string, senden: () => Promise<void>): Promis
   }
 }
 
+/** Anlass der HR-Meldung im Onboarding (E-A17): abgehakt oder nur kommentiert. */
+export type ErledigtAnlass = "ERLEDIGT" | "KOMMENTAR";
+
 /**
- * *-task-completed an HR. KEIN `email`-Feld: Empfaenger ist das An-Feld der
- * Vorlage (ohne An-Feld SKIPPED).
+ * Merker und Kurzform der HR-Meldung `onboarding-task-completed` (E-A17):
+ *
+ *   ist_erledigt   "ja", wenn die Stelle die Aufgabe abgehakt hat
+ *   nur_kommentar  "ja", wenn sie nur einen Kommentar hinterlassen hat —
+ *                  genau einer der beiden Merker ist "ja" (Zeichenketten:
+ *                  `renderTemplate` kennt nur „nicht leer“)
+ *   meldung_kurz   Betreff: „erledigt“, „erledigt, mit Kommentar“ (die
+ *                  Aufgabe traegt einen Kommentar — die Mail zeigt ihn) oder
+ *                  „kommentiert“
+ */
+export function erledigtMeldungFelder(
+  anlass: ErledigtAnlass,
+  kommentar: string | null | undefined,
+): { ist_erledigt: string; nur_kommentar: string; meldung_kurz: string } {
+  if (anlass === "KOMMENTAR") return { ist_erledigt: "", nur_kommentar: "ja", meldung_kurz: "kommentiert" };
+  return {
+    ist_erledigt: "ja",
+    nur_kommentar: "",
+    meldung_kurz: (kommentar ?? "").trim() ? "erledigt, mit Kommentar" : "erledigt",
+  };
+}
+
+/** Das HR-Postfach (SmtpConfig.replyToEmail), "" ohne — dann ohne An-Feld der Vorlage SKIPPED. */
+async function hrPostfachLaden(): Promise<string> {
+  const smtp = await prisma.smtpConfig.findUnique({ where: { id: "default" }, select: { replyToEmail: true } });
+  return smtp?.replyToEmail?.trim() ?? "";
+}
+
+/**
+ * *-task-completed an HR. KEIN `email`-Feld.
+ *
+ * Offboarding: Empfaenger ist das An-Feld der Vorlage (ohne An-Feld SKIPPED),
+ * Anlass immer das Abhaken. Onboarding (Paket A3, E-A17): Empfaenger ist das
+ * HR-Postfach (`hr_postfach`, Katalog-Default `{{hr_postfach}}`), Anlass das
+ * Abhaken ODER ein neuer Kommentar; dazu `ist_erledigt`, `nur_kommentar` und
+ * `meldung_kurz` (erledigtMeldungFelder). Die Payload des Offboardings bleibt
+ * Byte fuer Byte gleich.
  */
 async function aufgabeErledigtMelden(opts: {
   bereich: LinkBereich;
@@ -378,8 +448,17 @@ async function aufgabeErledigtMelden(opts: {
   offenInAbteilung: number;
   ueber: "LINK" | "PORTAL";
   completedById?: string;
+  /** Nur Onboarding: abgehakt (Vorgabe) oder nur kommentiert. */
+  anlass?: ErledigtAnlass;
 }): Promise<void> {
   const offen = await offeneImVorgang(opts.bereich);
+  const onboarding =
+    opts.bereich.modul === "ONBOARDING"
+      ? {
+          hr_postfach: await hrPostfachLaden(),
+          ...erledigtMeldungFelder(opts.anlass ?? "ERLEDIGT", opts.item.abteilungKommentar),
+        }
+      : {};
   await triggerWebhooks(MAIL_EVENTS[opts.bereich.modul].erledigt, {
     ...opts.mailFelder,
     departmentKey: opts.departmentKey ?? "",
@@ -399,6 +478,7 @@ async function aufgabeErledigtMelden(opts: {
           ? "Link der Führungskraft"
           : "Link der Abteilung",
     ...kommentarMailFelder(opts.item.abteilungKommentar),
+    ...onboarding,
     // Nur der Portal-Weg sendete diese Felder schon immer (Webhook-Abnehmer).
     ...(opts.ueber === "PORTAL"
       ? {
@@ -456,7 +536,32 @@ const AUFGABE_OEFFENTLICH = {
   abteilungKommentarAm: true,
 } as const satisfies Prisma.OffboardingChecklistItemSelect & Prisma.ChecklistItemSelect;
 
-type AufgabeOeffentlich = Prisma.OffboardingChecklistItemGetPayload<{ select: typeof AUFGABE_OEFFENTLICH }>;
+type AufgabeOeffentlichBasis = Prisma.OffboardingChecklistItemGetPayload<{ select: typeof AUFGABE_OEFFENTLICH }>;
+
+/**
+ * Eine Aufgabe auf der Link-Seite. Im Onboarding (Ausstattung & Zugaenge,
+ * Feinplan S14) haengen drei Felder an — im Offboarding fehlen sie ganz:
+ *   bemerkung  Bemerkung zur Position mit Beschriftung nach Herkunft (Regel 8),
+ *              nur bei Ausstattungsaufgaben, sonst null. Ueber die
+ *              Verknuepfung gelesen, nie aus `description` (dort steht nur der
+ *              Katalog-Hinweis fuer die Stelle).
+ *   eilt       Frist auf den Tag des Versands angehoben (Regel 14)
+ *   entfaellt  von HR gestrichen (R9, E-A21) — nur noch Kommentar moeglich
+ * `herkunft` und `entfaelltAm` selbst gehen nicht hinaus.
+ */
+type AufgabeOeffentlich = AufgabeOeffentlichBasis & {
+  bemerkung?: { text: string; label: string } | null;
+  eilt?: boolean;
+  entfaellt?: boolean;
+};
+
+/** Onboarding: dazu, was Bemerkung, „Eilt“ und „entfällt“ braucht (nur intern, siehe oben). */
+const ONBOARDING_AUFGABE_OEFFENTLICH = {
+  ...AUFGABE_OEFFENTLICH,
+  herkunft: true,
+  eilt: true,
+  entfaelltAm: true,
+} as const satisfies Prisma.ChecklistItemSelect;
 
 const VORGANG_OEFFENTLICH = {
   id: true,
@@ -475,10 +580,18 @@ const VORGANG_OEFFENTLICH = {
  * Fragebogen-Angaben ausser dem Namen, Verguetung, Kostenstellen, Notizen.
  * Stellenbezeichnung, Betriebsstaette und die Adresse der Fuehrungskraft
  * werden geladen, aber nur je Schluessel ausgegeben (zusatzWerte).
+ *
+ * Arbeitsort (E-A10, Feinplan 1.8): `arbeitsortId` und der Name — sonst stuende
+ * das Mailfeld `arbeitsort` (F15) auf dem Link-Weg (onboarding-task-completed,
+ * onboarding-department-completed) immer leer. Die Link-Seite zeigt ihn als
+ * eigenes Feld `data.arbeitsort` (nur wenn er von der Einrichtung abweicht —
+ * dieselbe Regel wie das Mailfeld).
  */
 export const ONBOARDING_VORGANG_OEFFENTLICH = {
   id: true,
   displayId: true,
+  arbeitsortId: true,
+  arbeitsort: { select: { name: true } },
   status: true,
   firstName: true,
   lastName: true,
@@ -502,6 +615,14 @@ interface OeffentlicherVorgang {
   anzeige: { vorgangsnummer: string; mitarbeiterName: string; einrichtung: string; bezugsdatum: string | null };
   zusatz: (departmentKey: string) => Partial<Record<ZusatzFeld, string>>;
   mailFelder: Record<string, unknown>;
+  /**
+   * Nur Onboarding (Ausstattung & Zugaenge, Regel 7, 1.8): was die Link-Seite
+   * ueber den Zuschnitt oben hinaus fuer GENAU diese Stelle zeigt — Arbeitsort
+   * (nur bei Abweichung, sonst null), die eigenen und freigegebenen Angaben und
+   * der Hinweis an die Stelle. Im Offboarding fehlt der Eintrag, die Antwort
+   * bleibt Byte fuer Byte gleich.
+   */
+  ausstattung?: (departmentKey: string) => Promise<{ arbeitsort: string | null } & AngabenFuerStelle>;
 }
 
 function offboardingOeffentlich(v: Prisma.OffboardingProcessGetPayload<{ select: typeof VORGANG_OEFFENTLICH }>): OeffentlicherVorgang {
@@ -522,6 +643,7 @@ function offboardingOeffentlich(v: Prisma.OffboardingProcessGetPayload<{ select:
 
 function onboardingOeffentlich(v: OnboardingVorgangOeffentlich): OeffentlicherVorgang {
   const beginn = v.supervisorData?.vertragsbeginn ?? null;
+  const mailFelder = onboardingAbteilungsMailFelder(v);
   return {
     bereich: { modul: "ONBOARDING", vorgangId: v.id },
     gesperrtMeldung: v.status === "EXPIRED" ? MELDUNGEN.VORGANG_NICHT_MEHR_AKTIV : null,
@@ -538,7 +660,14 @@ function onboardingOeffentlich(v: OnboardingVorgangOeffentlich): OeffentlicherVo
         betriebsstaette: v.supervisorData?.betriebsstaette,
         fuehrungskraftEmail: v.supervisorEmail,
       }),
-    mailFelder: onboardingAbteilungsMailFelder(v),
+    mailFelder,
+    ausstattung: async (key) => ({
+      // Dieselbe Regel wie das Mailfeld (F15): Name nur, wenn er abweicht.
+      arbeitsort: mailFelder.arbeitsort || null,
+      // Angaben und Hinweis NUR dieser Stelle (angabenFuer) — fremde Hinweise
+      // und nicht freigegebene Angaben verlassen den Server nie.
+      ...((await angabenJeStelleLaden(prisma, v.id)).get(key) ?? KEINE_ANGABEN),
+    }),
   };
 }
 
@@ -570,20 +699,45 @@ async function linkZumToken(token: string, modul: AbteilungsModul) {
 
 async function aufgabenDerAbteilung(b: LinkBereich, departmentKey: string): Promise<AufgabeOeffentlich[]> {
   const orderBy = [{ orderIndex: "asc" as const }, { category: "asc" as const }];
-  return b.modul === "OFFBOARDING"
-    ? prisma.offboardingChecklistItem.findMany({
-        where: { offboardingId: b.vorgangId, assigneeDepartment: departmentKey },
-        orderBy,
-        select: AUFGABE_OEFFENTLICH,
-      })
-    : prisma.checklistItem.findMany({
-        where: { onboardingId: b.vorgangId, assignee: departmentKey },
-        orderBy,
-        select: AUFGABE_OEFFENTLICH,
-      });
+  if (b.modul === "OFFBOARDING") {
+    return prisma.offboardingChecklistItem.findMany({
+      where: { offboardingId: b.vorgangId, assigneeDepartment: departmentKey },
+      orderBy,
+      select: AUFGABE_OEFFENTLICH,
+    });
+  }
+  const roh = await prisma.checklistItem.findMany({
+    where: { onboardingId: b.vorgangId, assignee: departmentKey },
+    orderBy,
+    select: ONBOARDING_AUFGABE_OEFFENTLICH,
+  });
+  // Bemerkungen nur zu Ausstattungsaufgaben — ohne solche keine Abfrage. Und
+  // nur, solange die Zeile dieser Stelle gehoert (Regel 8): Nach einem
+  // Stellenwechsel bleiben entfallene Aufgaben hier, die Bemerkung gilt der
+  // neuen Stelle.
+  const zuAusstattung = await ausstattungZuAufgabenLaden(
+    prisma,
+    roh.filter((a) => a.herkunft != null).map((a) => a.id),
+  );
+  return roh.map(({ herkunft: _herkunft, eilt, entfaelltAm, ...a }) => ({
+    ...a,
+    bemerkung: bemerkungFuerStelle(zuAusstattung.get(a.id), departmentKey),
+    eilt: eilt === true,
+    entfaellt: entfaelltAm != null,
+  }));
 }
 
-function fortschritt(aufgaben: ReadonlyArray<{ isCompleted: boolean }>) {
+/**
+ * Fortschritt der eigenen Aufgaben. Onboarding: ohne entfallene Aufgaben
+ * (`checklistFortschritt`, F2 — dieselbe Rechnung wie Portal und Link-Seite;
+ * ohne zaehlende Aufgabe 0 %). Offboarding: unveraendert (dort entfaellt
+ * nichts; ohne Aufgabe 100 %). Antwortform in beiden Modulen gleich.
+ */
+function fortschritt(modul: AbteilungsModul, aufgaben: ReadonlyArray<AufgabeOeffentlich>) {
+  if (modul === "ONBOARDING") {
+    const f = checklistFortschritt(aufgaben);
+    return { gesamt: f.gesamt, erledigt: f.erledigt, prozent: f.prozent };
+  }
   const gesamt = aufgaben.length;
   const erledigt = aufgaben.filter((a) => a.isCompleted).length;
   return { gesamt, erledigt, prozent: gesamt > 0 ? Math.round((erledigt / gesamt) * 100) : 100 };
@@ -612,6 +766,9 @@ async function oeffentlichLaden(modul: AbteilungsModul, token: string, jetzt: Da
   });
 
   const aufgaben = await aufgabenDerAbteilung(vorgang.bereich, link.departmentKey);
+  // Onboarding: Arbeitsort, Angaben, Hinweis (eigene Felder, nie in `vorgang`
+  // oder `zusatz` — beide sind je Schluessel festgelegt).
+  const ausstattung = vorgang.ausstattung ? await vorgang.ausstattung(link.departmentKey) : null;
   return {
     status: 200,
     body: {
@@ -620,10 +777,13 @@ async function oeffentlichLaden(modul: AbteilungsModul, token: string, jetzt: Da
         abteilung: { key: link.departmentKey, name: link.departmentName },
         vorgang: vorgang.anzeige,
         zusatz: vorgang.zusatz(link.departmentKey),
+        ...(ausstattung
+          ? { arbeitsort: ausstattung.arbeitsort, angaben: ausstattung.angaben, hinweis: ausstattung.hinweis }
+          : {}),
         readOnly: vorgang.readOnly,
         gueltigBis: link.expiresAt.toISOString(),
         aufgaben,
-        fortschritt: fortschritt(aufgaben),
+        fortschritt: fortschritt(modul, aufgaben),
         allTasksComplete: link.allTasksComplete,
       },
     },
@@ -655,8 +815,15 @@ export async function oeffentlicheAufgabenLaden(token: string, jetzt: Date = new
  *   410 { error: "Dieser Vorgang ist nicht mehr aktiv. Bitte keine weiteren Schritte unternehmen." }   EXPIRED
  *   410 { error: "Dieser Link ist abgelaufen." }
  *   200 { data: { modul: "ONBOARDING", abteilung, vorgang: { vorgangsnummer, mitarbeiterName (sonst „Name folgt"),
- *         einrichtung, bezugsdatum (Vertragsbeginn ISO | null) }, zusatz (nur erlaubte Felder), readOnly (COMPLETED),
- *         gueltigBis, aufgaben, fortschritt, allTasksComplete } }
+ *         einrichtung, bezugsdatum (Vertragsbeginn ISO | null) }, zusatz (nur erlaubte Felder),
+ *         arbeitsort (Name | null), angaben ([{ label, wert }]), hinweis (string | null), readOnly (COMPLETED),
+ *         gueltigBis, aufgaben (je Aufgabe zusaetzlich bemerkung, eilt, entfaellt), fortschritt (ohne
+ *         entfallene Aufgaben), allTasksComplete } }
+ *
+ * Ausstattung & Zugaenge (Feinplan S14, Regel 7, 1.8): `arbeitsort` nur, wenn
+ * er von der Einrichtung abweicht; `angaben`/`hinweis` nur die der eigenen
+ * Stelle bzw. die fuer sie freigegebenen (`angabenFuer`); `bemerkung` nur an
+ * der eigenen Aufgabe. `vorgang` und `zusatz` bleiben unveraendert.
  */
 export async function oeffentlicheOnboardingAufgabenLaden(
   token: string,
@@ -724,7 +891,32 @@ async function oeffentlichAendern(
     linkId: link.id,
   };
 
-  const { umgeschaltet, uebergaenge, fremd } = await prisma.$transaction(async (tx) => {
+  const nichts = { umgeschaltet: false, uebergaenge: [] as LinkUebergang[], kommentarGeaendert: false };
+  const { umgeschaltet, uebergaenge, fremd, entfallen, kommentarGeaendert, beendet } = await prisma.$transaction(async (tx) => {
+    // 0. Nur Onboarding (E-A19): ZUERST den Vorgang sperren, bedingt auf
+    //    „laufend“ — Reihenfolge Vorgang → Link → Aufgabe wie Karte und
+    //    Nachholen. Der Abschluss (Status-PATCH) zaehlt die offenen
+    //    Ausstattungsaufgaben nach SEINEM bedingten Update derselben Zeile:
+    //    So wartet er auf diesen Haken bzw. dieser PATCH auf den Abschluss
+    //    und findet ihn danach (0 Treffer → 409/410). Sonst rutschte ein
+    //    „wieder öffnen“ zwischen Zaehlen und Commit durch, und der Vorgang
+    //    stuende ohne Rueckfrage mit offener Aufgabe auf COMPLETED — die die
+    //    Stelle dann nicht mehr abhaken koennte (Link nur lesbar).
+    if (bereich.modul === "ONBOARDING") {
+      const gesperrt = await tx.onboardingProcess.updateMany({
+        where: { id: bereich.vorgangId, status: { notIn: [...ONBOARDING_ENDSTATUS] } },
+        data: { updatedAt: jetzt },
+      });
+      if (gesperrt.count === 0) {
+        const stand = await tx.onboardingProcess.findUnique({
+          where: { id: bereich.vorgangId },
+          select: { status: true },
+        });
+        const beendet = stand?.status === "EXPIRED" ? ("EXPIRED" as const) : ("COMPLETED" as const);
+        return { ...nichts, fremd: false, entfallen: false, beendet };
+      }
+    }
+
     // 1. Sperren (Link-Zeile), 2. Aufgabe aendern, 3. Status neu berechnen.
     await linksSperrenIn(tx, bereich, [link.departmentKey]);
 
@@ -733,7 +925,15 @@ async function oeffentlichAendern(
     // committet vorher), darf dieser Link sie nicht mehr aendern.
     const jetztZugeordnet = await aufgabenZustaendigkeit(tx, modul, item.id);
     if (jetztZugeordnet.departmentKey !== link.departmentKey) {
-      return { umgeschaltet: false, uebergaenge: [] as LinkUebergang[], fremd: true };
+      return { ...nichts, fremd: true, entfallen: false, beendet: null };
+    }
+    // Ebenso fuer „entfällt“ (Onboarding, Feinplan 1.11): HIER entschieden,
+    // nicht am Lesestand vor der Transaktion — streicht HR die Aufgabe
+    // gleichzeitig, setzte „wieder öffnen“ sie sonst auf offen, waehrend
+    // `entfaelltAm` stehen bliebe. Abhaken und Wiederoeffnen → 409, nichts
+    // wird geschrieben; ein reiner Kommentar bleibt moeglich.
+    if (isCompleted !== undefined && jetztZugeordnet.entfaellt) {
+      return { ...nichts, fremd: false, entfallen: true, beendet: null };
     }
 
     let umgeschaltet = false;
@@ -751,8 +951,11 @@ async function oeffentlichAendern(
       }
     }
 
+    // E-A17: ein neuer, nicht leerer Kommentar (ein geloeschter zaehlt nicht).
+    let kommentarGeaendert = false;
     if (comment !== undefined && comment !== null) {
       const k = await kommentarSetzenPerLink(tx, { itemId: item.id, text: comment, jetzt, modul });
+      kommentarGeaendert = k.geaendert && k.laenge > 0;
       if (k.geaendert) {
         // Nur die Laenge — der Text steht an der Aufgabe, nicht im Protokoll.
         await tx.auditLog.create({
@@ -780,9 +983,15 @@ async function oeffentlichAendern(
         },
       });
     }
-    return { umgeschaltet, uebergaenge, fremd: false };
+    return { umgeschaltet, uebergaenge, fremd: false, entfallen: false, kommentarGeaendert, beendet: null };
   });
+  // Inzwischen beendet (nur Onboarding): dieselben Antworten wie vor der Transaktion.
+  if (beendet === "EXPIRED") return { status: 410, body: { error: MELDUNGEN.VORGANG_NICHT_MEHR_AKTIV } };
+  if (beendet) return { status: 409, body: { error: MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN } };
   if (fremd) return { status: 404, body: { error: MELDUNGEN.AUFGABE_NICHT_GEFUNDEN } };
+  if (entfallen) {
+    return { status: 409, body: { error: MELDUNGEN.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" satisfies Grund } };
+  }
 
   // Nach dem Commit: frischer Stand fuer Antwort und Mails.
   const aufgaben = await aufgabenDerAbteilung(bereich, link.departmentKey);
@@ -791,7 +1000,14 @@ async function oeffentlichAendern(
   const u = uebergaenge.find((x) => x.departmentKey === link.departmentKey);
   const events = MAIL_EVENTS[modul];
 
-  if (umgeschaltet && isCompleted && aufgabe) {
+  // Mail an HR: beim Wechsel offen → erledigt; im Onboarding (E-A17) auch bei
+  // einem neuen, nicht leeren Kommentar — hakt die Stelle ab UND kommentiert,
+  // geht genau EINE Mail (Anlass „erledigt“, sie zeigt den Kommentar). Ein
+  // geloeschter oder unveraenderter Kommentar meldet nichts. Das Offboarding
+  // bleibt unveraendert (nur-Kommentar = keine Mail).
+  const erledigtGemeldet = umgeschaltet && isCompleted === true;
+  const nurKommentar = modul === "ONBOARDING" && !erledigtGemeldet && kommentarGeaendert;
+  if ((erledigtGemeldet || nurKommentar) && aufgabe) {
     await nachDemCommit(events.erledigt, () =>
       aufgabeErledigtMelden({
         bereich,
@@ -806,6 +1022,7 @@ async function oeffentlichAendern(
         },
         offenInAbteilung,
         ueber: "LINK",
+        anlass: erledigtGemeldet ? "ERLEDIGT" : "KOMMENTAR",
       }),
     );
   }
@@ -818,7 +1035,7 @@ async function oeffentlichAendern(
     body: {
       data: {
         aufgabe: aufgabe ?? null,
-        fortschritt: fortschritt(aufgaben),
+        fortschritt: fortschritt(modul, aufgaben),
         allTasksComplete: u ? u.offen === 0 : link.allTasksComplete && offenInAbteilung === 0,
       },
     },
@@ -852,8 +1069,23 @@ export async function oeffentlicheAufgabeAendern(
 /**
  * PATCH /api/onboarding-tasks/[token]/[itemId] — dieselbe Reihenfolge wie
  * oben; 410 bei EXPIRED mit „Dieser Vorgang ist nicht mehr aktiv. …", 409 bei
- * COMPLETED. Mails: onboarding-task-completed (an HR, mit Kommentar) und
- * onboarding-department-completed (an die Abteilung, genau einmal).
+ * COMPLETED. Mails: onboarding-task-completed (an das HR-Postfach, mit
+ * Kommentar — seit E-A17 auch bei einem reinen, neuen Kommentar, auch an einer
+ * entfallenen Aufgabe) und onboarding-department-completed (an die Abteilung,
+ * genau einmal).
+ *
+ * Ausstattung & Zugaenge (F2, Feinplan 1.11): Ist die Aufgabe von HR
+ * gestrichen (`entfaelltAm`) und kommt `isCompleted` mit, antwortet sie
+ *   409 { error: "Diese Aufgabe entfällt – …", grund: "AUFGABE_ENTFAELLT" }
+ * und schreibt nichts (auch keinen mitgeschickten Kommentar). Entschieden wird
+ * in der Transaktion nach der Linksperre; ein reiner Kommentar geht weiter.
+ * Antwort wie beim GET mit `bemerkung`, `eilt`, `entfaellt` und dem Fortschritt
+ * ohne entfallene Aufgaben.
+ *
+ * Die Transaktion sperrt zuerst den Vorgang (bedingt auf „laufend“, E-A19):
+ * Hat HR ihn inzwischen abgeschlossen bzw. abgebrochen, antwortet sie wie die
+ * Pruefung davor (409 nur lesen bzw. 410) und schreibt nichts — der Abschluss
+ * zaehlt die offenen Ausstattungsaufgaben unter derselben Sperre.
  */
 export async function oeffentlicheOnboardingAufgabeAendern(
   token: string,
@@ -1100,6 +1332,20 @@ async function benutzerNamen(session: SessionPayload, completedById: string | nu
  * KEINE Mail (Entscheidung Paket 5): Das Haekchen von HR meldet weder HR noch
  * die Abteilung etwas. Der Abteilungsstatus wird trotzdem neu berechnet
  * (Umhaengen: beide Links).
+ *
+ * Ausstattung & Zugaenge (S15; Regel 9, Regel 16, F2, Feinplan 1.11) — fuer
+ * Aufgaben mit `herkunft` (Ausstattung, Hinweis):
+ *   403 { error: "Ausstattungsaufgaben bearbeitet nur die Personalabteilung." }
+ *        Rolle nicht HR_EDIT_ROLES (sperrt SERVICE, VORGESETZTER, EINRICHTUNGSLEITUNG)
+ *   409 { error: "Zuständigkeit und Fälligkeit in der Karte …" }
+ *        `assignee` oder `dueDate` im Body (auch an der Hinweis-Aufgabe; deren
+ *        Faelligkeit aendert `hinweis-aendern` in der Karte, F20)
+ *   409 { error, grund: "AUFGABE_ENTFAELLT" }   `isCompleted` an einer entfallenen Aufgabe
+ * „Entfällt“ wird zusaetzlich IN der Transaktion geprueft: Das bedingte
+ * `updateMany` traegt `entfaelltAm: null`; trifft es nichts, liest der PATCH
+ * die Aufgabe nach der Linksperre erneut — hat HR sie inzwischen gestrichen,
+ * 409 statt „keine Aenderung“. `progress` zaehlt Entfallene nicht mit
+ * (dieselbe Aussage wie `checklistFortschritt`).
  */
 export async function onboardingAufgabeImPortalAendern(opts: {
   onboardingId: string;
@@ -1131,6 +1377,20 @@ export async function onboardingAufgabeImPortalAendern(opts: {
     return { status: 404, body: { error: MELDUNGEN.EINTRAG_NICHT_GEFUNDEN } };
   }
 
+  // Ausstattungs- und Hinweis-Aufgaben (Regel 9, Regel 16): nur HR, und
+  // Zustaendigkeit wie Faelligkeit nur ueber die Karte.
+  if (vorher.herkunft != null) {
+    if (!HR_EDIT_ROLES.includes(opts.session.role)) {
+      return { status: 403, body: { error: AUSSTATTUNGS_MELDUNGEN.PORTAL_NUR_HR } };
+    }
+    if (eingabe.assignee !== undefined || eingabe.dueDate !== undefined) {
+      return { status: 409, body: { error: AUSSTATTUNGS_MELDUNGEN.PORTAL_IN_DER_KARTE } };
+    }
+  }
+  if (vorher.entfaelltAm != null && eingabe.isCompleted !== undefined) {
+    return { status: 409, body: { error: MELDUNGEN.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" satisfies Grund } };
+  }
+
   const neuerSchluessel = eingabe.assignee; // undefined = unveraendert, null = keiner
   if (typeof neuerSchluessel === "string" && neuerSchluessel !== vorher.assignee) {
     const konfig = await prisma.departmentConfig.findMany({ select: { departmentKey: true } });
@@ -1150,18 +1410,31 @@ export async function onboardingAufgabeImPortalAendern(opts: {
 
   const schluessel = [vorher.assignee, zustaendigWechsel ? neuerSchluessel : null];
 
-  await prisma.$transaction(async (tx) => {
+  const { entfallen } = await prisma.$transaction(async (tx) => {
     await linksSperrenIn(tx, bereich, schluessel);
 
     let umgeschaltet = false;
     if (statusWechsel) {
+      // `entfaelltAm: null` (F2): Eine gestrichene Aufgabe ist `isCompleted` —
+      // „wieder öffnen“ setzte sie sonst auf offen, waehrend `entfaelltAm`
+      // stehen bliebe.
       const r = await tx.checklistItem.updateMany({
-        where: { id: vorher.id, isCompleted: vorher.isCompleted },
+        where: { id: vorher.id, isCompleted: vorher.isCompleted, entfaelltAm: null },
         data: eingabe.isCompleted
           ? { isCompleted: true, completedAt: jetzt, completedById: opts.session.userId }
           : { isCompleted: false, completedAt: null, completedById: null },
       });
       umgeschaltet = r.count === 1;
+      if (!umgeschaltet) {
+        // Nach der Linksperre erneut lesen: Hat HR sie inzwischen in der Karte
+        // gestrichen, ist das 409 — sonst wie bisher „keine Aenderung“. Vor
+        // jedem weiteren Schreiben, also bleibt auch die Notiz unberuehrt.
+        const jetztStand = await tx.checklistItem.findUnique({
+          where: { id: vorher.id },
+          select: { entfaelltAm: true },
+        });
+        if (jetztStand?.entfaelltAm != null) return { entfallen: true };
+      }
     }
 
     const rest: Prisma.ChecklistItemUncheckedUpdateInput = {};
@@ -1218,7 +1491,11 @@ export async function onboardingAufgabeImPortalAendern(opts: {
         },
       });
     }
+    return { entfallen: false };
   });
+  if (entfallen) {
+    return { status: 409, body: { error: MELDUNGEN.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" satisfies Grund } };
+  }
 
   const nachher = await prisma.checklistItem.findUnique({
     where: { id: vorher.id },
@@ -1235,9 +1512,11 @@ export async function onboardingAufgabeImPortalAendern(opts: {
     : null;
   const abteilungName = key ? (link?.departmentName ?? abteilungLabel(key)) : "";
 
+  // Ohne Entfallene in Zaehler und Nenner (F2) — dieselbe Aussage wie
+  // `checklistFortschritt`; eine entfallene Aufgabe ist `isCompleted`.
   const [total, completed] = await Promise.all([
-    prisma.checklistItem.count({ where: { onboardingId: vorgang.id } }),
-    prisma.checklistItem.count({ where: { onboardingId: vorgang.id, isCompleted: true } }),
+    prisma.checklistItem.count({ where: { onboardingId: vorgang.id, entfaelltAm: null } }),
+    prisma.checklistItem.count({ where: { onboardingId: vorgang.id, isCompleted: true, entfaelltAm: null } }),
   ]);
   const benutzer = await benutzerNamen(opts.session, nachher.completedById);
   const erledigtVon = erledigtVonBestimmen(

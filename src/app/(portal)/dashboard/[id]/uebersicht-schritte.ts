@@ -24,6 +24,7 @@ import type { WorkflowStep } from "@/components/process-workflow-stepper";
 import type { AbteilungsUebersichtDaten } from "@/lib/abteilungsaufgaben";
 import type { UnterlagenUebersicht } from "@/lib/unterlagen";
 import { abteilungLabel } from "@/lib/constants";
+import { checklistFortschritt } from "@/lib/ausstattung";
 import { formatProgress, type FragebogenFortschritt } from "@/lib/fragebogen-steps";
 import {
   bereitZurPruefung,
@@ -81,6 +82,11 @@ export interface SchritteStand {
     isCompleted: boolean;
     assignee: string | null;
     notes: string | null;
+    /**
+     * Von HR gestrichen (Ausstattung & Zugaenge, F2): zugleich `isCompleted`,
+     * zaehlt aber weder im Zaehler noch im Nenner (`checklistFortschritt`).
+     */
+    entfaelltAm?: string | Date | null;
   }[];
   abteilungen?: AbteilungsUebersichtDaten;
   /**
@@ -183,9 +189,12 @@ export function onboardingWorkflowSchritte(
   // prüfen" behauptete dort eine Arbeit, die niemand getan hat.
   const geprueft = s.status === "REVIEWED" || istAbgeschlossen;
 
-  const checklistTotal = s.checklistItems.length;
-  const checklistDone = s.checklistItems.filter((i) => i.isCompleted).length;
-  const checklistAllDone = checklistTotal > 0 && checklistDone === checklistTotal;
+  // Ohne entfallene Aufgaben (F2) — dieselbe Rechnung wie Reiter, Kopfzeile,
+  // Balken und Link-Seite. Nur entfallene Punkte heissen NICHT „fertig“.
+  const fortschritt = checklistFortschritt(s.checklistItems);
+  const checklistTotal = fortschritt.gesamt;
+  const checklistDone = fortschritt.erledigt;
+  const checklistAllDone = fortschritt.alleErledigt;
   // Die Checkliste beginnt, wenn HR geprueft hat — NICHT schon, sobald beide
   // Spuren da sind. Sonst stuenden „Daten prüfen" und „Checkliste abarbeiten"
   // bei JEDEM Vorgang gleichzeitig als aktive Karten nebeneinander, samt der
@@ -208,7 +217,7 @@ export function onboardingWorkflowSchritte(
   const abtGesperrt = abt?.gesperrt ?? null;
   const abtInformierbar = abt?.informierbar ?? 0;
   const abtInfo = [
-    checklistTotal === 0 ? "Keine Checkliste zugewiesen" : null,
+    s.checklistItems.length === 0 ? "Keine Checkliste zugewiesen" : null,
     abtZeilen.length > 0 ? `Abteilungen: ${abtFertig} von ${abtZeilen.length} fertig` : null,
     abtGesperrt?.text ?? null,
     abtZeilen.length > 0 && !abtGesperrt && (abt?.niemandInformiert ?? false)
@@ -417,7 +426,7 @@ export function onboardingWorkflowSchritte(
       items:
         checklistTotal > 0 && !checklistAllDone && checklisteFreigegeben
           ? s.checklistItems
-              .filter((i) => !i.isCompleted)
+              .filter((i) => !i.isCompleted && i.entfaelltAm == null)
               .slice(0, 5)
               .map((i) => ({
                 id: i.id,
@@ -603,8 +612,8 @@ export function onboardingKurzschritte(s: SchritteStand): {
 } {
   const fbAb = mitarbeiterAbgesendet(s);
   const modAb = vorgesetzteAbgesendet(s);
-  const checklistTotal = s.checklistItems.length;
-  const checklistAllDone = checklistTotal > 0 && s.checklistItems.every((i) => i.isCompleted);
+  // Ohne entfallene Aufgaben (F2, `checklistFortschritt`) — wie der Stepper.
+  const checklistAllDone = checklistFortschritt(s.checklistItems).alleErledigt;
   const istAbgeschlossen = s.status === "COMPLETED";
   const geprueft = s.status === "REVIEWED" || istAbgeschlossen;
 

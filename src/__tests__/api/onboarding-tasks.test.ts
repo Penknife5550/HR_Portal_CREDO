@@ -46,7 +46,16 @@ jest.mock("@/lib/abteilungsaufgaben-uebergaenge", () => {
 });
 
 import { NextRequest } from "next/server";
-import { db, dbLeeren, fakePrisma, naechsteId, neuerLink, type Zeile } from "../hilfen/abteilungs-fake-db";
+import {
+  db,
+  dbLeeren,
+  fakePrisma,
+  naechsteId,
+  neueAusstattungsZeile,
+  neuerLink,
+  neuerStellenHinweis,
+  type Zeile,
+} from "../hilfen/abteilungs-fake-db";
 import { GET as aufgabenLaden } from "@/app/api/onboarding-tasks/[token]/route";
 import { PATCH as aufgabeAendern } from "@/app/api/onboarding-tasks/[token]/[itemId]/route";
 import {
@@ -113,6 +122,11 @@ function aufgabe(teil: Zeile = {}): Zeile {
     notes: null,
     abteilungKommentar: null,
     abteilungKommentarAm: null,
+    // Paket A3 (S14): Spalten mit den Standardwerten des Schemas — der Link-
+    // PATCH schaltet nur mit `entfaelltAm: null` im WHERE um.
+    herkunft: null,
+    eilt: false,
+    entfaelltAm: null,
     ...teil,
   };
 }
@@ -275,24 +289,35 @@ describe("GET /api/onboarding-tasks/[token]", () => {
         bezugsdatum: BEGINN.toISOString(),
       });
       expect(data.aufgaben).toHaveLength(1);
+      // Wie im Offboarding (abteilungsaufgaben-routen.test.ts) — im Onboarding
+      // seit Paket A3 (S14) dazu Bemerkung, „Eilt“ und „entfällt“. Herkunft und
+      // `entfaelltAm` selbst gehen nicht hinaus.
       expect(Object.keys(data.aufgaben[0]).sort()).toEqual(
         [
           "abteilungKommentar",
           "abteilungKommentarAm",
+          "bemerkung",
           "category",
           "completedAt",
           "description",
           "dueDate",
+          "eilt",
+          "entfaellt",
           "id",
           "isCompleted",
           "orderIndex",
           "title",
         ].sort(),
       );
+      expect(data.aufgaben[0]).toMatchObject({ bemerkung: null, eilt: false, entfaellt: false });
       expect(data.aufgaben[0].description).toBe("Konto in der Schulverwaltung und in Microsoft 365");
       expect(JSON.stringify(data)).not.toContain("Intern: Rücksprache");
       // Der Fortschritt zaehlt nur die eigenen Aufgaben.
       expect(data.fortschritt).toEqual({ gesamt: 1, erledigt: 0, prozent: 0 });
+      // Ausstattung & Zugaenge: eigene Felder, ohne Ausstattung leer.
+      expect(data.arbeitsort).toBeNull();
+      expect(data.angaben).toEqual([]);
+      expect(data.hinweis).toBeNull();
       expect(db.links[0].openCount).toBe(1);
     });
 
@@ -313,6 +338,11 @@ describe("GET /api/onboarding-tasks/[token]", () => {
       expect(aufruf.include.onboarding.select.personalData).toEqual({
         select: { firstName: true, lastName: true },
       });
+      // Paket A3 (S13, Feinplan 1.8): Der Arbeitsort kommt mit — nur sein Name,
+      // fuer das Mailfeld `arbeitsort` auf dem Link-Weg. `data.vorgang` bleibt
+      // unveraendert (oben); als eigenes Feld der Seite kommt er mit S14.
+      expect(aufruf.include.onboarding.select.arbeitsortId).toBe(true);
+      expect(aufruf.include.onboarding.select.arbeitsort).toEqual({ select: { name: true } });
     });
 
     it("zeigt nur die Zusatzfelder, die der Schlüssel sehen darf", async () => {
@@ -355,6 +385,180 @@ describe("GET /api/onboarding-tasks/[token]", () => {
       ];
       const { data } = await (await laden("tok-it")).json();
       expect(data.vorgang.mitarbeiterName).toBe(MELDUNGEN.NAME_FOLGT);
+    });
+
+    // ---- Paket A3 (S14): Ausstattung & Zugaenge auf der Link-Seite ----
+
+    describe("Ausstattung & Zugänge (Regel 7, 1.8, F2)", () => {
+      it("Arbeitsort als eigenes Feld — nur bei Abweichung; `vorgang` und `zusatz` unverändert", async () => {
+        db.onboardingVorgaenge = [
+          vorgang({ arbeitsortId: "org-foev", arbeitsort: { name: "Förderverein Minden" } }),
+        ];
+        const { data } = await (await laden("tok-it")).json();
+        expect(data.arbeitsort).toBe("Förderverein Minden");
+        // Nicht in `vorgang` (dort sind die Felder festgelegt) und nicht in `zusatz`.
+        expect(data.vorgang).toEqual({
+          vorgangsnummer: "ONB-2026-031",
+          mitarbeiterName: "Anna Beispiel",
+          einrichtung: "FES Minden",
+          bezugsdatum: BEGINN.toISOString(),
+        });
+        expect(data.zusatz).toEqual({
+          stellenbezeichnung: "Lehrkraft Sek. I",
+          betriebsstaette: "Minden, Hauptstandort",
+          ansprechpartner_email: "a.leitung@example.org",
+        });
+
+        // Gleich der Einrichtung (gleicher Name) → null, wie das Mailfeld (F15).
+        db.onboardingVorgaenge = [vorgang({ arbeitsortId: "org-x", arbeitsort: { name: "FES Minden" } })];
+        expect((await (await laden("tok-it")).json()).data.arbeitsort).toBeNull();
+      });
+
+      it("je Aufgabe Bemerkung (getrennt vom Katalog-Hinweis), „Eilt“ und „entfällt“", async () => {
+        db.ausstattungZeilen = [
+          neueAusstattungsZeile({
+            id: "aus-ipad",
+            onboardingId: "onb-1",
+            departmentKey: "IT",
+            art: "JA_NEIN",
+            bezeichnung: "Dienst-iPad",
+            aufgabeTitel: "Dienst-iPad bereitstellen",
+            quelle: "FUEHRUNGSKRAFT",
+            bemerkung: "Mit Stift und Hülle",
+            bemerkungQuelle: "FUEHRUNGSKRAFT",
+          }),
+          neueAusstattungsZeile({
+            id: "aus-zug",
+            onboardingId: "onb-1",
+            departmentKey: "IT",
+            art: "AUSWAHL",
+            bezeichnung: "Zugänge",
+            aufgabeTitel: "Zugang einrichten",
+            auswahl: ["WebUntis"],
+            quelle: "FUEHRUNGSKRAFT",
+            bemerkung: "Nur lesend",
+            bemerkungQuelle: "BEIDE",
+          }),
+        ];
+        db.onboardingAufgaben = [
+          aufgabe({
+            id: "i-ipad",
+            title: "Dienst-iPad bereitstellen",
+            category: "Ausstattung & Zugänge",
+            orderIndex: -100000,
+            herkunft: "AUSSTATTUNG",
+            eilt: true,
+            description: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+          }),
+          aufgabe({
+            id: "i-zug",
+            title: "Zugang einrichten: WebUntis",
+            category: "Ausstattung & Zugänge",
+            orderIndex: -99900,
+            herkunft: "AUSSTATTUNG",
+            isCompleted: true,
+            completedAt: new Date(),
+            entfaelltAm: new Date(),
+          }),
+          aufgabe({ id: "i-vorlage", title: "Benutzerkonto anlegen", description: "M365" }),
+        ];
+        db.ausstattungAufgaben = [
+          { ausstattungId: "aus-ipad", option: "", checklistItemId: "i-ipad", createdAt: new Date() },
+          { ausstattungId: "aus-zug", option: "WebUntis", checklistItemId: "i-zug", createdAt: new Date() },
+        ];
+
+        const { data } = await (await laden("tok-it")).json();
+        const nach = (id: string) => data.aufgaben.find((a: Zeile) => a.id === id);
+        expect(nach("i-ipad")).toMatchObject({
+          bemerkung: { text: "Mit Stift und Hülle", label: "Bemerkung der Führungskraft" },
+          eilt: true,
+          entfaellt: false,
+          // Die Bemerkung steht NIE in `description` (dort nur der Katalog-Hinweis).
+          description: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+        });
+        expect(nach("i-zug")).toMatchObject({
+          bemerkung: { text: "Nur lesend", label: "Bemerkung der Führungskraft, ergänzt durch die Personalabteilung" },
+          entfaellt: true,
+          isCompleted: true,
+        });
+        expect(nach("i-vorlage")).toMatchObject({ bemerkung: null, eilt: false, entfaellt: false });
+        // Ausstattung steht oben (orderIndex unter allen Vorlagenpunkten).
+        expect(data.aufgaben.map((a: Zeile) => a.id)).toEqual(["i-ipad", "i-zug", "i-vorlage"]);
+        // Fortschritt OHNE die entfallene Aufgabe (F2): 0 von 2, nicht 1 von 3.
+        expect(data.fortschritt).toEqual({ gesamt: 2, erledigt: 0, prozent: 0 });
+        // Interne Spalten gehen nicht hinaus.
+        expect(nach("i-ipad")).not.toHaveProperty("herkunft");
+        expect(nach("i-ipad")).not.toHaveProperty("entfaelltAm");
+      });
+
+      it("Fortschritt: entfallene zählen weder im Zähler noch im Nenner; nur entfallene → 0 von 0", async () => {
+        db.onboardingAufgaben = [
+          aufgabe({ id: "i-1", isCompleted: true, completedAt: new Date() }),
+          aufgabe({ id: "i-2" }),
+          aufgabe({ id: "i-3", herkunft: "AUSSTATTUNG", isCompleted: true, completedAt: new Date(), entfaelltAm: new Date() }),
+        ];
+        expect((await (await laden("tok-it")).json()).data.fortschritt).toEqual({ gesamt: 2, erledigt: 1, prozent: 50 });
+
+        db.onboardingAufgaben = [
+          aufgabe({ id: "i-3", herkunft: "AUSSTATTUNG", isCompleted: true, completedAt: new Date(), entfaelltAm: new Date() }),
+        ];
+        expect((await (await laden("tok-it")).json()).data.fortschritt).toEqual({ gesamt: 0, erledigt: 0, prozent: 0 });
+      });
+
+      it("Angaben: eigene und freigegebene; Hinweis nur der eigenen Stelle — fremde verlassen den Server nie", async () => {
+        db.ausstattungZeilen = [
+          neueAusstattungsZeile({
+            onboardingId: "onb-1",
+            departmentKey: "FACILITY",
+            art: "ANGABE",
+            angabeSchluessel: "UNTERRICHTSFAECHER",
+            bezeichnung: "Unterrichtsfächer",
+            angabe: "Chemie, Sport",
+            sichtbarFuer: ["IT"],
+            quelle: "FUEHRUNGSKRAFT",
+          }),
+          neueAusstattungsZeile({
+            onboardingId: "onb-1",
+            departmentKey: "IT",
+            art: "ANGABE",
+            angabeSchluessel: "DURCHWAHL",
+            bezeichnung: "Gewünschte Durchwahl",
+            angabe: "214",
+            quelle: "FUEHRUNGSKRAFT",
+          }),
+          neueAusstattungsZeile({
+            onboardingId: "onb-1",
+            departmentKey: "VERWALTUNG",
+            art: "ANGABE",
+            angabeSchluessel: "ARBEITSPLATZ_RAUM",
+            bezeichnung: "Raum des Arbeitsplatzes",
+            angabe: "Büro 2.14",
+            quelle: "FUEHRUNGSKRAFT",
+          }),
+        ];
+        db.stellenHinweise = [
+          neuerStellenHinweis({ onboardingId: "onb-1", departmentKey: "IT", text: "Laptop bitte mit Dockingstation", quelle: "FUEHRUNGSKRAFT" }),
+          neuerStellenHinweis({ onboardingId: "onb-1", departmentKey: "VERWALTUNG", text: "Nur für die Verwaltung", quelle: "FUEHRUNGSKRAFT" }),
+        ];
+
+        const res = await laden("tok-it");
+        const { data } = await res.json();
+        expect(data.angaben).toEqual([
+          { label: "Gewünschte Durchwahl", wert: "214" },
+          { label: "Unterrichtsfächer", wert: "Chemie, Sport" },
+        ]);
+        expect(data.hinweis).toBe("Laptop bitte mit Dockingstation");
+        const text = JSON.stringify(data);
+        expect(text).not.toContain("Büro 2.14");
+        expect(text).not.toContain("Nur für die Verwaltung");
+
+        // Die Buchhaltung sieht nichts davon.
+        db.links = [link({ departmentKey: "BUCHHALTUNG", departmentName: "Buchhaltung", token: "tok-bh" })];
+        db.onboardingAufgaben = [aufgabe({ assignee: "BUCHHALTUNG" })];
+        const fuerBuchhaltung = (await (await laden("tok-bh")).json()).data;
+        expect(fuerBuchhaltung.angaben).toEqual([]);
+        expect(fuerBuchhaltung.hinweis).toBeNull();
+      });
     });
   });
 });
@@ -463,9 +667,47 @@ describe("PATCH /api/onboarding-tasks/[token]/[itemId]", () => {
       expect(fertig[0][1]).toMatchObject({ email: "it@example.org", abteilung: "IT-Abteilung", anzahl_aufgaben: 2 });
       expect(db.links[0].allTasksComplete).toBe(true);
 
-      // Ein weiteres Speichern (nur Kommentar) bestaetigt nicht noch einmal.
+      // Ein weiteres Speichern (nur Kommentar) bestaetigt nicht noch einmal —
+      // HR erfaehrt den neuen Kommentar aber (E-A17, S18).
       await aendern("tok-it", zweite.id as string, { body: { comment: "Nachtrag" } });
       expect(mails("onboarding-department-completed")).toHaveLength(1);
+      expect(mails("onboarding-task-completed").map((c) => c[1].meldung_kurz)).toEqual([
+        "erledigt",
+        "erledigt, mit Kommentar",
+        "kommentiert",
+      ]);
+    });
+
+    // ---- Paket A3 (S18, E-A17): jeder neue Kommentar erreicht das HR-Postfach ----
+
+    it("ein neuer Kommentar ohne Abhaken meldet HR (kommentarGeaendert) — unverändert oder geleert nicht", async () => {
+      db.replyToEmail = "personal@example.org";
+      const erste = await aendern("tok-it", itemId, { body: { comment: "Kommt am 03.10." } });
+      expect(erste.status).toBe(200);
+      expect(db.onboardingAufgaben[0].isCompleted).toBe(false);
+      const gemeldet = mails("onboarding-task-completed");
+      expect(gemeldet).toHaveLength(1);
+      expect(gemeldet[0][1]).toMatchObject({
+        hr_postfach: "personal@example.org",
+        ist_erledigt: "",
+        nur_kommentar: "ja",
+        meldung_kurz: "kommentiert",
+        kommentar_text: "Kommt am 03.10.",
+      });
+      expect(gemeldet[0][1]).not.toHaveProperty("email");
+
+      // Derselbe Text: nichts geaendert, keine Mail. Geleert: keine Mail.
+      expect((await aendern("tok-it", itemId, { body: { comment: "Kommt am 03.10." } })).status).toBe(200);
+      expect((await aendern("tok-it", itemId, { body: { comment: "" } })).status).toBe(200);
+      expect(mails("onboarding-task-completed")).toHaveLength(1);
+      expect(db.onboardingAufgaben[0].abteilungKommentar).toBeNull();
+    });
+
+    it("abhaken und kommentieren in einem PATCH: genau eine Mail", async () => {
+      await aendern("tok-it", itemId, { body: { isCompleted: true, comment: "Konto steht" } });
+      const gemeldet = mails("onboarding-task-completed");
+      expect(gemeldet).toHaveLength(1);
+      expect(gemeldet[0][1]).toMatchObject({ ist_erledigt: "ja", nur_kommentar: "", meldung_kurz: "erledigt, mit Kommentar" });
     });
 
     it("409 bei abgeschlossenem Vorgang, 410 bei EXPIRED — die Aufgabe bleibt unverändert", async () => {
@@ -488,6 +730,72 @@ describe("PATCH /api/onboarding-tasks/[token]/[itemId]", () => {
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: MELDUNGEN.LINK_UNGUELTIG });
       expect(db.onboardingAufgaben[0].isCompleted).toBe(false);
+    });
+
+    // ---- Paket A3 (S14): gestrichene Aufgaben (F2, Feinplan 1.11) ----
+
+    describe("entfallene Aufgabe", () => {
+      const GESTRICHEN = new Date("2026-09-20T09:00:00.000Z");
+
+      function streichen(a: Zeile): void {
+        Object.assign(a, { herkunft: "AUSSTATTUNG", isCompleted: true, completedAt: GESTRICHEN, completedById: "hr-1", entfaelltAm: GESTRICHEN });
+      }
+
+      it.each([[true], [false]])(
+        "409 AUFGABE_ENTFAELLT bei isCompleted: %s — nichts wird geschrieben, auch kein mitgeschickter Kommentar",
+        async (isCompleted) => {
+          streichen(db.onboardingAufgaben[0]);
+          const vorher = structuredClone(db.onboardingAufgaben[0]);
+          const res = await aendern("tok-it", itemId, { body: { isCompleted, comment: "Schon erledigt" } });
+          expect(res.status).toBe(409);
+          expect(await res.json()).toEqual({ error: MELDUNGEN.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" });
+          expect(db.onboardingAufgaben[0]).toEqual(vorher);
+          expect(db.audits).toEqual([]);
+          expect(mockTrigger).not.toHaveBeenCalled();
+        },
+      );
+
+      it("ein Kommentar allein bleibt möglich; `entfaellt` steht in der Antwort", async () => {
+        streichen(db.onboardingAufgaben[0]);
+        const res = await aendern("tok-it", itemId, { body: { comment: "Schlüssel war schon ausgegeben" } });
+        expect(res.status).toBe(200);
+        const { data } = await res.json();
+        expect(data.aufgabe).toMatchObject({ entfaellt: true, isCompleted: true, abteilungKommentar: "Schlüssel war schon ausgegeben" });
+        // Ohne zaehlende Aufgabe: 0 von 0 (die entfallene zaehlt nicht).
+        expect(data.fortschritt).toEqual({ gesamt: 0, erledigt: 0, prozent: 0 });
+        expect(db.onboardingAufgaben[0]).toMatchObject({ entfaelltAm: GESTRICHEN, isCompleted: true });
+        // Seit S18 (E-A17) erfaehrt HR auch diesen Kommentar.
+        expect(mails("onboarding-task-completed")).toHaveLength(1);
+        expect(mails("onboarding-task-completed")[0][1]).toMatchObject({ meldung_kurz: "kommentiert" });
+      });
+
+      it("Wettlauf: beim Lesen noch offen, vor der Linksperre gestrichen → 409, `entfaelltAm` und `isCompleted` bleiben", async () => {
+        // Haken zwischen dem Lesestand vor der Transaktion und `linksSperrenIn`:
+        // Der erste Sperr-Aufruf streicht die Aufgabe zuerst — wie eine HR-
+        // Aktion, die vor dieser Transaktion committet.
+        const sperren = fp.offboardingDepartmentLink.updateMany;
+        const echt = sperren.getMockImplementation()!;
+        sperren.mockImplementationOnce(async (args: unknown) => {
+          streichen(db.onboardingAufgaben[0]);
+          return echt(args);
+        });
+
+        // „wieder öffnen“ traefe mit WHERE isCompleted: true die gestrichene Aufgabe.
+        const res = await aendern("tok-it", itemId, { body: { isCompleted: false } });
+        expect(res.status).toBe(409);
+        expect((await res.json()).grund).toBe("AUFGABE_ENTFAELLT");
+        expect(db.onboardingAufgaben[0]).toMatchObject({ entfaelltAm: GESTRICHEN, isCompleted: true, completedAt: GESTRICHEN });
+        expect(db.audits).toEqual([]);
+        expect(mockTrigger).not.toHaveBeenCalled();
+      });
+
+      it("das bedingte Umschalten traegt `entfaelltAm: null` im WHERE (zweites Netz)", async () => {
+        await aendern("tok-it", itemId, { body: { isCompleted: true } });
+        const aufrufe = fp.checklistItem.updateMany.mock.calls.map((c) => c[0] as { where: Zeile });
+        expect(aufrufe).toContainEqual(
+          expect.objectContaining({ where: { id: itemId, isCompleted: false, entfaelltAm: null } }),
+        );
+      });
     });
   });
 });

@@ -16,6 +16,14 @@
  * (individuelleMailsAufraeumen in individuelle-mail-dienst.ts). Die Antwort
  * traegt dafuer `individuelleMails` — `AUSWERTER` in zeitplaner/bericht.ts liest es.
  *
+ * Seit Paket A3 (S20, E-A22) leert er ausserdem Bemerkungen, Angaben und
+ * Hinweise aus „Ausstattung & Zugänge“ sechs Monate nach Abschluss oder
+ * Abbruch des Onboardings (eigene Frist `freitextGrenze`, nicht die zwoelf
+ * Monate oben; die Zeilen bleiben als Nachweis —
+ * `ausstattungFreitexteLeeren` in ausstattung-lauf.ts). Antwortfeld
+ * `ausstattung`: `{ geleert, hinweiseGeleert, fehler }`, im Probelauf
+ * `{ wuerdeLeeren }`.
+ *
  * Gestartet vom Zeitplaner des Portals (src/lib/zeitplaner/, Einstellungen →
  * Automatische Läufe); Handaufruf ueber die duenne Route POST /api/cron/dokumente-aufbewahrung
  * (Bearer CRON_SECRET). Probelauf (`dryRun`, Route: ?dryRun=1): nur zaehlen.
@@ -27,11 +35,21 @@ import { deleteUploadedFile, deleteUploadedDirIfEmpty } from "@/lib/file-upload"
 import { AUFBEWAHRUNG_MONATE, aufbewahrungsGrenze } from "@/lib/erzeugte-dokumente-vorgang";
 import { laufAntwort, type LaufErgebnis, type LaufOptionen } from "@/lib/laeufe/lauf-ergebnis";
 import { individuelleMailsAufraeumen } from "@/lib/individuelle-mail-dienst";
+import { FREITEXT_AUFBEWAHRUNG_MONATE, freitextGrenze } from "@/lib/ausstattung";
+import { ausstattungFreitexteLeeren, leeresFreitexteErgebnis } from "@/lib/ausstattung-lauf";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 
 export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promise<LaufErgebnis> {
   try {
     const dryRun = opts.dryRun === true;
-    const grenze = aufbewahrungsGrenze(opts.jetzt ?? new Date());
+    const jetzt = opts.jetzt ?? new Date();
+    const grenze = aufbewahrungsGrenze(jetzt);
+    // Eigene, kuerzere Frist fuer die Freitexte der Ausstattung (E-A22).
+    const ausstattungGrenze = freitextGrenze(jetzt);
+    const ausstattungKopf = {
+      aufbewahrungMonate: FREITEXT_AUFBEWAHRUNG_MONATE,
+      grenze: ausstattungGrenze.toISOString(),
+    };
 
     const faellig = await prisma.generatedDocument.findMany({
       where: { createdAt: { lt: grenze } },
@@ -40,6 +58,7 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
 
     if (dryRun) {
       const mails = await individuelleMailsAufraeumen({ grenze, dryRun: true });
+      const ausstattung = await ausstattungFreitexteLeeren({ grenze: ausstattungGrenze, dryRun: true });
       return laufAntwort({
         success: true,
         dryRun: true,
@@ -47,6 +66,8 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
         grenze: grenze.toISOString(),
         wuerdeLoeschen: faellig.length,
         individuelleMails: { wuerdeLeeren: mails.mails },
+        // Zeilen (Bemerkung/Angabe) und Hinweise zusammen.
+        ausstattung: { ...ausstattungKopf, wuerdeLeeren: ausstattung.geleert + ausstattung.hinweiseGeleert },
       });
     }
 
@@ -88,6 +109,16 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
       mails.fehler++;
     }
 
+    // Eigener Block (E-A22): Freitexte der Ausstattung leeren — ein Fehler dort
+    // laesst Dokumente und E-Mails oben unberuehrt.
+    let ausstattung = leeresFreitexteErgebnis();
+    try {
+      ausstattung = await ausstattungFreitexteLeeren({ grenze: ausstattungGrenze, dryRun: false, jetzt });
+    } catch (err) {
+      console.error("[cron/dokumente-aufbewahrung] Ausstattung (Freitexte):", fehlerKennung(err));
+      ausstattung.fehler++;
+    }
+
     return laufAntwort({
       success: true,
       aufbewahrungMonate: AUFBEWAHRUNG_MONATE,
@@ -97,6 +128,12 @@ export async function dokumenteAufbewahrungLauf(opts: LaufOptionen = {}): Promis
       ordnerGeloescht,
       fehler,
       individuelleMails: { geleert: mails.mails, dateienGeloescht: mails.dateienGeloescht, fehler: mails.fehler },
+      ausstattung: {
+        ...ausstattungKopf,
+        geleert: ausstattung.geleert,
+        hinweiseGeleert: ausstattung.hinweiseGeleert,
+        fehler: ausstattung.fehler,
+      },
     });
   } catch (error) {
     console.error("[cron/dokumente-aufbewahrung] Schwerer Fehler:", error);

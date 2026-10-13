@@ -22,11 +22,15 @@
  *  6. Onboarding (/onboarding-tasks/[token]): dieselbe Komponente mit den
  *     Onboarding-Begriffen, Countdown „Bis zum Dienstbeginn", die zusaetzliche
  *     Reihe „Nur für {Abteilung}" und der Hinweis aus der Vorlage.
+ *     Ausstattung & Zugaenge (Paket A3, S14, Mockup 6.5): Arbeitsort im Kopf,
+ *     Angaben und Hinweis im Block „Nur für …“, Bemerkung als eigener Kasten,
+ *     „Eilt“, „entfällt“ (eigener Abschnitt, kein Abhaken, Zaehler ohne sie).
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import OffboardingTasksPage from "@/app/offboarding-tasks/[token]/page";
 import OnboardingTasksPage from "@/app/onboarding-tasks/[token]/page";
 import type { AufgabenSeitenDaten, OeffentlicheAufgabe } from "@/components/abteilungsaufgaben/aufgaben-seite";
+import { MELDUNGEN as MELDUNGEN_ABT } from "@/lib/abteilungsaufgaben";
 
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -99,6 +103,7 @@ function seitenDaten(teil: Partial<AufgabenSeitenDaten> = {}): AufgabenSeitenDat
   const aufgaben = teil.aufgaben ?? [A1, A2];
   const erledigt = aufgaben.filter((a) => a.isCompleted).length;
   return {
+    modul: "OFFBOARDING",
     abteilung: { key: "IT", name: "IT-Abteilung" },
     vorgang: {
       vorgangsnummer: "OFF-2027-GYM-014",
@@ -265,11 +270,21 @@ describe("Inhalt", () => {
     expect(within(karteVon("a1")).getByRole("button", { name: "Kommentar ändern" })).not.toBeNull();
   });
 
-  it("ohne Aufgaben: Hinweis", async () => {
+  it("ohne Aufgaben: Hinweis — der Fortschritt steht wie eh und je auf 100 %", async () => {
     uhrStellen();
     getAntwort = { status: 200, body: { data: seitenDaten({ aufgaben: [] }) } };
     await zeigeSeite();
     expect(seitentext()).toContain("Keine Aufgaben für diese Abteilung vorhanden.");
+    // Das Offboarding kennt kein „entfällt“ (F2) und bleibt Byte fuer Byte gleich.
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("100");
+    expect(seitentext()).toContain("100 %");
+
+    // Auch ohne `modul` in der Antwort (aelterer Stand): Offboarding-Rechnung.
+    cleanup();
+    const { modul: _modul, ...ohneModul } = seitenDaten({ aufgaben: [] });
+    getAntwort = { status: 200, body: { data: ohneModul } };
+    await zeigeSeite();
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("100");
   });
 });
 
@@ -520,6 +535,7 @@ describe("Onboarding-Seite", () => {
     const aufgaben = teil.aufgaben ?? [onbAufgabe()];
     const erledigt = aufgaben.filter((a) => a.isCompleted).length;
     return {
+      modul: "ONBOARDING",
       abteilung: { key: "IT", name: "IT-Abteilung" },
       vorgang: {
         vorgangsnummer: "ONB-2026-031",
@@ -663,5 +679,170 @@ describe("Onboarding-Seite", () => {
     expect(seitentext()).toContain(
       "Dieser Vorgang ist nicht mehr aktiv. Bitte keine weiteren Schritte unternehmen.",
     );
+  });
+
+  // ---- Paket A3 (S14): Ausstattung & Zugaenge (Mockup 6.5) ----
+
+  describe("Ausstattung & Zugänge", () => {
+    const IPAD = onbAufgabe({
+      id: "o-ipad",
+      title: "Dienst-iPad bereitstellen",
+      category: "Ausstattung & Zugänge",
+      orderIndex: -100000,
+      dueDate: "2026-09-27T00:00:00.000Z",
+      description: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+      bemerkung: { text: "Mit Stift und Hülle,\nApps: WebUntis", label: "Bemerkung der Führungskraft" },
+      eilt: true,
+      entfaellt: false,
+    });
+    const PARKPLATZ = onbAufgabe({
+      id: "o-park",
+      title: "Parkplatz bereitstellen",
+      category: "Ausstattung & Zugänge",
+      orderIndex: -99900,
+      dueDate: null,
+      isCompleted: true,
+      completedAt: "2026-09-20T09:00:00.000Z",
+      bemerkung: null,
+      eilt: false,
+      entfaellt: true,
+    });
+
+    function mitAusstattung(teil: Partial<AufgabenSeitenDaten> = {}): AufgabenSeitenDaten {
+      return onbDaten({
+        aufgaben: [IPAD, PARKPLATZ, onbAufgabe({ bemerkung: null, eilt: false, entfaellt: false })],
+        arbeitsort: "Förderverein Minden",
+        angaben: [
+          { label: "Gewünschte Durchwahl", wert: "214" },
+          { label: "Unterrichtsfächer", wert: "Chemie, Sport" },
+        ],
+        hinweis: "Bitte den Laptop\nmit Dockingstation.",
+        ...teil,
+      });
+    }
+
+    it("Kopf: Arbeitsort neben der Einrichtung — ohne Abweichung keine Zeile", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      expect(document.querySelector("[data-arbeitsort]")?.textContent).toBe("Arbeitsort: Förderverein Minden");
+
+      cleanup();
+      getAntwort = { status: 200, body: { data: mitAusstattung({ arbeitsort: null }) } };
+      await zeigeOnboarding();
+      expect(document.querySelector("[data-arbeitsort]")).toBeNull();
+      expect(seitentext()).not.toContain("Arbeitsort");
+    });
+
+    it("Block „Nur für …“: Zusatzfelder, dann Angaben und der Hinweis an die Stelle", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      const reihe = document.querySelector("[data-zusatz]") as HTMLElement;
+      expect(reihe.textContent).toContain("Nur für IT-Abteilung");
+      expect(reihe.textContent).toContain("Lehrkraft Sek. I");
+      const angaben = reihe.querySelector("[data-angaben]") as HTMLElement;
+      expect(angaben.querySelector('[data-angabe="Unterrichtsfächer"]')?.textContent).toBe("UnterrichtsfächerChemie, Sport");
+      expect(angaben.querySelector('[data-angabe="Gewünschte Durchwahl"]')?.textContent).toBe("Gewünschte Durchwahl214");
+      const hinweis = angaben.querySelector("[data-stellen-hinweis]") as HTMLElement;
+      expect(hinweis.textContent).toBe("Hinweis der FührungskraftBitte den Laptop\nmit Dockingstation.");
+    });
+
+    it("Angaben ohne Zusatzfelder (z. B. Buchhaltung): der Block steht trotzdem", async () => {
+      uhrStellen(ONB_JETZT);
+      const d = mitAusstattung({ zusatz: {}, hinweis: null });
+      getAntwort = { status: 200, body: { data: { ...d, abteilung: { key: "BUCHHALTUNG", name: "Buchhaltung" } } } };
+      await zeigeOnboarding();
+      const reihe = document.querySelector("[data-zusatz]") as HTMLElement;
+      expect(reihe.textContent).toContain("Nur für Buchhaltung");
+      expect(reihe.querySelector("[data-stellen-hinweis]")).toBeNull();
+      expect(reihe.textContent).toContain("Chemie, Sport");
+    });
+
+    it("Bemerkung als eigener Kasten an der Aufgabe, getrennt vom festen Hinweis aus dem Katalog", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      const karte = karteVon("o-ipad");
+      expect(karte.querySelector('[data-hinweis="beschreibung"]')?.textContent).toBe(
+        "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+      );
+      const kasten = karte.querySelector("[data-bemerkung]") as HTMLElement;
+      expect(kasten.textContent).toBe("Bemerkung der FührungskraftMit Stift und Hülle,\nApps: WebUntis");
+      // Aufgaben ohne Bemerkung bekommen keinen Kasten.
+      expect(karteVon("o1").querySelector("[data-bemerkung]")).toBeNull();
+    });
+
+    it("„Eilt“ neben der Fälligkeit einer offenen Aufgabe; Kategorie „Ausstattung & Zugänge“ oben", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      expect(karteVon("o-ipad").querySelector('[data-kennzeichen="eilt"]')?.textContent).toBe("Eilt");
+      expect(karteVon("o-ipad").textContent).toContain("Fällig 27.09.2026");
+      expect(karteVon("o1").querySelector('[data-kennzeichen="eilt"]')).toBeNull();
+      const offen = screen.getByRole("region", { name: "Offene Aufgaben (2)" });
+      expect(within(offen).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+        "Ausstattung & Zugänge",
+        "Vor dem ersten Tag",
+      ]);
+    });
+
+    it("„entfällt“: eigener Abschnitt, Kennzeichen, kein Abhaken, kein „Erledigt am“, Kommentar bleibt möglich", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      const entfallen = screen.getByRole("region", { name: "Entfallene Aufgaben (1)" });
+      const karte = within(entfallen).getByText("Parkplatz bereitstellen").closest("[data-aufgabe]") as HTMLElement;
+      expect(karte.querySelector('[data-kennzeichen="entfaellt"]')?.textContent).toBe("Entfällt");
+      expect(karte.textContent).toContain("Die Personalabteilung hat diese Aufgabe gestrichen.");
+      expect(karte.textContent).not.toContain("Erledigt am");
+      const box = within(karte).getByRole("button", { name: "Entfällt – kann nicht abgehakt werden" }) as HTMLButtonElement;
+      expect(box.disabled).toBe(true);
+      fireEvent.click(box);
+      expect(patches()).toHaveLength(0);
+      expect((within(karte).getByRole("button", { name: "Kommentar hinzufügen" }) as HTMLButtonElement).disabled).toBe(false);
+      // Nicht unter „Erledigte Aufgaben“, und im Zaehler nicht mitgezaehlt (F2): 0 von 2.
+      expect(screen.queryByRole("region", { name: /Erledigte Aufgaben/ })).toBeNull();
+      expect(seitentext()).toContain("0 / 2 erledigt");
+      expect(seitentext()).not.toContain("Alle Aufgaben erledigt");
+    });
+
+    it("nur entfallene Aufgaben: „nichts mehr zu tun“ statt „Alle Aufgaben erledigt“, 0 / 0", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung({ aufgaben: [PARKPLATZ] }) } };
+      await zeigeOnboarding();
+      const text = seitentext();
+      expect(text).toContain("Für Sie ist nichts mehr zu tun – alle Aufgaben sind entfallen.");
+      expect(text).toContain("0 / 0 erledigt");
+      // Onboarding: ohne zaehlende Aufgabe 0 % (checklistFortschritt), nicht 100 %.
+      expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("0");
+      expect(text).not.toContain("Alle Aufgaben erledigt");
+      expect(text).not.toContain("Keine Aufgaben für diese Abteilung vorhanden.");
+    });
+
+    it("409 „entfällt“ beim Abhaken: Meldung des Servers, die Aufgabe wandert zu den entfallenen", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      patchAntwort = () => ({ status: 409, body: { error: MELDUNGEN_ABT.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" } });
+      await zeigeOnboarding();
+      await act(async () => {
+        fireEvent.click(within(karteVon("o-ipad")).getByRole("button", { name: "Als erledigt markieren" }));
+      });
+      expect(screen.getByRole("alert").textContent).toBe(MELDUNGEN_ABT.AUFGABE_ENTFAELLT);
+      const entfallen = screen.getByRole("region", { name: "Entfallene Aufgaben (2)" });
+      expect(within(entfallen).getByText("Dienst-iPad bereitstellen")).not.toBeNull();
+      expect(seitentext()).toContain("Offene Aufgaben (1)");
+    });
+
+    it("Offboarding-Daten ohne die neuen Felder: kein Kasten, kein Kennzeichen, kein Abschnitt", async () => {
+      uhrStellen();
+      await zeigeSeite();
+      expect(document.querySelector("[data-bemerkung]")).toBeNull();
+      expect(document.querySelector("[data-kennzeichen]")).toBeNull();
+      expect(document.querySelector("[data-angaben]")).toBeNull();
+      expect(document.querySelector("[data-arbeitsort]")).toBeNull();
+      expect(screen.queryByRole("region", { name: /Entfallene Aufgaben/ })).toBeNull();
+      expect(seitentext()).toContain("0 / 2 erledigt");
+    });
   });
 });

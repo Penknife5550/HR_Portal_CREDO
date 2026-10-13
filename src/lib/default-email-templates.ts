@@ -1241,6 +1241,27 @@ CREDO Gruppe – {{einrichtung}}`,
   //     Zeile "Betriebsstätte:" stehen. Ein Admin darf sie in dieser Vorlage
   //     auch weglassen; was NICHT geht, ist sie in eine der drei anderen
   //     Vorlagen zu setzen — dort liefert sie keine Aufrufstelle.
+  //
+  // Ausstattung & Zugaenge (Paket A3):
+  //   - Bemerkung („Bemerkung der Führungskraft: …“) und „(eilt)“ baut der
+  //     Code in {{aufgabenliste}}/{{aufgabenliste_html}} — sie stehen auch in
+  //     einer gespeicherten Vorlage ohne „Zurücksetzen“.
+  //   - Nur die Zuweisungsmail: {{angaben_html}} sind fertige, maskierte Zeilen
+  //     des Infokastens (Angaben wie Unterrichtsfächer und der Hinweis der
+  //     Führungskraft an die Stelle), {{angaben}} derselbe Inhalt roh fuer den
+  //     Textteil; beide leer ohne Angaben. {{arbeitsort}} nur, wenn er von der
+  //     Einrichtung abweicht (F15) — sonst stuende beim Hausmeister der
+  //     Grundschule nur der Foerderverein.
+  //   - Im Betreff von Zuweisung und Erinnerung gesperrt (betreffOhne):
+  //     Aufgabenliste, Angaben, Nachtrag, Link.
+  //   - Nachtrag (Regel 10, F7): {{#nachtrag}} mit {{nachtrag_liste_html}}
+  //     (fertige, maskierte Liste „Neu/Geändert/Entfällt: …“) bzw.
+  //     {{nachtrag_liste}} im Textteil — in JEDER Zuweisungsmail, sobald
+  //     sich nach der Information etwas geaendert hat, und in „Nachtrag
+  //     senden“. Die Aufgabenliste steht in {{#hat_offene_aufgaben}}: Ein
+  //     Nachtrag, der nur „Entfällt“ meldet, hat keine offenen Aufgaben.
+  //     Flach, nie verschachtelt (deshalb steht {{#arbeitsort}} VOR dem
+  //     Block im Einleitungssatz, nicht darin).
   // =============================================
   {
     event: "onboarding-department-assigned",
@@ -1263,9 +1284,15 @@ CREDO Gruppe – {{einrichtung}}`,
           </div>
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Aufgaben zum Dienstbeginn</h2>
           <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Guten Tag, bitte bereiten Sie den Dienstbeginn für <strong>{{mitarbeiter_name}}</strong> am {{vertragsbeginn}} in {{einrichtung}} vor. Folgende Aufgaben sind für Sie vorgesehen (zuständig: {{abteilung}}):
+            Guten Tag, bitte bereiten Sie den Dienstbeginn für <strong>{{mitarbeiter_name}}</strong> am {{vertragsbeginn}} in {{einrichtung}}{{#arbeitsort}} (Arbeitsort: {{arbeitsort}}){{/arbeitsort}} vor.{{#hat_offene_aufgaben}} Folgende Aufgaben sind für Sie vorgesehen (zuständig: {{abteilung}}):{{/hat_offene_aufgaben}}
           </p>
-          {{aufgabenliste_html}}
+          {{#hat_offene_aufgaben}}{{aufgabenliste_html}}{{/hat_offene_aufgaben}}
+          {{#nachtrag}}<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 16px;">
+            <tr><td style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;">
+              <p style="margin:0 0 8px;color:#92400e;font-size:14px;font-weight:bold;">Ihre Aufgaben wurden seit der letzten Nachricht ergänzt oder geändert:</p>
+              {{nachtrag_liste_html}}
+            </td></tr>
+          </table>{{/nachtrag}}
           {{#ist_fuehrungskraft}}<p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">
             Sie erhalten diese Aufgaben, weil Sie im Onboarding-Vorgang als Führungskraft eingetragen sind. Falls das nicht zutrifft, geben Sie bitte der Personalabteilung Bescheid.
           </p>{{/ist_fuehrungskraft}}
@@ -1278,6 +1305,10 @@ CREDO Gruppe – {{einrichtung}}`,
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vorgangsnummer</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{vorgangsnummer}}</p>
             </td></tr>
+            {{#arbeitsort}}<tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Arbeitsort</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{arbeitsort}}</p>
+            </td></tr>{{/arbeitsort}}
             {{#stellenbezeichnung}}<tr><td style="padding:0 16px 16px;">
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Stellenbezeichnung</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{stellenbezeichnung}}</p>
@@ -1290,6 +1321,7 @@ CREDO Gruppe – {{einrichtung}}`,
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Ansprechpartner (Führungskraft)</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{ansprechpartner_email}}</p>
             </td></tr>{{/ansprechpartner_email}}
+            {{#angaben_html}}{{angaben_html}}{{/angaben_html}}
           </table>
           <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
             <tr><td style="background-color:#2563eb;border-radius:8px;">
@@ -1321,17 +1353,22 @@ CREDO Gruppe – {{einrichtung}}`,
 </html>`,
     bodyText: `Onboarding-Aufgaben für {{abteilung}}: Dienstbeginn {{vertragsbeginn}} ({{einrichtung}})
 
-Bitte bereiten Sie den Dienstbeginn für {{mitarbeiter_name}} am {{vertragsbeginn}} in {{einrichtung}} vor. Folgende Aufgaben sind für Sie vorgesehen (zuständig: {{abteilung}}):
+Bitte bereiten Sie den Dienstbeginn für {{mitarbeiter_name}} am {{vertragsbeginn}} in {{einrichtung}}{{#arbeitsort}} (Arbeitsort: {{arbeitsort}}){{/arbeitsort}} vor.{{#hat_offene_aufgaben}} Folgende Aufgaben sind für Sie vorgesehen (zuständig: {{abteilung}}):
 
-{{aufgabenliste}}
-{{#ist_fuehrungskraft}}
+{{aufgabenliste}}{{/hat_offene_aufgaben}}
+{{#nachtrag}}
+Ihre Aufgaben wurden seit der letzten Nachricht ergänzt oder geändert:
+{{nachtrag_liste}}
+{{/nachtrag}}{{#ist_fuehrungskraft}}
 Sie erhalten diese Aufgaben, weil Sie im Onboarding-Vorgang als Führungskraft eingetragen sind. Falls das nicht zutrifft, geben Sie bitte der Personalabteilung Bescheid.
 {{/ist_fuehrungskraft}}
 Vertragsbeginn: {{vertragsbeginn}}
-{{#stellenbezeichnung}}Stellenbezeichnung: {{stellenbezeichnung}}
+{{#arbeitsort}}Arbeitsort: {{arbeitsort}}
+{{/arbeitsort}}{{#stellenbezeichnung}}Stellenbezeichnung: {{stellenbezeichnung}}
 {{/stellenbezeichnung}}{{#betriebsstaette}}Betriebsstätte: {{betriebsstaette}}
 {{/betriebsstaette}}{{#ansprechpartner_email}}Ansprechpartner (Führungskraft): {{ansprechpartner_email}}
-{{/ansprechpartner_email}}
+{{/ansprechpartner_email}}{{#angaben}}{{angaben}}
+{{/angaben}}
 Aufgaben öffnen: {{link}}
 Gültig bis {{ablaufdatum}}. Bitte leiten Sie den Link nur innerhalb Ihres Bereichs weiter.
 {{#erneut_gesendet}}
@@ -1348,20 +1385,27 @@ CREDO HR-Portal`,
       { key: "{{nachname}}", description: "Nachname (kann vor dem Fragebogen leer sein)" },
       { key: "{{abteilung}}", description: "Zuständigkeit: Name der Abteilung bzw. „Führungskraft“" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{arbeitsort}}", description: "Arbeitsort, nur wenn er von der Einrichtung abweicht (z. B. die Grundschule, an der jemand des Fördervereins arbeitet), sonst leer (für {{#arbeitsort}}…{{/arbeitsort}})" },
       { key: "{{vertragsbeginn}}", description: "Vertragsbeginn / Dienstbeginn (TT.MM.JJJJ)" },
-      { key: "{{link}}", description: "Link zu den Aufgaben (ohne Anmeldung)" },
+      { key: "{{link}}", description: "Link zu den Aufgaben (ohne Anmeldung) – nie im Betreff" },
       { key: "{{ablaufdatum}}", description: "Der Link ist gültig bis (TT.MM.JJJJ)" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
-      { key: "{{aufgabenliste}}", description: "Aufgaben als Klartext, eine Zeile je Aufgabe („- Titel – fällig TT.MM.JJJJ“), ein Hinweis eingerückt darunter – für den Textteil" },
+      { key: "{{aufgabenliste}}", description: "Aufgaben als Klartext, eine Zeile je Aufgabe („- Titel – fällig TT.MM.JJJJ“, bei kurzfristig angehobener Frist mit „(eilt)“), Hinweis und Bemerkung zur Position eingerückt darunter – für den Textteil, nie im Betreff" },
       { key: "{{aufgabenliste_html}}", description: "Dieselben Aufgaben als HTML-Liste, bereits maskiert – für den HTML-Teil" },
       { key: "{{anzahl_aufgaben}}", description: "Anzahl der gelisteten Aufgaben" },
       { key: "{{naechste_faelligkeit}}", description: "Früheste Fälligkeit der gelisteten Aufgaben (TT.MM.JJJJ, leer ohne Fälligkeit)" },
       { key: "{{stellenbezeichnung}}", description: "Stellenbezeichnung aus den Einstellungsmodalitäten – nur für Zuständigkeiten, die sie sehen dürfen, sonst leer (für {{#stellenbezeichnung}}…{{/stellenbezeichnung}})" },
       { key: "{{betriebsstaette}}", description: "Betriebsstätte aus den Einstellungsmodalitäten – nur für Zuständigkeiten, die sie sehen dürfen, sonst leer" },
       { key: "{{ansprechpartner_email}}", description: "E-Mail der Führungskraft des Vorgangs – nur für Zuständigkeiten, die sie sehen dürfen, sonst leer" },
+      { key: "{{angaben}}", description: "Angaben aus „Ausstattung & Zugänge“ für diese Zuständigkeit (z. B. Unterrichtsfächer, Durchwahl) und der Hinweis der Führungskraft an sie, eine Zeile je Angabe – für den Textteil, nie im Betreff; leer ohne Angaben (für {{#angaben}}…{{/angaben}})" },
+      { key: "{{angaben_html}}", description: "Dieselben Angaben als fertige Zeilen des Infokastens, bereits maskiert – für den HTML-Teil innerhalb der Tabelle (für {{#angaben_html}}…{{/angaben_html}})" },
       { key: "{{erneut_gesendet}}", description: "„ja“, wenn die Mail mit unverändertem Link erneut gesendet wird, sonst leer (für {{#erneut_gesendet}}…{{/erneut_gesendet}})" },
       { key: "{{neuer_link}}", description: "„ja“, wenn ein neuer Link vergeben wurde (Link erneuert oder Adresse geändert) – der alte gilt dann nicht mehr; sonst leer" },
       { key: "{{ist_fuehrungskraft}}", description: "„ja“, wenn die Mail an die Führungskraft geht, sonst leer" },
+      { key: "{{hat_offene_aufgaben}}", description: "„ja“, wenn für die Zuständigkeit noch Aufgaben offen sind, sonst leer – ein Nachtrag, der nur „Entfällt“ meldet, hat keine Aufgabenliste (für {{#hat_offene_aufgaben}}…{{/hat_offene_aufgaben}})" },
+      { key: "{{nachtrag}}", description: "„ja“, wenn sich seit der letzten Nachricht an die Zuständigkeit etwas geändert hat (Nachtrag oder erneute Mail), sonst leer (für {{#nachtrag}}…{{/nachtrag}})" },
+      { key: "{{nachtrag_liste}}", description: "Die Änderungen als Klartext, eine Zeile je Aufgabe („Neu: …“, „Geändert: …“, „Entfällt: …“) – für den Textteil, nie im Betreff" },
+      { key: "{{nachtrag_liste_html}}", description: "Dieselben Änderungen als HTML-Liste, bereits maskiert – für den HTML-Teil" },
     ],
   },
 
@@ -1375,6 +1419,9 @@ CREDO HR-Portal`,
   // mehr ueberfaellig). ist_ueberfaellig haengt an den Aufgaben, nicht an der
   // Stufe. Bewusst KEIN Satz, HR werde informiert — eine HR-Eskalation gibt
   // es nicht. Aufgaben ohne Faelligkeit loesen nie eine Erinnerung aus.
+  // Paket A3: Die erste Erinnerung mit einer eilenden Ausstattungsaufgabe ist
+  // hoechstens „Überfällig“ (eiltDeckeln, Regel 14); Angaben traegt die
+  // Erinnerung bewusst nicht (nur die Zuweisungsmail).
   // =============================================
   {
     event: "onboarding-department-reminder",
@@ -1454,7 +1501,7 @@ CREDO HR-Portal`,
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{vertragsbeginn}}", description: "Vertragsbeginn / Dienstbeginn (TT.MM.JJJJ)" },
       { key: "{{offene_aufgaben}}", description: "Anzahl der offenen Aufgaben dieser Zuständigkeit" },
-      { key: "{{aufgabenliste}}", description: "Offene Aufgaben als Klartext, eine Zeile je Aufgabe, ein Hinweis eingerückt darunter – für den Textteil" },
+      { key: "{{aufgabenliste}}", description: "Offene Aufgaben als Klartext, eine Zeile je Aufgabe (bei kurzfristig angehobener Frist mit „(eilt)“), Hinweis und Bemerkung zur Position eingerückt darunter – für den Textteil, nie im Betreff" },
       { key: "{{aufgabenliste_html}}", description: "Dieselben Aufgaben als HTML-Liste, bereits maskiert – für den HTML-Teil" },
       { key: "{{anzahl_aufgaben}}", description: "Anzahl der gelisteten (offenen) Aufgaben" },
       { key: "{{naechste_faelligkeit}}", description: "Früheste Fälligkeit der offenen Aufgaben (TT.MM.JJJJ, leer ohne Fälligkeit)" },
@@ -1465,25 +1512,32 @@ CREDO HR-Portal`,
       { key: "{{ist_warnung}}", description: "„ja“ bei der Stufe „Überfällig“, sonst leer" },
       { key: "{{ist_eskalation}}", description: "„ja“ bei der Stufe „Dringend“ (seit 3 Tagen oder länger überfällig), sonst leer" },
       { key: "{{ist_fuehrungskraft}}", description: "„ja“, wenn die Mail an die Führungskraft geht, sonst leer" },
-      { key: "{{link}}", description: "Link zu den Aufgaben (ohne Anmeldung)" },
+      { key: "{{link}}", description: "Link zu den Aufgaben (ohne Anmeldung) – nie im Betreff" },
       { key: "{{ablaufdatum}}", description: "Der Link ist gültig bis (TT.MM.JJJJ)" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
     ],
   },
 
   // =============================================
-  // Onboarding: Aufgabe erledigt (an HR)
+  // Onboarding: Aufgabe erledigt oder kommentiert (an HR)
   //
-  // Geht nur hinaus, wenn in der Vorlage ein An-Feld steht (Katalog to: "").
   // Ausloeser ist AUSSCHLIESSLICH der Link der Abteilung — hakt HR im Portal
   // ab, meldet das Portal HR nichts an sich selbst (Entscheidung Paket 5).
+  // Paket A3 (E-A17): Auch ein reiner Kommentar der Stelle (geaendert, nicht
+  // leer) geht ans HR-Postfach; abhaken und kommentieren zugleich gibt genau
+  // EINE Mail. Empfaenger ist `{{hr_postfach}}` (Katalog-Default; ein An-Feld
+  // der gespeicherten Vorlage geht vor). Genau einer der Merker
+  // {{ist_erledigt}} / {{nur_kommentar}} ist „ja“ — die Bloecke stehen
+  // nebeneinander, nie ineinander. {{meldung_kurz}} traegt den Betreff
+  // („erledigt“, „erledigt, mit Kommentar“, „kommentiert“). Kommentar und
+  // Aufgabenliste nie im Betreff (betreffOhne, F19).
   // {{kommentar}} ist schon maskiert (Zeilenumbrueche als <br>),
   // {{kommentar_text}} ist der Rohtext und steht NUR im Textteil.
   // =============================================
   {
     event: "onboarding-task-completed",
     name: "Onboarding-Aufgabe erledigt",
-    subject: "Onboarding-Aufgabe erledigt: {{aufgabe}} ({{abteilung}})",
+    subject: "Onboarding-Aufgabe {{meldung_kurz}}: {{aufgabe}} ({{abteilung}})",
     bodyHtml: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -1496,22 +1550,32 @@ CREDO HR-Portal`,
           <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
         </td></tr>
         <tr><td style="background-color:#ffffff;padding:32px;">
-          <div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+          {{#ist_erledigt}}<div style="display:inline-block;background-color:#d1fae5;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
             <span style="color:#065f46;font-weight:bold;font-size:14px;">Aufgabe erledigt</span>
-          </div>
+          </div>{{/ist_erledigt}}
+          {{#nur_kommentar}}<div style="display:inline-block;background-color:#dbeafe;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#1e40af;font-weight:bold;font-size:14px;">Rückmeldung zur Aufgabe</span>
+          </div>{{/nur_kommentar}}
           <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">{{aufgabe}}</h2>
-          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+          {{#ist_erledigt}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
             Die Aufgabe „{{aufgabe}}“ für {{mitarbeiter_name}} wurde als erledigt markiert.
-          </p>
+          </p>{{/ist_erledigt}}
+          {{#nur_kommentar}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Zur Aufgabe „{{aufgabe}}“ für {{mitarbeiter_name}} hat die zuständige Stelle einen Kommentar hinterlassen. Bitte prüfen Sie, ob von Ihrer Seite etwas zu tun ist.
+          </p>{{/nur_kommentar}}
           <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 24px;">
             <tr><td style="padding:16px;">
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Zuständigkeit</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{abteilung}}</p>
             </td></tr>
-            <tr><td style="padding:0 16px 16px;">
+            {{#ist_erledigt}}<tr><td style="padding:0 16px 16px;">
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Erledigt über</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{erledigt_ueber}}</p>
-            </td></tr>
+            </td></tr>{{/ist_erledigt}}
+            {{#nur_kommentar}}<tr><td style="padding:0 16px 16px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Gemeldet über</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{erledigt_ueber}}</p>
+            </td></tr>{{/nur_kommentar}}
             <tr><td style="padding:0 16px 16px;">
               <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vertragsbeginn</p>
               <p style="margin:0;color:#374151;font-size:14px;">{{vertragsbeginn}}</p>
@@ -1543,13 +1607,15 @@ CREDO HR-Portal`,
   </table>
 </body>
 </html>`,
-    bodyText: `Onboarding-Aufgabe erledigt: {{aufgabe}} ({{abteilung}})
+    bodyText: `Onboarding-Aufgabe {{meldung_kurz}}: {{aufgabe}} ({{abteilung}})
 
-Die Aufgabe „{{aufgabe}}“ für {{mitarbeiter_name}} wurde als erledigt markiert.
-
+{{#ist_erledigt}}Die Aufgabe „{{aufgabe}}“ für {{mitarbeiter_name}} wurde als erledigt markiert.
+{{/ist_erledigt}}{{#nur_kommentar}}Zur Aufgabe „{{aufgabe}}“ für {{mitarbeiter_name}} hat die zuständige Stelle einen Kommentar hinterlassen. Bitte prüfen Sie, ob von Ihrer Seite etwas zu tun ist.
+{{/nur_kommentar}}
 Zuständigkeit: {{abteilung}}
-Erledigt über: {{erledigt_ueber}}
-Vertragsbeginn: {{vertragsbeginn}}
+{{#ist_erledigt}}Erledigt über: {{erledigt_ueber}}
+{{/ist_erledigt}}{{#nur_kommentar}}Gemeldet über: {{erledigt_ueber}}
+{{/nur_kommentar}}Vertragsbeginn: {{vertragsbeginn}}
 Vorgangsnummer: {{vorgangsnummer}}
 Noch offen im Vorgang: {{offene_aufgaben}} Aufgabe(n)
 {{#kommentar_text}}
@@ -1557,12 +1623,16 @@ Kommentar der Abteilung: {{kommentar_text}}
 {{/kommentar_text}}
 CREDO HR-Portal`,
     variables: [
-      { key: "{{aufgabe}}", description: "Titel der erledigten Aufgabe" },
+      { key: "{{aufgabe}}", description: "Titel der Aufgabe" },
       { key: "{{abteilung}}", description: "Zuständigkeit der Aufgabe bzw. „Führungskraft“" },
+      { key: "{{meldung_kurz}}", description: "Für den Betreff: „erledigt“, „erledigt, mit Kommentar“ oder „kommentiert“" },
+      { key: "{{ist_erledigt}}", description: "„ja“, wenn die Stelle die Aufgabe abgehakt hat, sonst leer (für {{#ist_erledigt}}…{{/ist_erledigt}})" },
+      { key: "{{nur_kommentar}}", description: "„ja“, wenn die Stelle nur einen Kommentar hinterlassen hat (ohne Abhaken), sonst leer (für {{#nur_kommentar}}…{{/nur_kommentar}})" },
       { key: "{{mitarbeiter_name}}", description: "Name der neuen Mitarbeiterin / des neuen Mitarbeiters – ohne bekannten Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“ (nie leer, nie eine E-Mail-Adresse)" },
       { key: "{{erledigt_ueber}}", description: "„Link der Abteilung“ bzw. „Link der Führungskraft“" },
-      { key: "{{kommentar}}", description: "Kommentar der Abteilung für den HTML-Teil, bereits maskiert (Zeilenumbrüche als <br>); leer ohne Kommentar (für {{#kommentar}}…{{/kommentar}})" },
-      { key: "{{kommentar_text}}", description: "Kommentar der Abteilung als Rohtext – nur für den Textteil (im HTML-Teil wird er maskiert)" },
+      { key: "{{kommentar}}", description: "Kommentar der Abteilung für den HTML-Teil, bereits maskiert (Zeilenumbrüche als <br>); leer ohne Kommentar (für {{#kommentar}}…{{/kommentar}}) – nie im Betreff" },
+      { key: "{{kommentar_text}}", description: "Kommentar der Abteilung als Rohtext – nur für den Textteil (im HTML-Teil wird er maskiert), nie im Betreff" },
+      { key: "{{hr_postfach}}", description: "HR-Postfach (Antwortadresse in den SMTP-Einstellungen) – Standard-Empfänger" },
       { key: "{{einrichtung}}", description: "Name der Einrichtung" },
       { key: "{{vertragsbeginn}}", description: "Vertragsbeginn / Dienstbeginn (TT.MM.JJJJ)" },
       { key: "{{offene_aufgaben}}", description: "Anzahl der im ganzen Vorgang noch offenen Aufgaben" },
@@ -1634,6 +1704,218 @@ CREDO HR-Portal`,
       { key: "{{email}}", description: "E-Mail der Abteilungs-Kontaktperson (Empfänger)" },
       { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
       { key: "{{ist_fuehrungskraft}}", description: "„ja“, wenn die Bestätigung an die Führungskraft geht, sonst leer" },
+    ],
+  },
+
+  // =============================================
+  // Onboarding: Absage an eine Abteilung (Paket A3, E-A20)
+  //
+  // Nur per HR-Knopf „Stellen über die Absage informieren…“, nachdem der
+  // Vorgang als abgelaufen markiert ist (EXPIRED) — je informierter Stelle
+  // EINE Mail an die Adresse, die informiert wurde (F16). Sie nennt die schon
+  // erledigten Aufgaben (F17, {{erledigte_liste_html}} fertig und maskiert,
+  // {{erledigte_liste}} roh nur im Textteil), damit Zugaenge geloescht und
+  // Ausgegebenes zurueckgenommen werden. BEWUSST ohne Link: Der Vorgang ist
+  // abgelaufen, der Link antwortet 410. Wie die uebrigen Onboarding-Vorlagen
+  // steht {{abteilung}} nur in Klammern, {{mitarbeiter_name}} nur nach „für“
+  // (Akkusativ — die neutrale Bezeichnung lautet „den neuen Mitarbeiter“).
+  // Nur flache Bloecke ({{#hat_erledigte}}, {{#arbeitsort}}).
+  // =============================================
+  {
+    event: "onboarding-department-abgesagt",
+    name: "Onboarding: Absage an Abteilung",
+    subject: "Absage: Onboarding für {{mitarbeiter_name}} entfällt ({{vorgangsnummer}})",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fee2e2;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#991b1b;font-weight:bold;font-size:14px;">Abgesagt</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Der Dienstbeginn am {{vertragsbeginn}} entfällt</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Guten Tag,
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            das Onboarding für {{mitarbeiter_name}} in {{einrichtung}}{{#arbeitsort}} (Arbeitsort: {{arbeitsort}}){{/arbeitsort}} findet nicht statt. Die Ihnen dafür zugewiesenen Aufgaben (zuständig: {{abteilung}}) entfallen, und der Link zu Ihren Aufgaben ist nicht mehr aktiv.
+          </p>
+          {{#hat_erledigte}}<p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
+            Folgendes hatten Sie bereits erledigt. Bitte machen Sie es rückgängig – etwa Zugänge löschen oder sperren und Ausgegebenes zurücknehmen:
+          </p>
+          {{erledigte_liste_html}}{{/hat_erledigte}}
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
+            Für noch offene Aufgaben ist nichts mehr zu tun.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 20px;">
+            <tr><td style="padding:16px 18px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vorgang</p>
+              <p style="margin:0 0 12px;color:#374151;font-size:14px;">{{einrichtung}} · {{vorgangsnummer}}</p>
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Geplanter Dienstbeginn</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{vertragsbeginn}}</p>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Bei Fragen wenden Sie sich bitte an die Personalabteilung.
+          </p>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Absage: Onboarding für {{mitarbeiter_name}} entfällt ({{vorgangsnummer}})
+
+Guten Tag,
+
+das Onboarding für {{mitarbeiter_name}} in {{einrichtung}}{{#arbeitsort}} (Arbeitsort: {{arbeitsort}}){{/arbeitsort}} findet nicht statt. Die Ihnen dafür zugewiesenen Aufgaben (zuständig: {{abteilung}}) entfallen, und der Link zu Ihren Aufgaben ist nicht mehr aktiv.
+{{#hat_erledigte}}
+Folgendes hatten Sie bereits erledigt. Bitte machen Sie es rückgängig – etwa Zugänge löschen oder sperren und Ausgegebenes zurücknehmen:
+
+{{erledigte_liste}}
+{{/hat_erledigte}}
+Für noch offene Aufgaben ist nichts mehr zu tun.
+
+Vorgang: {{einrichtung}} · {{vorgangsnummer}}
+Geplanter Dienstbeginn: {{vertragsbeginn}}
+
+Bei Fragen wenden Sie sich bitte an die Personalabteilung.
+
+Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{abteilung}}", description: "Zuständigkeit: Name der Abteilung bzw. „Führungskraft“ (wie bei der Information)" },
+      { key: "{{mitarbeiter_name}}", description: "Name der neuen Mitarbeiterin / des neuen Mitarbeiters – ohne bekannten Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“ (nie leer, nie eine E-Mail-Adresse)" },
+      { key: "{{vertragsbeginn}}", description: "Geplanter Vertragsbeginn / Dienstbeginn (TT.MM.JJJJ)" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{arbeitsort}}", description: "Arbeitsort, nur wenn er von der Einrichtung abweicht, sonst leer (für {{#arbeitsort}}…{{/arbeitsort}})" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+      { key: "{{erledigte_liste}}", description: "Schon erledigte Aufgaben dieser Stelle als Klartext, eine Zeile je Aufgabe (nur Titel) – für den Textteil, nie im Betreff" },
+      { key: "{{erledigte_liste_html}}", description: "Dieselben Aufgaben als HTML-Liste, bereits maskiert – für den HTML-Teil, nie im Betreff" },
+      { key: "{{anzahl_erledigt}}", description: "Anzahl der schon erledigten Aufgaben dieser Stelle" },
+      { key: "{{hat_erledigte}}", description: "„ja“, wenn die Stelle schon etwas erledigt hat, sonst leer (für {{#hat_erledigte}}…{{/hat_erledigte}})" },
+      { key: "{{email}}", description: "Adresse, an die die Stelle informiert wurde (Empfänger)" },
+      { key: "{{ist_fuehrungskraft}}", description: "„ja“, wenn die Absage an die Führungskraft geht, sonst leer" },
+    ],
+  },
+
+  // =============================================
+  // Onboarding: Ausstattung noch offen (Sammelmail an HR, Paket A3, E-A18)
+  //
+  // Lauf „Onboarding-Erinnerungen“, Abschnitt 4 (src/lib/ausstattung-lauf.ts):
+  // am Werktag vor Dienstbeginn je Vorgang EINE Mail an das HR-Postfach
+  // (`{{hr_postfach}}`, Katalog-Default) mit allen noch offenen
+  // Ausstattungs- und Hinweis-Aufgaben — nur Titel und Stelle, nie
+  // Bemerkung, Angabe oder Hinweistext; die Fuehrungskraft nicht in Kopie.
+  // {{offene_liste_html}} ist fertig und maskiert, {{offene_liste}} der
+  // Rohtext nur fuer den Textteil. Liste und Portal-Link nie im Betreff.
+  // =============================================
+  {
+    event: "onboarding-ausstattung-offen",
+    name: "Onboarding: Ausstattung noch offen (HR)",
+    subject: "Noch offene Ausstattung für {{mitarbeiter_name}} – Dienstbeginn {{vertragsbeginn}} ({{vorgangsnummer}})",
+    bodyHtml: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background-color:#1a1a2e;border-radius:8px 8px 0 0;padding:24px 32px;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">CREDO HR-Portal</h1>
+          <p style="margin:4px 0 0;color:#a0a0c0;font-size:13px;">{{einrichtung}}</p>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;padding:32px;">
+          <div style="display:inline-block;background-color:#fef3c7;border-radius:6px;padding:8px 16px;margin-bottom:24px;">
+            <span style="color:#92400e;font-weight:bold;font-size:14px;">Ausstattung noch offen</span>
+          </div>
+          <h2 style="color:#1a1a2e;font-size:18px;margin:0 0 16px;">Dienstbeginn am {{vertragsbeginn}}</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Guten Tag,
+          </p>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+            am {{vertragsbeginn}} beginnt der Dienst für {{mitarbeiter_name}}. Aus „Ausstattung &amp; Zugänge“ sind noch <strong>{{anzahl_offen}}</strong> Aufgabe(n) nicht erledigt:
+          </p>
+          {{offene_liste_html}}
+          <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f9fafb;border-radius:8px;margin:0 0 20px;">
+            <tr><td style="padding:16px 18px;">
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Vorgang</p>
+              <p style="margin:0 0 12px;color:#374151;font-size:14px;">{{einrichtung}} · {{vorgangsnummer}}</p>
+              {{#arbeitsort}}<p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Arbeitsort</p>
+              <p style="margin:0 0 12px;color:#374151;font-size:14px;">{{arbeitsort}}</p>{{/arbeitsort}}
+              <p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Dienstbeginn</p>
+              <p style="margin:0;color:#374151;font-size:14px;">{{vertragsbeginn}}</p>
+            </td></tr>
+          </table>
+          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
+            Bitte klären Sie mit den zuständigen Stellen, was bis zum Dienstbeginn noch bereitsteht, und vereinbaren Sie, wo nötig, eine Übergangslösung.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td style="background-color:#2563eb;border-radius:8px;">
+              <a href="{{portalLink}}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;">
+                Vorgang im Portal öffnen →
+              </a>
+            </td></tr>
+          </table>
+          <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:0 0 12px;">
+            Diese Meldung kommt je Vorgang einmal, am Werktag vor Dienstbeginn. Bemerkungen und Hinweise der Führungskraft stehen nur im Portal (Reiter Checkliste, Karte „Ausstattung &amp; Zugänge“).
+          </p>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Diese E-Mail wurde automatisch vom CREDO HR-Portal versendet.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;border-radius:0 0 8px 8px;padding:16px 32px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">© CREDO Gruppe – HR-Portal</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    bodyText: `Noch offene Ausstattung für {{mitarbeiter_name}} – Dienstbeginn {{vertragsbeginn}} ({{vorgangsnummer}})
+
+Guten Tag,
+
+am {{vertragsbeginn}} beginnt der Dienst für {{mitarbeiter_name}}. Aus „Ausstattung & Zugänge“ sind noch {{anzahl_offen}} Aufgabe(n) nicht erledigt:
+
+{{offene_liste}}
+
+Vorgang: {{einrichtung}} · {{vorgangsnummer}}
+{{#arbeitsort}}Arbeitsort: {{arbeitsort}}
+{{/arbeitsort}}Dienstbeginn: {{vertragsbeginn}}
+
+Bitte klären Sie mit den zuständigen Stellen, was bis zum Dienstbeginn noch bereitsteht, und vereinbaren Sie, wo nötig, eine Übergangslösung.
+
+Vorgang im Portal öffnen: {{portalLink}}
+
+Diese Meldung kommt je Vorgang einmal, am Werktag vor Dienstbeginn. Bemerkungen und Hinweise der Führungskraft stehen nur im Portal (Reiter Checkliste, Karte „Ausstattung & Zugänge“).
+
+CREDO HR-Portal`,
+    variables: [
+      { key: "{{mitarbeiter_name}}", description: "Name der neuen Mitarbeiterin / des neuen Mitarbeiters – ohne bekannten Namen „die neue Mitarbeiterin / den neuen Mitarbeiter“ (nie leer, nie eine E-Mail-Adresse)" },
+      { key: "{{vertragsbeginn}}", description: "Vertragsbeginn / Dienstbeginn (TT.MM.JJJJ)" },
+      { key: "{{anzahl_offen}}", description: "Anzahl der noch offenen Ausstattungs- und Hinweis-Aufgaben" },
+      { key: "{{offene_liste}}", description: "Offene Aufgaben als Klartext, eine Zeile je Aufgabe („Titel – Stelle“, ohne Bemerkungen) – für den Textteil, nie im Betreff" },
+      { key: "{{offene_liste_html}}", description: "Dieselben Aufgaben als HTML-Liste, bereits maskiert – für den HTML-Teil, nie im Betreff" },
+      { key: "{{einrichtung}}", description: "Name der Einrichtung" },
+      { key: "{{arbeitsort}}", description: "Arbeitsort, nur wenn er von der Einrichtung abweicht, sonst leer (für {{#arbeitsort}}…{{/arbeitsort}})" },
+      { key: "{{vorgangsnummer}}", description: "Vorgangsnummer" },
+      { key: "{{portalLink}}", description: "Link zum Vorgang im Portal (Reiter Checkliste) – nie im Betreff" },
+      { key: "{{hr_postfach}}", description: "HR-Postfach (Antwortadresse in den SMTP-Einstellungen) – Standard-Empfänger" },
     ],
   },
 

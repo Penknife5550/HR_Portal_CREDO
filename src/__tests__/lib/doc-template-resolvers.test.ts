@@ -4,6 +4,8 @@
  * - Katalog: Onboarding erbt allgemeine + ergaenzt spezifische Platzhalter, Keys eindeutig.
  * - Resolver: fuellt Felder aus Personal-/Vorgesetzten-Daten; sensible Felder werden nur
  *   aufgeloest + gemeldet, wenn die Vorlage sie nutzt (placeholders-Gating).
+ * - {ausstattung_liste} (Ausstattung & Zugaenge, S20/E-A25): eine Zeile je
+ *   gewaehlter Position, ohne Bemerkung, Angabe, Hinweis und Gestrichenes.
  */
 
 // canAccessProcess wird ueberschrieben, alles andere aus permissions bleibt echt.
@@ -182,6 +184,77 @@ describe("Onboarding-Resolver", () => {
     expect(data.vorname).toBe("Anna");
     expect(data.name).toBe("Anna");
     expect(data.nachname).toBeUndefined();
+  });
+
+  // Ausstattung & Zugaenge (Paket A3, S20, E-A25): {ausstattung_liste} fuer ein
+  // Schreiben „Was Sie am ersten Tag erhalten“ — ohne Bemerkungen.
+  describe("{ausstattung_liste} (E-A25)", () => {
+    const vorgang = (ausstattung: unknown) => ({
+      displayId: "2026-GYM-020",
+      email: "anna.privat@example.org",
+      firstName: "Anna",
+      lastName: "Beispiel",
+      organizationId: "org1",
+      personalData: null,
+      supervisorData: null,
+      ausstattung,
+    });
+
+    it("steht im Onboarding-Katalog, ist nicht sensibel und sagt „ohne Bemerkungen“", () => {
+      const def = getPlaceholderCatalog("ONBOARDING").find((p) => p.key === "ausstattung_liste");
+      expect(def).toBeDefined();
+      expect(def?.sensitive).toBeFalsy();
+      expect(def?.label).toContain("ohne Bemerkungen");
+      // Nur im Onboarding — die anderen Module kennen keine Ausstattung.
+      expect(getPlaceholderCatalog("OFFBOARDING").some((p) => p.key === "ausstattung_liste")).toBe(false);
+    });
+
+    it("eine Zeile je gewaehlter Position, Auswahl mit Optionen — ohne Bemerkung, Angabe, Gestrichenes", async () => {
+      mockFindOnboarding.mockResolvedValue(
+        vorgang([
+          {
+            departmentKey: "IT", art: "AUSWAHL", bezeichnung: "Zugänge", auswahl: ["Dienst-E-Mail", "WebUntis"],
+            reihenfolge: 2, gestrichenAm: null,
+            // Kaeme eine Bemerkung doch mit, stuende sie trotzdem nicht im Brief.
+            bemerkung: "Bitte erst nach der Verpflichtung",
+          },
+          { departmentKey: "IT", art: "JA_NEIN", bezeichnung: "Dienst-iPad (Lernmittel)", auswahl: [], reihenfolge: 1, gestrichenAm: null },
+          { departmentKey: "FACILITY", art: "JA_NEIN", bezeichnung: "Spind", auswahl: [], reihenfolge: 0, gestrichenAm: new Date("2027-01-10T10:00:00Z") },
+          { departmentKey: "IT", art: "ANGABE", bezeichnung: "Gewünschte Durchwahl", auswahl: [], reihenfolge: 3, gestrichenAm: null, angabe: "214" },
+        ]),
+      );
+
+      const { data, sensitiveFields } = await getResolver("ONBOARDING")(ctx());
+      expect(data.ausstattung_liste).toBe("Dienst-iPad (Lernmittel)\nZugänge: Dienst-E-Mail, WebUntis");
+      expect(String(data.ausstattung_liste)).not.toMatch(/Verpflichtung|214|Spind/);
+      expect(sensitiveFields).toEqual([]);
+    });
+
+    it("liest nur Titel und Auswahl — Bemerkung, Angabe und Hinweise fragt die Abfrage gar nicht ab", async () => {
+      mockFindOnboarding.mockResolvedValue(vorgang([]));
+      await getResolver("ONBOARDING")(ctx());
+      const auswahl = mockFindOnboarding.mock.calls[0][0].select;
+      expect(auswahl.ausstattung).toEqual({
+        where: { gestrichenAm: null, art: { in: ["JA_NEIN", "AUSWAHL"] } },
+        select: { departmentKey: true, art: true, bezeichnung: true, auswahl: true, reihenfolge: true, gestrichenAm: true },
+      });
+      expect(auswahl.stellenHinweise).toBeUndefined();
+    });
+
+    it("nichts gewaehlt (oder Vorgang vor dem Paket): kein Wert, wie bei jedem leeren Feld", async () => {
+      mockFindOnboarding.mockResolvedValue(vorgang([]));
+      expect((await getResolver("ONBOARDING")(ctx())).data.ausstattung_liste).toBeUndefined();
+      mockFindOnboarding.mockResolvedValue(vorgang(undefined));
+      expect((await getResolver("ONBOARDING")(ctx())).data.ausstattung_liste).toBeUndefined();
+    });
+
+    it("fremder Mandant: keine Liste (wie alle Vorgangsdaten)", async () => {
+      mockCanAccessProcess.mockResolvedValueOnce(false);
+      mockFindOnboarding.mockResolvedValue(
+        vorgang([{ departmentKey: "IT", art: "JA_NEIN", bezeichnung: "Dienst-iPad", auswahl: [], reihenfolge: 0, gestrichenAm: null }]),
+      );
+      expect((await getResolver("ONBOARDING")(ctx())).data.ausstattung_liste).toBeUndefined();
+    });
   });
 });
 

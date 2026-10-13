@@ -10,7 +10,9 @@
  * ausschnitt und eigene Wahl, sonst `null`), PUT nimmt `ausstattung` und
  * `hinweise` — Laden, Pruefen und Schreiben in src/lib/ausstattung-dienst.ts.
  * POST gibt der HR-Mail `supervisor-completed` die Kurzform mit
- * (`ausstattung_kurz`, „6 Positionen für 3 Stellen“, ohne Bemerkungstexte).
+ * (`ausstattung_kurz`, „6 Positionen für 3 Stellen“, ohne Bemerkungstexte)
+ * und legt nach dem Commit der Abgabe die Aufgaben der Stellen an (Paket A3,
+ * `onboardingAusstattungNachholenIn` in einer zweiten Transaktion).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -24,7 +26,8 @@ import {
 } from "@/lib/onboarding-spuren";
 import { statusAbgleichen } from "@/lib/onboarding-status-abgleich";
 import type { StatusAbgleich } from "@/lib/onboarding-status-abgleich";
-import { faelligkeitenSetzen } from "@/lib/abteilungsaufgaben-onboarding";
+import { onboardingAusstattungNachholenIn } from "@/lib/abteilungsaufgaben-onboarding";
+import { fehlerKennung } from "@/lib/fehler-kennung";
 import { triggerN8nWebhook } from "@/lib/n8n";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -637,18 +640,22 @@ export async function POST(
   /**
    * Jetzt — und nur jetzt — steht der Vertragsbeginn fest: Der Modalitaeten-Link
    * ist mit der Abgabe gesperrt (auth.ts), das Datum aendert sich nicht mehr.
-   * Also die Faelligkeiten der Checkliste EINMAL ausrechnen (Vertragsbeginn +
-   * Tagesangabe aus der Vorlage). Punkte ohne Tagesangabe bleiben ohne Frist.
+   * Also aus der Wahl „Ausstattung & Zugänge" die Aufgaben der Stellen anlegen
+   * (je Option eine, Paket A3) und die Faelligkeiten der Checkliste EINMAL
+   * ausrechnen (Vertragsbeginn + Tagesangabe; Ausstattungsaufgaben nie vor
+   * heute, sonst „Eilt"). Punkte ohne Tagesangabe bleiben ohne Frist. Beides
+   * im Nachholen des Adapters, in der Sperrreihenfolge Vorgang → Links →
+   * Aufgaben.
    *
    * Bewusst NACH dem Commit der Abgabe und in einer eigenen Transaktion: Die
    * Abgabe darf daran nicht scheitern. Und bewusst OHNE Versand — Abteilungen
    * informiert nur HR per Knopf (Entscheidung Paket 5). Geht es hier schief,
-   * holt das erste „Abteilungen informieren" es nach.
+   * holen die erste Aktion der Karte oder der taegliche Lauf es nach.
    */
   try {
-    await prisma.$transaction((tx) => faelligkeitenSetzen(tx, onboarding.id));
+    await prisma.$transaction((tx) => onboardingAusstattungNachholenIn(tx, onboarding.id, { jetzt: abgegebenAm }));
   } catch (err) {
-    console.error("[Modalitaeten] Faelligkeiten konnten nicht gesetzt werden:", err);
+    console.error("[Modalitaeten] Ausstattung und Faelligkeiten nicht gesetzt:", fehlerKennung(err));
   }
 
   // HR-Benachrichtigung „Einstellungsmodalitaeten eingereicht".

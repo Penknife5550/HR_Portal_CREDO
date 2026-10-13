@@ -50,6 +50,23 @@ import { EVENT_CATALOG, EVENT_GROUP_ORDER, type EventGroup } from "@/lib/events"
  * Begruendung wie beim Dokumentenpaket — Anhaenge, die HR vom eigenen PC
  * waehlt, und eine im Dialog gewaehlte Adresse (overrideTo). Ein Test haelt
  * individuelle-mail-dienst.ts gegen diese Liste.
+ *
+ * Die Mails der Onboarding-Abteilungsaufgaben (Ausstattung & Zugaenge, Paket
+ * A3, Entscheidung E-A16, Feinplan F1/F18): Die Payload traegt den Link der
+ * Stelle (Zugang zur Aufgabenseite), kuenftig auch Bemerkungen und Angaben
+ * zur Ausstattung — nichts davon gehoert an eine frei konfigurierbare
+ * Webhook-URL. Anders als die vier Ausnahmen oben laufen diese Mails WEITER
+ * ueber triggerWebhooks; der Dispatcher laesst fuer jedes Ereignis dieser
+ * Liste seinen Webhook-Schritt aus (`webhooksGesperrt`). Die Liste ist damit
+ * nicht nur Anzeigetext, sondern eine wirksame Sperre — auch fuer kuenftige
+ * Aufrufer. Im Versandkern der Abteilungsaufgaben liefert `webhookAktiv` fuer
+ * diese Ereignisse `false`: Die WEBHOOK-Regel („SKIPPED bei aktivem Webhook
+ * zaehlt als zugestellt") gilt nur noch im Offboarding. Die Offboarding-
+ * Abteilungsereignisse stehen bewusst NICHT hier. Ebenso gesperrt sind die
+ * Sammelmail an HR `onboarding-ausstattung-offen` (E-A18, F18): Sie nennt die
+ * offenen Ausstattungsaufgaben mit Stelle und Namen der Person — und die
+ * Absage `onboarding-department-abgesagt` (E-A20, F18): Sie nennt die schon
+ * erledigten Aufgaben einer Stelle samt Namen der Person (ohne Link).
  */
 const DOKUMENTENPAKET_HINWEIS =
   "Webhooks auf dieses Ereignis feuern nicht: Das Dokumentenpaket wird mit Anhängen direkt per SMTP versendet, ohne Webhook-Aufruf.";
@@ -63,8 +80,19 @@ const UNTERLAGEN_HINWEIS =
 const INDIVIDUELLE_MAIL_HINWEIS =
   "Webhooks auf dieses Ereignis feuern nicht: Die individuelle E-Mail wird mit ihren Anhängen direkt per SMTP versendet, ohne Webhook-Aufruf.";
 
+const AUSSTATTUNG_HINWEIS =
+  "Webhooks auf dieses Ereignis feuern nicht: Die Mail enthält den Link der Stelle bzw. Angaben zur Ausstattung und wird deshalb nur per SMTP versendet.";
+
 export const EVENTS_OHNE_WEBHOOK: Readonly<Record<string, string>> = {
   "individuelle-mail": INDIVIDUELLE_MAIL_HINWEIS,
+  "onboarding-department-assigned": AUSSTATTUNG_HINWEIS,
+  "onboarding-department-reminder": AUSSTATTUNG_HINWEIS,
+  "onboarding-task-completed": AUSSTATTUNG_HINWEIS,
+  "onboarding-department-completed": AUSSTATTUNG_HINWEIS,
+  // Absage an die informierten Stellen (E-A20, F18): erledigte Aufgaben samt Person.
+  "onboarding-department-abgesagt": AUSSTATTUNG_HINWEIS,
+  // Sammelmail an HR (E-A18, F18): Titel und Stellen der offenen Ausstattung.
+  "onboarding-ausstattung-offen": AUSSTATTUNG_HINWEIS,
   "onboarding-starter-packet-sent": DOKUMENTENPAKET_HINWEIS,
   "offboarding-documents-sent": DOKUMENTENPAKET_HINWEIS,
   "civil-service-documents-sent": DOKUMENTENPAKET_HINWEIS,
@@ -74,6 +102,19 @@ export const EVENTS_OHNE_WEBHOOK: Readonly<Record<string, string>> = {
   "unterlage-zurueckgewiesen": UNTERLAGEN_HINWEIS,
   "bem-frist-erinnerung": BEM_HINWEIS,
 };
+
+/**
+ * Feuern Webhooks auf dieses Ereignis nie? Wirksam an zwei Stellen: In
+ * triggerWebhooks entfaellt der Webhook-Schritt (die Mail geht unveraendert
+ * hinaus), und der Versandkern der Abteilungsaufgaben wertet ein SKIPPED nie
+ * als „an Webhook uebergeben" (WEBHOOK-Regel nur im Offboarding).
+ *
+ * Eigene Eigenschaft statt `EVENTS_OHNE_WEBHOOK[event]`: Ein Name wie
+ * "toString" faende sonst die geerbte Methode des Objekts.
+ */
+export function webhooksGesperrt(event: string): boolean {
+  return Object.prototype.hasOwnProperty.call(EVENTS_OHNE_WEBHOOK, event);
+}
 
 export interface EreignisOption {
   /** Technischer Event-Name (== WebhookConfig.event / EmailLog.event) */

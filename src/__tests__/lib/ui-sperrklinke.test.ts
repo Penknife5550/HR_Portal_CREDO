@@ -162,7 +162,8 @@ const MUSTER: Muster[] = [
     schluessel: "confirm",
     name: "confirm(",
     zaehle: perRegex(/\bconfirm\(/g),
-    gesamt: 30,
+    // 29 seit Paket A3 (S19): „Vorgang abschließen“ im Onboarding nutzt den Abschluss-Dialog.
+    gesamt: 29,
     stattdessen: "eigener Bestaetigungsdialog (ui/dialog, bis dahin unterlagen/dialog-rahmen.tsx)",
   },
   {

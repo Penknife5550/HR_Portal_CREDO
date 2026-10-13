@@ -27,6 +27,17 @@
  *      seine Regeln stehen in src/__tests__/lib/abteilungsaufgaben-onboarding.test.ts;
  *      ungemockt liefe er gegen den schmalen Prisma-Mock dieser Datei und
  *      verbrauchte die `findMany`-Antworten der Abschnitte 1 und 2.
+ *
+ * Dazu aus Paket A3 (Ausstattung & Zugaenge, S12):
+ *   7. Abschnitt 3a holt fehlende Ausstattungsaufgaben nach — VOR den
+ *      Abteilungs-Erinnerungen — und meldet sein Ergebnis als `ausstattung`.
+ *      Auch dieser Lauf ist hier eine Huelle (Regeln in
+ *      src/__tests__/lib/ausstattung-lauf.test.ts); ein Fehler dort laesst die
+ *      uebrigen Abschnitte stehen.
+ *   8. (S18, E-A18) Abschnitt 4 schickt die Sammelmail „Ausstattung noch
+ *      offen“ an HR — NACH den Abteilungs-Erinnerungen — und meldet sie im
+ *      selben Feld als `ausstattung.sammelmail`; `ausstattung.errors` zaehlt
+ *      die Ausnahmen beider Abschnitte. Auch hier eine Huelle.
  */
 
 const mockPrisma = {
@@ -36,6 +47,8 @@ const mockPrisma = {
 };
 const mockTriggerWebhooks = jest.fn();
 const mockAbteilungsErinnerungen = jest.fn();
+const mockAusstattungLauf = jest.fn();
+const mockSammelmailLauf = jest.fn();
 
 // Anspruch, Sperre und Protokoll des Zeitplaners sind in zeitplaner-*.test.ts
 // geprueft; hier zaehlt nur die Lauf-Funktion hinter der duennen Route.
@@ -47,6 +60,12 @@ jest.mock("@/lib/webhooks", () => ({ triggerWebhooks: mockTriggerWebhooks }));
 jest.mock("@/lib/url", () => ({ getBaseUrl: () => "https://hr.example" }));
 jest.mock("@/lib/abteilungsaufgaben-onboarding", () => ({
   onboardingErinnerungenSenden: (...a: unknown[]) => mockAbteilungsErinnerungen(...a),
+}));
+jest.mock("@/lib/ausstattung-lauf", () => ({
+  ausstattungNachholenLauf: (...a: unknown[]) => mockAusstattungLauf(...a),
+  ausstattungSammelmailLauf: (...a: unknown[]) => mockSammelmailLauf(...a),
+  leeresNachholErgebnis: () => ({ nachgeholt: { vorgaenge: 0, aufgaben: 0 }, errors: 0 }),
+  leeresSammelmailErgebnis: () => ({ sammelmail: { versendet: 0, nichtZugestellt: 0, uebersprungen: 0 }, errors: 0 }),
 }));
 
 import { POST } from "@/app/api/cron/reminders/route";
@@ -129,7 +148,12 @@ beforeEach(() => {
     details: [],
     uebersprungen: [],
   });
+  mockAusstattungLauf.mockResolvedValue({ nachgeholt: { vorgaenge: 0, aufgaben: 0 }, errors: 0 });
+  mockSammelmailLauf.mockResolvedValue({ sammelmail: { versendet: 0, nichtZugestellt: 0, uebersprungen: 0 }, errors: 0 });
 });
+
+/** `ausstattung` der Antwort ohne Befund (Abschnitte 3a und 4). */
+const OHNE_SAMMELMAIL = { versendet: 0, nichtZugestellt: 0, uebersprungen: 0 };
 
 describe("Zugriff", () => {
   it("verlangt das Cron-Geheimnis", async () => {
@@ -474,8 +498,99 @@ describe("Abteilungs-Erinnerungen im Onboarding", () => {
       details: [],
       uebersprungen: [],
     });
+    // Abschnitt 3a lief davor und bleibt verbucht, Abschnitt 4 laeuft trotzdem.
+    expect(daten.ausstattung).toEqual({ nachgeholt: { vorgaenge: 0, aufgaben: 0 }, sammelmail: OHNE_SAMMELMAIL, errors: 0 });
+    expect(mockSammelmailLauf).toHaveBeenCalled();
     // Das Versandprotokoll raeumt seit 09/2026 der Lauf „Wartung“ auf, nicht dieser.
     expect(mockPrisma.emailLog.deleteMany).not.toHaveBeenCalled();
+    stumm.mockRestore();
+  });
+});
+
+// =============================================
+// Abschnitt 3a: Ausstattung & Zugaenge nachholen (Paket A3)
+// =============================================
+
+describe("Ausstattung nachholen (Abschnitt 3a)", () => {
+  it("meldet das Ergebnis als `ausstattung` — vor den Abteilungs-Erinnerungen, ohne `total` zu veraendern", async () => {
+    mockAusstattungLauf.mockResolvedValue({ nachgeholt: { vorgaenge: 2, aufgaben: 5 }, errors: 0 });
+
+    const daten = await (await POST(req())).json();
+
+    expect(mockAusstattungLauf).toHaveBeenCalledWith(expect.any(Date));
+    expect(daten.ausstattung).toEqual({ nachgeholt: { vorgaenge: 2, aufgaben: 5 }, sammelmail: OHNE_SAMMELMAIL, errors: 0 });
+    expect(daten.total).toBe(0);
+    // Erst nachholen, dann erinnern: Eine heute angelegte Aufgabe steht schon
+    // in der Erinnerung.
+    expect(mockAusstattungLauf.mock.invocationCallOrder[0]).toBeLessThan(
+      mockAbteilungsErinnerungen.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("ein Fehler in Abschnitt 3a zaehlt als Fehler und laesst die uebrigen Abschnitte stehen", async () => {
+    const stumm = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockPrisma.onboardingProcess.findMany
+      .mockResolvedValueOnce([maVorgang()])
+      .mockResolvedValueOnce([vgVorgang()]);
+    mockAusstattungLauf.mockRejectedValue(new Error("Datenbank weg"));
+
+    const res = await POST(req());
+    const daten = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(daten.employeeReminders).toBe(1);
+    expect(daten.supervisorReminders).toBe(1);
+    expect(daten.ausstattung).toEqual({ nachgeholt: { vorgaenge: 0, aufgaben: 0 }, sammelmail: OHNE_SAMMELMAIL, errors: 1 });
+    expect(mockAbteilungsErinnerungen).toHaveBeenCalled();
+    expect(mockSammelmailLauf).toHaveBeenCalled();
+    stumm.mockRestore();
+  });
+});
+
+// =============================================
+// Abschnitt 4: Sammelmail „Ausstattung noch offen“ an HR (Paket A3, S18)
+// =============================================
+
+describe("Sammelmail Ausstattung (Abschnitt 4)", () => {
+  it("meldet ihr Ergebnis in `ausstattung.sammelmail` — nach den Abteilungs-Erinnerungen, ohne `total` zu veraendern", async () => {
+    mockAusstattungLauf.mockResolvedValue({ nachgeholt: { vorgaenge: 1, aufgaben: 2 }, errors: 1 });
+    mockSammelmailLauf.mockResolvedValue({ sammelmail: { versendet: 2, nichtZugestellt: 1, uebersprungen: 1 }, errors: 1 });
+
+    const daten = await (await POST(req())).json();
+
+    expect(mockSammelmailLauf).toHaveBeenCalledWith(expect.any(Date));
+    // Derselbe Zeitpunkt wie das Nachholen.
+    expect(mockSammelmailLauf.mock.calls[0][0]).toEqual(mockAusstattungLauf.mock.calls[0][0]);
+    expect(daten.ausstattung).toEqual({
+      nachgeholt: { vorgaenge: 1, aufgaben: 2 },
+      sammelmail: { versendet: 2, nichtZugestellt: 1, uebersprungen: 1 },
+      // Ausnahmen beider Abschnitte zusammen.
+      errors: 2,
+    });
+    expect(daten.total).toBe(0);
+    // Was eine Stelle heute noch abhakt, steht nicht mehr in der Sammelmail.
+    expect(mockAbteilungsErinnerungen.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSammelmailLauf.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("ein Fehler in Abschnitt 4 zaehlt als Fehler und laesst die uebrigen Abschnitte stehen", async () => {
+    const stumm = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockPrisma.onboardingProcess.findMany
+      .mockResolvedValueOnce([maVorgang()])
+      .mockResolvedValueOnce([vgVorgang()]);
+    mockAusstattungLauf.mockResolvedValue({ nachgeholt: { vorgaenge: 1, aufgaben: 1 }, errors: 0 });
+    mockSammelmailLauf.mockRejectedValue(new Error("Datenbank weg"));
+
+    const res = await POST(req());
+    const daten = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(daten.employeeReminders).toBe(1);
+    expect(daten.supervisorReminders).toBe(1);
+    expect(daten.ausstattung).toEqual({ nachgeholt: { vorgaenge: 1, aufgaben: 1 }, sammelmail: OHNE_SAMMELMAIL, errors: 1 });
+    // Geloggt nur die Kennung, nie der Fehlertext.
+    expect(JSON.stringify(stumm.mock.calls)).not.toContain("Datenbank weg");
     stumm.mockRestore();
   });
 });

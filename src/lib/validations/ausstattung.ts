@@ -6,6 +6,7 @@
  *   - ausblendungSchema               PUT   /api/settings/ausstattung/[id]/ausblendung
  *   - arbeitsortSchema                PATCH /api/onboarding/[id]/arbeitsort
  *   - modalitaetenAusstattungSchema   PUT   /api/modalitaeten/[token] (Schritt „Ausstattung & Zugänge“)
+ *   - ausstattungAktionSchema         POST  /api/onboarding/[id]/ausstattung (HR-Karte, S15)
  *
  * Zod prueft nur die FORM der Felder (Typ, Laenge, Wertlisten, Zeichen). Die
  * Felder gegeneinander prueft `positionPruefen` (src/lib/ausstattung.ts) — beim
@@ -46,10 +47,11 @@ import {
   MELDUNGEN,
   PERSONENGRUPPEN,
   REIHENFOLGE_MAX,
+  istNichtErlaubteStelle,
   type Einrichtungsart,
   type Personengruppe,
 } from "@/lib/ausstattung";
-import { schluesselFeld } from "@/lib/validations/abteilungsaufgaben";
+import { schluesselFeld, tagesdatumGueltig } from "@/lib/validations/abteilungsaufgaben";
 
 /** Keine spitzen Klammern und kein Steuerzeichen (auch kein CR/LF) — einzeilige Texte. */
 const OHNE_KLAMMERN_STEUERZEICHEN = /^[^<>\p{Cc}]*$/u;
@@ -166,6 +168,17 @@ const personengruppeFeld = z.enum(PERSONENGRUPPEN_WERTE, {
 
 const optionFeld = einzeiligerText(GRENZEN.option, MELDUNGEN.OPTION_LEER, MELDUNGEN.OPTION_ZU_LANG);
 
+/** Faelligkeit in Tagen relativ zum Vertragsbeginn: ganze Zahl −365…365 oder null (leer = null). */
+const faelligTageFeld = z.preprocess(
+  (v) => (v === undefined || v === null || v === "" ? null : v),
+  z
+    .number({ invalid_type_error: MELDUNGEN.FAELLIG_UNGUELTIG })
+    .int(MELDUNGEN.FAELLIG_UNGUELTIG)
+    .min(-GRENZEN.faelligTage, MELDUNGEN.FAELLIG_UNGUELTIG)
+    .max(GRENZEN.faelligTage, MELDUNGEN.FAELLIG_UNGUELTIG)
+    .nullable(),
+);
+
 // =============================================
 // Katalogposition (Einstellungen → Ausstattung & Zugänge)
 // =============================================
@@ -215,15 +228,7 @@ const katalogPositionFelder = {
   bemerkungAnbieten: z.boolean(FALSCHER_TYP).optional(),
   bemerkungPlatzhalter: optionalerEinzeiligerText(GRENZEN.bemerkungPlatzhalter, MELDUNGEN.PLATZHALTER_ZU_LANG),
   aufgabeTitel: optionalerEinzeiligerText(GRENZEN.aufgabeTitel, MELDUNGEN.AUFGABENTITEL_ZU_LANG),
-  defaultDueDays: z.preprocess(
-    (v) => (v === undefined || v === null || v === "" ? null : v),
-    z
-      .number({ invalid_type_error: MELDUNGEN.FAELLIG_UNGUELTIG })
-      .int(MELDUNGEN.FAELLIG_UNGUELTIG)
-      .min(-GRENZEN.faelligTage, MELDUNGEN.FAELLIG_UNGUELTIG)
-      .max(GRENZEN.faelligTage, MELDUNGEN.FAELLIG_UNGUELTIG)
-      .nullable(),
-  ),
+  defaultDueDays: faelligTageFeld,
   personengruppen: liste(
     personengruppeFeld,
     PERSONENGRUPPEN_WERTE.length * 2,
@@ -421,3 +426,142 @@ export const modalitaetenAusstattungSchema = z
   .strip();
 
 export type ModalitaetenAusstattungInput = z.infer<typeof modalitaetenAusstattungSchema>;
+
+// =============================================
+// HR-Karte „Ausstattung & Zugänge“ (POST /api/onboarding/[id]/ausstattung, S15)
+// =============================================
+
+/** Stelle in der Karte: Form eines Abteilungsschluessels, nie MITARBEITER oder VORGESETZTER (Regel 11, 400). */
+const karteStelleFeld = schluesselFeld.refine((k) => !istNichtErlaubteStelle(k), MELDUNGEN.STELLE_NICHT_ERLAUBT);
+
+/** Faelligkeit einer Aufgabe: "YYYY-MM-DD" mit Rueckprobe oder null (= ohne Faelligkeit); "" = null. */
+const karteTagFeld = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+  z
+    .string({ invalid_type_error: MELDUNGEN.KARTE_DATUM_UNGUELTIG })
+    .trim()
+    .refine(tagesdatumGueltig, MELDUNGEN.KARTE_DATUM_UNGUELTIG)
+    .nullable(),
+);
+
+/** Angabe (Art „Angabe“): einzeilig, ohne Steuerzeichen, hoechstens GRENZEN.angabe ("" = leer). */
+const karteAngabeFeld = z.preprocess(
+  normalisiert,
+  z.string(FALSCHER_TYP).max(GRENZEN.angabe, MELDUNGEN.ANGABE_ZU_LANG).regex(OHNE_STEUERZEICHEN, MELDUNGEN.ANGABE_EINZEILIG),
+);
+
+/** Gewaehlte Optionen (Auswahl); ob sie zur Position gehoeren, prueft der Dienst. */
+const karteAuswahlFeld = z.array(optionFeld, FALSCHER_TYP).max(GRENZEN.optionen, MELDUNGEN.OPTIONEN_ZU_VIELE);
+
+/**
+ * Freie Position von HR: immer Ja/Nein (E-A13: keine freien Angaben), ohne
+ * Hinweis fuer die Stelle (der landete in `description` und damit bei
+ * PORTAL_ROLES), Bezeichnung hoechstens GRENZEN.freieBezeichnung.
+ */
+const freiePositionSchema = z
+  .object(
+    {
+      departmentKey: karteStelleFeld,
+      bezeichnung: einzeiligerText(GRENZEN.freieBezeichnung, MELDUNGEN.BEZEICHNUNG_FEHLT, MELDUNGEN.KARTE_FREI_ZU_LANG),
+      relativeDueDays: faelligTageFeld.optional(),
+    },
+    KEIN_OBJEKT,
+  )
+  .strip();
+
+const karteIdFeld = idFeld(MELDUNGEN.KARTE_ID_UNGUELTIG);
+
+/** Wahl beim Hinzufuegen und Uebernehmen (Inhalt prueft der Dienst gegen die Art). */
+const wahlFelder = {
+  auswahl: karteAuswahlFeld.optional(),
+  angabe: karteAngabeFeld.optional(),
+  bemerkung: freitextFeld(GRENZEN.bemerkung, MELDUNGEN.BEMERKUNG_ZU_LANG).optional(),
+};
+
+/**
+ * Die sechs Aktionen der Karte (Feinplan 1.4). Zod prueft die Form; ob
+ * Position, Option und Zeile zu diesem Vorgang gehoeren, ob die Felder zur
+ * Art passen und was Regel 9 erlaubt, prueft `ausstattungAktionAusfuehren`.
+ *
+ *   hinzufuegen          { positionId } ODER { frei: { departmentKey, bezeichnung, relativeDueDays? } },
+ *                        dazu auswahl?, angabe?, bemerkung?
+ *   aendern              { ausstattungId, auswahl?, angabe?, bemerkung? ("" = entfernen),
+ *                          departmentKey? (Stellenwechsel), faelligkeiten?: { option, dueDate }[] }
+ *   streichen            { ausstattungId }
+ *   hinweis-aendern      { departmentKey, hinweis? ("" = entfernen), dueDate? } — mindestens eines
+ *   hinweis-gesehen      { departmentKey }
+ *   hinweis-uebernehmen  { departmentKey, positionId ODER frei, auswahl?, angabe?, bemerkung? }
+ *
+ * `departmentKey` nie aus NICHT_ERLAUBTE_STELLEN (400, Regel 11) — auch nicht
+ * bei `frei` und im Stellenwechsel. Unbekannte Felder fallen weg.
+ */
+export const ausstattungAktionSchema = z
+  .discriminatedUnion(
+    "aktion",
+    [
+      z.object({ aktion: z.literal("hinzufuegen"), positionId: karteIdFeld.optional(), frei: freiePositionSchema.optional(), ...wahlFelder }).strip(),
+      z
+        .object({
+          aktion: z.literal("aendern"),
+          ausstattungId: karteIdFeld,
+          ...wahlFelder,
+          departmentKey: karteStelleFeld.optional(),
+          faelligkeiten: z
+            .array(
+              z.object(
+                {
+                  option: z.string(FALSCHER_TYP).trim().max(GRENZEN.option, MELDUNGEN.OPTION_ZU_LANG),
+                  dueDate: karteTagFeld,
+                },
+                KEIN_OBJEKT,
+              ),
+              FALSCHER_TYP,
+            )
+            .max(GRENZEN.optionen, MELDUNGEN.OPTIONEN_ZU_VIELE)
+            .optional(),
+        })
+        .strip(),
+      z.object({ aktion: z.literal("streichen"), ausstattungId: karteIdFeld }).strip(),
+      z
+        .object({
+          aktion: z.literal("hinweis-aendern"),
+          departmentKey: karteStelleFeld,
+          hinweis: freitextFeld(GRENZEN.hinweis, MELDUNGEN.HINWEIS_ZU_LANG).optional(),
+          dueDate: karteTagFeld.optional(),
+        })
+        .strip(),
+      z.object({ aktion: z.literal("hinweis-gesehen"), departmentKey: karteStelleFeld }).strip(),
+      z
+        .object({
+          aktion: z.literal("hinweis-uebernehmen"),
+          departmentKey: karteStelleFeld,
+          positionId: karteIdFeld.optional(),
+          frei: freiePositionSchema.optional(),
+          ...wahlFelder,
+        })
+        .strip(),
+    ],
+    {
+      errorMap: (issue) => ({
+        message:
+          issue.code === "invalid_union_discriminator" ? "Unbekannte Aktion." : ABTEILUNGS_MELDUNGEN.UNGUELTIGE_EINGABE,
+      }),
+    },
+  )
+  .superRefine((d, ctx) => {
+    if (d.aktion === "hinzufuegen" || d.aktion === "hinweis-uebernehmen") {
+      if ((d.positionId === undefined) === (d.frei === undefined)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: MELDUNGEN.KARTE_POSITION_ODER_FREI });
+      }
+    } else if (d.aktion === "hinweis-aendern") {
+      if (d.hinweis === undefined && d.dueDate === undefined) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: MELDUNGEN.KARTE_HINWEIS_ODER_FAELLIG });
+      }
+    } else if (d.aktion === "aendern") {
+      if ([d.auswahl, d.angabe, d.bemerkung, d.departmentKey, d.faelligkeiten].every((v) => v === undefined)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: MELDUNGEN.MINDESTENS_EIN_FELD });
+      }
+    }
+  });
+
+export type AusstattungAktionInput = z.infer<typeof ausstattungAktionSchema>;

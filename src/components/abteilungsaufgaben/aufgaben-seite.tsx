@@ -23,19 +23,41 @@
  * Die Fusszeile nennt die Einrichtung des Vorgangs und die Gueltigkeit des
  * Links — frueher stand dort fest „Christlicher Schulverein Minden e.V.",
  * fuer alle 16 Mandanten.
+ *
+ * Ausstattung & Zugaenge (Onboarding, Feinplan S14, Mockup 6.5): Der Server
+ * liefert dazu den Arbeitsort (Kopf, neben der Einrichtung — nur wenn er
+ * abweicht), Angaben und Hinweis an die eigene Stelle (Block „Nur für …“) und
+ * je Aufgabe Bemerkung, „Eilt“ und „entfällt“. Eine entfallene Aufgabe steht
+ * unter „Entfallene Aufgaben“, laesst sich nicht abhaken (Server 409), nimmt
+ * aber weiter einen Kommentar. Gezaehlt wird mit `checklistFortschritt` —
+ * entfallene Aufgaben zaehlen weder im Zaehler noch im Nenner (F2). Die
+ * Bausteine dafuer stehen in src/components/ausstattung/link-seite-teile.tsx.
+ * Im Offboarding fehlen alle diese Felder; die Seite sieht dort aus wie zuvor
+ * (auch „100 %“ ohne Aufgabe — `checklistFortschritt` gaebe 0 %, `data.modul`
+ * unterscheidet).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { Minus } from "lucide-react";
 import { CredoLinie } from "@/components/credo-linie";
 import {
   KOMMENTAR_MAX,
   MELDUNGEN,
   ZUSATZFELD_LABELS,
+  type AbteilungsModul,
   type ZusatzFeld,
 } from "@/lib/abteilungsaufgaben";
+import { checklistFortschritt } from "@/lib/ausstattung";
 import { formatDatumDE } from "@/lib/format";
 import { datumUhrzeitDE } from "@/components/abteilungsaufgaben/abteilungen-karte";
+import {
+  AngabenEintraege,
+  BemerkungKasten,
+  ENTFAELLT_TEXT,
+  EiltKennzeichen,
+  EntfaelltKennzeichen,
+} from "@/components/ausstattung/link-seite-teile";
 
 // =============================================
 // Typen (Form wie GET /api/offboarding-tasks/[token])
@@ -53,9 +75,25 @@ export interface OeffentlicheAufgabe {
   abteilungKommentarAm: string | null;
   /** Hinweis aus der Checklisten-Vorlage (Paket 5, beide Module). */
   description?: string | null;
+  /**
+   * Nur Onboarding (Ausstattung & Zugaenge): Bemerkung zur Position mit ihrer
+   * Beschriftung nach Herkunft (Regel 8) — eigener Kasten, getrennt von
+   * `description` (dem festen Hinweis aus dem Katalog).
+   */
+  bemerkung?: { text: string; label: string } | null;
+  /** Nur Onboarding: Frist auf den Tag der Benachrichtigung angehoben (Regel 14). */
+  eilt?: boolean;
+  /** Nur Onboarding: von der Personalabteilung gestrichen (R9, E-A21) — kein Abhaken mehr. */
+  entfaellt?: boolean;
 }
 
 export interface AufgabenSeitenDaten {
+  /**
+   * Modul des Links (der Server liefert es in beiden Modulen). Nur fuer den
+   * Fortschritt ohne zaehlende Aufgabe: Onboarding 0 % (F2), Offboarding wie
+   * eh und je 100 %; fehlt es, gilt das Offboarding.
+   */
+  modul?: AbteilungsModul;
   abteilung: { key: string; name: string };
   vorgang: {
     vorgangsnummer: string;
@@ -73,6 +111,15 @@ export interface AufgabenSeitenDaten {
    * Onboarding). Der Server schneidet zu; die Seite zeigt nur, was ankommt.
    */
   zusatz?: Partial<Record<ZusatzFeld, string>>;
+  /**
+   * Nur Onboarding (E-A10, F15): Arbeitsort, wenn er von der Einrichtung
+   * abweicht, sonst `null`. Steht im Kopf neben der Einrichtung.
+   */
+  arbeitsort?: string | null;
+  /** Nur Onboarding (Regel 7): Angaben aus „Ausstattung & Zugänge“, die diese Stelle sehen darf. */
+  angaben?: { label: string; wert: string }[];
+  /** Nur Onboarding (Regel 7, E-A14): Hinweis der Führungskraft an genau diese Stelle. */
+  hinweis?: string | null;
   /** Vorgang abgeschlossen: nur lesen. */
   readOnly: boolean;
   gueltigBis: string;
@@ -223,8 +270,11 @@ export function AufgabenSeite({
     return () => clearTimeout(timer);
   }, [meldung]);
 
-  const offeneAufgaben = useMemo(() => aufgaben.filter((a) => !a.isCompleted), [aufgaben]);
-  const erledigteAufgaben = useMemo(() => aufgaben.filter((a) => a.isCompleted), [aufgaben]);
+  // Entfallene Aufgaben sind auf dem Server `isCompleted` (F2) — hier stehen
+  // sie in einem eigenen Abschnitt, nie unter „Erledigt“.
+  const offeneAufgaben = useMemo(() => aufgaben.filter((a) => !a.isCompleted && !a.entfaellt), [aufgaben]);
+  const erledigteAufgaben = useMemo(() => aufgaben.filter((a) => a.isCompleted && !a.entfaellt), [aufgaben]);
+  const entfalleneAufgaben = useMemo(() => aufgaben.filter((a) => a.entfaellt === true), [aufgaben]);
 
   // Offene Aufgaben je Kategorie, in der Reihenfolge des Servers (Position; Kategorien nach ihrem ersten Punkt).
   const offenNachKategorie = useMemo(() => {
@@ -278,8 +328,13 @@ export function AufgabenSeite({
     if (aufgabe) setAufgaben((prev) => prev.map((a) => (a.id === aufgabe.id ? aufgabe : a)));
   };
 
-  /** Fehler des Servers: abgeschlossen → nur lesen, abgebrochen/abgelaufen → Fehlerseite. */
-  const fehlerZeigen = (err: unknown) => {
+  /**
+   * Fehler des Servers: abgeschlossen → nur lesen, abgebrochen/abgelaufen →
+   * Fehlerseite, inzwischen gestrichen (409 „entfällt“) → die Aufgabe als
+   * entfallen zeigen, ohne die Seite neu zu laden (jeder GET zaehlt als
+   * „geöffnet“).
+   */
+  const fehlerZeigen = (err: unknown, aufgabeId?: string) => {
     const text = err instanceof Error ? err.message : FEHLER_SPEICHERN;
     const status = err instanceof SpeicherFehler ? err.status : 0;
     if (status === 410 || (status === 404 && text === MELDUNGEN.LINK_UNGUELTIG)) {
@@ -287,11 +342,16 @@ export function AufgabenSeite({
       return;
     }
     if (status === 409 && text === MELDUNGEN.VORGANG_ABGESCHLOSSEN_NUR_LESEN) setReadOnly(true);
+    if (status === 409 && text === MELDUNGEN.AUFGABE_ENTFAELLT && aufgabeId) {
+      setAufgaben((prev) =>
+        prev.map((a) => (a.id === aufgabeId ? { ...a, isCompleted: true, entfaellt: true } : a)),
+      );
+    }
     setMeldung(text);
   };
 
   const umschalten = async (aufgabe: OeffentlicheAufgabe) => {
-    if (readOnly || speichert.has(aufgabe.id)) return;
+    if (readOnly || aufgabe.entfaellt || speichert.has(aufgabe.id)) return;
     const neu = !aufgabe.isCompleted;
     const body: { isCompleted: boolean; comment?: string } = { isCompleted: neu };
     // Den Entwurf nur mitschicken, wenn jemand getippt hat, das Feld noch offen
@@ -326,7 +386,7 @@ export function AufgabenSeite({
     } catch (err) {
       // Zurueck auf den Stand vor dem Klick.
       setAufgaben((prev) => prev.map((a) => (a.id === aufgabe.id ? aufgabe : a)));
-      fehlerZeigen(err);
+      fehlerZeigen(err, aufgabe.id);
     } finally {
       setzeSpeichert(aufgabe.id, false);
     }
@@ -407,9 +467,13 @@ export function AufgabenSeite({
 
   // ---- Aufgaben ----
   const nun = jetzt ?? new Date();
-  const gesamt = aufgaben.length;
-  const erledigt = erledigteAufgaben.length;
-  const prozent = gesamt > 0 ? Math.round((erledigt / gesamt) * 100) : 100;
+  // EINE Rechnung (F2): entfallene Aufgaben zaehlen weder im Zaehler noch im
+  // Nenner — ohne zaehlende Aufgabe steht der Balken im Onboarding auf 0 %.
+  // Das Offboarding kennt kein „entfällt“ und bleibt Byte fuer Byte wie zuvor:
+  // ohne Aufgabe 100 % (wie `fortschritt` des Servers).
+  const zaehlung = checklistFortschritt(aufgaben);
+  const { gesamt, erledigt, alleErledigt } = zaehlung;
+  const prozent = gesamt === 0 && daten.modul !== "ONBOARDING" ? 100 : zaehlung.prozent;
   // Ohne Bezugsdatum (Altbestand ohne Modalitaeten) entfallen Zeile UND
   // Countdown — `formatDatumDE(null)` waere leer, `tageBis(null)` aber 0 und
   // damit „Heute ist der erste Arbeitstag".
@@ -419,11 +483,17 @@ export function AufgabenSeite({
   const zusatzFelder = (Object.entries(daten.zusatz ?? {}) as [ZusatzFeld, string][]).filter(
     ([feld, wert]) => !!wert && feld in ZUSATZ_LABELS_SEITE,
   );
+  // Ausstattung & Zugaenge (nur Onboarding): Arbeitsort, Angaben, Hinweis.
+  const arbeitsort = daten.arbeitsort?.trim() || null;
+  const angaben = (daten.angaben ?? []).filter((a) => a.wert.trim() !== "");
+  const stellenHinweis = daten.hinweis?.trim() || null;
+  const nurFuerSichtbar = zusatzFelder.length > 0 || angaben.length > 0 || !!stellenHinweis;
 
   const renderAufgabe = (aufgabe: OeffentlicheAufgabe) => {
     const laeuft = speichert.has(aufgabe.id);
     const animiert = geradeErledigt.has(aufgabe.id);
     const offenEditor = editorOffen.has(aufgabe.id);
+    const entfaellt = aufgabe.entfaellt === true;
     const faelligIn = aufgabe.dueDate ? tageBis(aufgabe.dueDate, nun) : null;
     const ueberfaellig = !aufgabe.isCompleted && faelligIn !== null && faelligIn < 0;
     const entwurf = entwuerfe[aufgabe.id];
@@ -445,21 +515,33 @@ export function AufgabenSeite({
           <button
             type="button"
             onClick={() => umschalten(aufgabe)}
-            disabled={laeuft || readOnly}
-            aria-label={aufgabe.isCompleted ? "Als offen markieren" : "Als erledigt markieren"}
-            aria-pressed={aufgabe.isCompleted}
+            disabled={laeuft || readOnly || entfaellt}
+            aria-label={
+              entfaellt
+                ? "Entfällt – kann nicht abgehakt werden"
+                : aufgabe.isCompleted
+                  ? "Als offen markieren"
+                  : "Als erledigt markieren"
+            }
+            aria-pressed={entfaellt ? undefined : aufgabe.isCompleted}
             className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 transition-all duration-300 sm:h-6 sm:w-6 sm:rounded-md ${
-              aufgabe.isCompleted
-                ? "border-green-500 bg-green-500 text-white"
-                : "border-gray-300 bg-white hover:border-primary hover:bg-primary/5"
+              entfaellt
+                ? "cursor-not-allowed border-border bg-muted text-muted-foreground"
+                : aufgabe.isCompleted
+                  ? "border-green-500 bg-green-500 text-white"
+                  : "border-gray-300 bg-white hover:border-primary hover:bg-primary/5"
             } ${laeuft ? "opacity-50" : ""} ${readOnly ? "cursor-not-allowed opacity-60" : ""} ${
               animiert ? "scale-110" : ""
             }`}
           >
-            {aufgabe.isCompleted && (
-              <svg className="h-4 w-4 sm:h-3.5 sm:w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+            {entfaellt ? (
+              <Minus className="h-4 w-4 sm:h-3.5 sm:w-3.5" strokeWidth={3} aria-hidden="true" />
+            ) : (
+              aufgabe.isCompleted && (
+                <svg className="h-4 w-4 sm:h-3.5 sm:w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )
             )}
           </button>
 
@@ -472,15 +554,19 @@ export function AufgabenSeite({
               >
                 {aufgabe.title}
               </h4>
+              {entfaellt && <EntfaelltKennzeichen />}
               {aufgabe.dueDate && !aufgabe.isCompleted && (
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    ueberfaellig ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
-                  }`}
-                >
-                  {ueberfaellig
-                    ? `Überfällig seit ${formatDatumDE(aufgabe.dueDate)}`
-                    : `Fällig ${formatDatumDE(aufgabe.dueDate)}`}
+                <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  {aufgabe.eilt && <EiltKennzeichen />}
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      ueberfaellig ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
+                    }`}
+                  >
+                    {ueberfaellig
+                      ? `Überfällig seit ${formatDatumDE(aufgabe.dueDate)}`
+                      : `Fällig ${formatDatumDE(aufgabe.dueDate)}`}
+                  </span>
                 </span>
               )}
             </div>
@@ -495,7 +581,16 @@ export function AufgabenSeite({
               </p>
             )}
 
-            {aufgabe.isCompleted && aufgabe.completedAt && (
+            {/* Bemerkung zur Position (Onboarding) — eigener Kasten, getrennt vom Katalog-Hinweis. */}
+            <BemerkungKasten bemerkung={aufgabe.bemerkung} />
+
+            {entfaellt && (
+              <p className="mt-1.5 text-xs text-muted-foreground" data-entfaellt-text>
+                {ENTFAELLT_TEXT}
+              </p>
+            )}
+
+            {aufgabe.isCompleted && !entfaellt && aufgabe.completedAt && (
               <p className="mt-1.5 text-xs text-green-700">
                 Erledigt am {datumUhrzeitDE(aufgabe.completedAt)}
               </p>
@@ -607,6 +702,12 @@ export function AufgabenSeite({
             <div>
               <dt className="text-xs text-muted-foreground">Einrichtung</dt>
               <dd className="break-words font-medium text-foreground">{einrichtung || "—"}</dd>
+              {/* Arbeitsort (Onboarding, E-A10) — nur, wenn er von der Einrichtung abweicht. */}
+              {arbeitsort && (
+                <dd className="break-words text-xs text-muted-foreground" data-arbeitsort>
+                  Arbeitsort: <span className="font-medium text-foreground">{arbeitsort}</span>
+                </dd>
+              )}
             </div>
             {bezug && (
               <div>
@@ -616,20 +717,24 @@ export function AufgabenSeite({
             )}
           </dl>
 
-          {/* Zweite Reihe: nur, was genau diese Stelle sehen darf. */}
-          {zusatzFelder.length > 0 && (
+          {/* Zweite Reihe: nur, was genau diese Stelle sehen darf — dazu im
+              Onboarding Angaben und Hinweis aus „Ausstattung & Zugänge“. */}
+          {nurFuerSichtbar && (
             <div className="mt-3 border-t pt-3" data-zusatz>
               <p className="text-xs font-semibold text-foreground">
                 Nur für {daten.abteilung.name}
               </p>
-              <dl className="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-                {zusatzFelder.map(([feld, wert]) => (
-                  <div key={feld}>
-                    <dt className="text-xs text-muted-foreground">{ZUSATZ_LABELS_SEITE[feld]}</dt>
-                    <dd className="break-words font-medium text-foreground">{wert}</dd>
-                  </div>
-                ))}
-              </dl>
+              {zusatzFelder.length > 0 && (
+                <dl className="mt-2 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                  {zusatzFelder.map(([feld, wert]) => (
+                    <div key={feld}>
+                      <dt className="text-xs text-muted-foreground">{ZUSATZ_LABELS_SEITE[feld]}</dt>
+                      <dd className="break-words font-medium text-foreground">{wert}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <AngabenEintraege angaben={angaben} hinweis={stellenHinweis} />
             </div>
           )}
 
@@ -690,8 +795,8 @@ export function AufgabenSeite({
           </section>
         )}
 
-        {/* Alles erledigt */}
-        {gesamt > 0 && offeneAufgaben.length === 0 && (
+        {/* Alles erledigt (entfallene zaehlen nicht mit) */}
+        {alleErledigt && (
           <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-6 text-center" role="status">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
               <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -715,7 +820,22 @@ export function AufgabenSeite({
           </section>
         )}
 
-        {gesamt === 0 && (
+        {/* Entfallene Aufgaben (Onboarding): von der Personalabteilung gestrichen */}
+        {entfalleneAufgaben.length > 0 && (
+          <section className="mt-8" aria-labelledby="entfallene-aufgaben">
+            <h2 id="entfallene-aufgaben" className="mb-3 text-sm font-semibold text-muted-foreground">
+              Entfallene Aufgaben ({entfalleneAufgaben.length})
+            </h2>
+            {gesamt === 0 && (
+              <p className="mb-3 text-sm text-muted-foreground" role="status">
+                Für Sie ist nichts mehr zu tun – alle Aufgaben sind entfallen.
+              </p>
+            )}
+            <ul className="space-y-3">{entfalleneAufgaben.map(renderAufgabe)}</ul>
+          </section>
+        )}
+
+        {aufgaben.length === 0 && (
           <div className="mt-6 rounded-xl border bg-card p-8 text-center">
             <p className="text-muted-foreground">Keine Aufgaben für diese Abteilung vorhanden.</p>
           </div>

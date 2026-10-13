@@ -30,6 +30,7 @@ import {
   CIVIL_SERVICE_STATUS_LABELS,
 } from "@/lib/constants";
 import { formatDatumDE } from "@/lib/format";
+import { ausstattungListe } from "@/lib/ausstattung";
 
 export interface ResolverContext {
   organizationId?: string | null;
@@ -233,6 +234,15 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
           wochenstunden: true, probezeitMonate: true, urlaubstageProJahr: true,
         },
       },
+      // {ausstattung_liste} (E-A25): nur Titel und gewaehlte Optionen — Bemerkung,
+      // Angabe und Hinweise werden gar nicht erst gelesen.
+      ausstattung: {
+        where: { gestrichenAm: null, art: { in: ["JA_NEIN", "AUSWAHL"] } },
+        select: {
+          departmentKey: true, art: true, bezeichnung: true, auswahl: true,
+          reihenfolge: true, gestrichenAm: true,
+        },
+      },
     },
   });
   if (!ob) {
@@ -316,6 +326,10 @@ const onboardingResolver: PlaceholderResolver = async (ctx) => {
   if (sd?.wochenstunden != null) set("wochenstunden", String(sd.wochenstunden).replace(".", ","));
   if (sd?.probezeitMonate != null) set("probezeit_monate", sd.probezeitMonate);
   if (sd?.urlaubstageProJahr != null) set("urlaubstage", sd.urlaubstageProJahr);
+
+  // Ausstattung & Zugaenge (E-A25): eine Zeile je gewaehlter, nicht gestrichener
+  // Position; die Regel steht rein in ausstattung.ts. Nichts gewaehlt → kein Wert.
+  set("ausstattung_liste", ausstattungListe(ob.ausstattung ?? []));
 
   // Sensible Felder nur aufloesen/melden, wenn die Vorlage sie nutzt.
   const wants = (key: string): boolean =>

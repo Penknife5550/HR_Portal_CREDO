@@ -121,6 +121,16 @@ export const ONBOARDING_PLACEHOLDERS: PlaceholderDef[] = [
   { key: "wochenstunden", label: "Wochenstunden", example: "39", group: "Vertrag" },
   { key: "probezeit_monate", label: "Probezeit (Monate)", example: "6", group: "Vertrag" },
   { key: "urlaubstage", label: "Urlaubstage pro Jahr", example: "30", group: "Vertrag" },
+  // Ausstattung & Zugaenge (E-A25): fuer ein Schreiben „Was Sie am ersten Tag
+  // erhalten“. Nur Katalogtitel und gewaehlte Optionen, eine Zeile je
+  // Position — nie Bemerkungen, Angaben oder Hinweise (Freitext fuer die
+  // Stellen) und nie Erstzugaenge. Resolver: `ausstattungListe` (ausstattung.ts).
+  {
+    key: "ausstattung_liste",
+    label: "Ausstattung & Zugänge (eine Zeile je Position, ohne Bemerkungen)",
+    example: "Zugänge: Dienst-E-Mail, WebUntis",
+    group: "Ausstattung",
+  },
 ];
 
 /**

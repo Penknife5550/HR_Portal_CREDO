@@ -53,10 +53,18 @@ jest.mock("@/lib/rate-limit", () => ({
   tokenRateLimiter: { check: () => ({ allowed: true }) },
   getClientIp: () => "203.0.113.7",
   getClientIpOrNull: () => "203.0.113.7",
-  // Die Modalitaeten-Route zieht ueber `faelligkeitenSetzen` auch
-  // src/lib/abteilungsaufgaben-uebergaenge.ts herein, und die baut beim Laden
-  // ihre eigene Bremse je Link.
+  // Vorsorglich: Liefe der Adapter (unten gemockt) echt, zoege die
+  // Modalitaeten-Route src/lib/abteilungsaufgaben-uebergaenge.ts herein, und
+  // die baut beim Laden ihre eigene Bremse je Link.
   createRateLimiter: () => ({ check: () => ({ allowed: true }) }),
+}));
+// Paket A3 (S12): Nach der Abgabe holt die Route die Ausstattungsaufgaben nach
+// und setzt die Faelligkeiten (`onboardingAusstattungNachholenIn`, eigene
+// Transaktion). Hier geht es um die HR-Mail — das Nachholen ist ein Spy, seine
+// Regeln stehen in ausstattung-aufgaben.test.ts.
+const mockNachholenIn = jest.fn();
+jest.mock("@/lib/abteilungsaufgaben-onboarding", () => ({
+  onboardingAusstattungNachholenIn: (...a: unknown[]) => mockNachholenIn(...a),
 }));
 jest.mock("@/lib/n8n", () => ({
   triggerN8nWebhook: (...a: unknown[]) => mockN8n(...a),
@@ -212,6 +220,7 @@ beforeEach(() => {
   mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachFragebogen());
   mockPrisma.onboardingAusstattung.findMany.mockResolvedValue([]);
   mockPrisma.onboardingStellenHinweis.findMany.mockResolvedValue([]);
+  mockNachholenIn.mockResolvedValue({ gesperrt: true, angelegt: 0, stellen: [], angehoben: 0 });
   // Die Transaktions-Rueckrufe laufen echt, gegen dieselben Mocks — und ihr
   // Rueckgabewert traegt den `StatusAbgleich` nach draussen.
   mockPrisma.$transaction.mockImplementation((arg: unknown) =>
@@ -611,6 +620,24 @@ describe("Modalitaeten abgesendet — Ausstattung in Kurzform (Paket A2)", () =>
     expect(p.ausstattung_kurz).toBe("");
     expect(p.fragebogen_offen).toBe("ja");
     expect(fehler).toHaveBeenCalled();
+    fehler.mockRestore();
+  });
+
+  it("Nachholen der Aufgaben scheitert (Paket A3) → nur geloggt, die HR-Mail geht unveraendert", async () => {
+    mockSupervisorToken.mockResolvedValue(modalitaetenToken({ supervisorData: MIT_AUSSTATTUNG }));
+    mockPrisma.onboardingAusstattung.findMany.mockResolvedValue([
+      { art: "JA_NEIN", departmentKey: "IT", gestrichenAm: null },
+    ]);
+    mockNachholenIn.mockRejectedValue(Object.assign(new Error("Unique constraint"), { code: "P2002" }));
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await absenden();
+
+    expect(mockNachholenIn).toHaveBeenCalledWith(mockPrisma, "ob1", expect.objectContaining({ jetzt: expect.any(Date) }));
+    expect(fehler).toHaveBeenCalledWith(expect.stringContaining("[Modalitaeten]"), "P2002");
+    const p = payload("supervisor-completed")!;
+    expect(p.ausstattung_kurz).toBe("1 Position für 1 Stelle");
+    expect(p.fragebogen_offen).toBe("ja");
     fehler.mockRestore();
   });
 

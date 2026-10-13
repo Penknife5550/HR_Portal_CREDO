@@ -215,6 +215,120 @@ describe("Standardvorlagen der Nachforderung (Paket 4)", () => {
 });
 
 /**
+ * Paket A3 (Ausstattung & Zugaenge): Die vier Onboarding-Abteilungsvorlagen
+ * bekommen neue Bloecke ({{#arbeitsort}}, {{#angaben_html}}, {{#angaben}},
+ * seit S17 {{#nachtrag}} und {{#hat_offene_aufgaben}}). Dieselbe Regel wie bei den Unterlagen: Bloecke nie
+ * verschachteln — sonst bliebe ein innerer Marker woertlich in der Mail stehen.
+ */
+describe("Onboarding-Abteilungsvorlagen: flache Bedingungsbloecke (Paket A3)", () => {
+  const ONBOARDING_ABTEILUNG = [
+    "onboarding-department-assigned",
+    "onboarding-department-reminder",
+    "onboarding-task-completed",
+    "onboarding-department-completed",
+    // S18 (E-A18): die Sammelmail an HR haelt dieselbe Regel ein.
+    "onboarding-ausstattung-offen",
+  ];
+  const vorlage = (event: string) => DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event)!;
+
+  it("kein Bedingungsblock steht in einem anderen", () => {
+    for (const event of ONBOARDING_ABTEILUNG) {
+      const v = vorlage(event);
+      expect({ event, gefunden: Boolean(v) }).toEqual({ event, gefunden: true });
+      for (const teil of [v.subject, v.bodyHtml, v.bodyText ?? ""]) {
+        for (const block of teil.matchAll(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g)) {
+          expect({ event, block: block[1], innen: /\{\{[#/]/.test(block[2]) }).toEqual({
+            event,
+            block: block[1],
+            innen: false,
+          });
+        }
+      }
+    }
+  });
+
+  it("jeder geoeffnete Block wird geschlossen (gleich viele Anfangs- und Schlussmarker je Name)", () => {
+    for (const event of ONBOARDING_ABTEILUNG) {
+      const v = vorlage(event);
+      for (const teil of [v.subject, v.bodyHtml, v.bodyText ?? ""]) {
+        const zaehlen = (zeichen: string) =>
+          [...teil.matchAll(new RegExp(`\\{\\{${zeichen}(\\w+)\\}\\}`, "g"))].map((m) => m[1]).sort();
+        expect({ event, auf: zaehlen("#") }).toEqual({ event, auf: zaehlen("/") });
+      }
+    }
+  });
+
+  it("die Zuweisungsmail zeigt Angaben und Arbeitsort in HTML und Text, die Erinnerung keine Angaben", () => {
+    const zuweisung = vorlage("onboarding-department-assigned");
+    expect(zuweisung.bodyHtml).toContain("{{#angaben_html}}{{angaben_html}}{{/angaben_html}}");
+    expect(zuweisung.bodyText).toContain("{{#angaben}}{{angaben}}");
+    expect(zuweisung.bodyHtml).toContain("{{#arbeitsort}}");
+    expect(zuweisung.bodyText).toContain("{{#arbeitsort}}Arbeitsort: {{arbeitsort}}");
+    // Rohtext nie ins HTML (dort steht das maskierte Feld), HTML-Feld nie in den Text.
+    expect(zuweisung.bodyHtml).not.toMatch(/\{\{angaben\}\}/);
+    expect(zuweisung.bodyText).not.toContain("angaben_html");
+    const variablen = zuweisung.variables?.map((v) => v.key) ?? [];
+    expect(variablen).toEqual(expect.arrayContaining(["{{angaben}}", "{{angaben_html}}", "{{arbeitsort}}"]));
+
+    const erinnerung = vorlage("onboarding-department-reminder");
+    for (const teil of [erinnerung.bodyHtml, erinnerung.bodyText ?? ""]) expect(teil).not.toContain("angaben");
+  });
+
+  // S17 (Regel 10, F7): Der Nachtrag steht flach in beiden Teilen, die
+  // Aufgabenliste in {{#hat_offene_aufgaben}} — ein Nachtrag, der nur
+  // „Entfällt“ meldet, hat keine offene Aufgabe und damit keine Liste.
+  it("die Zuweisungsmail traegt den Nachtrag flach und die Aufgabenliste im Block {{#hat_offene_aufgaben}}", () => {
+    const zuweisung = vorlage("onboarding-department-assigned");
+    expect(zuweisung.bodyHtml).toMatch(/\{\{#nachtrag\}\}[\s\S]*\{\{nachtrag_liste_html\}\}[\s\S]*\{\{\/nachtrag\}\}/);
+    expect(zuweisung.bodyText).toMatch(/\{\{#nachtrag\}\}[\s\S]*\{\{nachtrag_liste\}\}[\s\S]*\{\{\/nachtrag\}\}/);
+    expect(zuweisung.bodyHtml).toContain("{{#hat_offene_aufgaben}}{{aufgabenliste_html}}{{/hat_offene_aufgaben}}");
+    expect(zuweisung.bodyText).toMatch(/\{\{#hat_offene_aufgaben\}\}[\s\S]*\{\{aufgabenliste\}\}\{\{\/hat_offene_aufgaben\}\}/);
+    // Rohtext nie ins HTML, HTML-Feld nie in den Text.
+    expect(zuweisung.bodyHtml).not.toMatch(/\{\{nachtrag_liste\}\}/);
+    expect(zuweisung.bodyText).not.toContain("nachtrag_liste_html");
+    const variablen = zuweisung.variables?.map((v) => v.key) ?? [];
+    expect(variablen).toEqual(
+      expect.arrayContaining(["{{nachtrag}}", "{{nachtrag_liste}}", "{{nachtrag_liste_html}}", "{{hat_offene_aufgaben}}"]),
+    );
+    // Der Betreff bleibt ohne Nachtrag (betreffOhne sperrt die Liste ohnehin).
+    expect(zuweisung.subject).not.toContain("nachtrag");
+  });
+
+  // S18 (E-A17): Die Erledigt-Meldung kennt zwei Anlaesse. Die Bloecke
+  // {{#ist_erledigt}} und {{#nur_kommentar}} stehen nebeneinander — in HTML
+  // UND Text —, der Betreff traegt nur die Kurzform.
+  it("die Erledigt-Meldung hat je Anlass einen eigenen Satz, beide flach", () => {
+    const erledigt = vorlage("onboarding-task-completed");
+    expect(erledigt.subject).toBe("Onboarding-Aufgabe {{meldung_kurz}}: {{aufgabe}} ({{abteilung}})");
+    for (const teil of [erledigt.bodyHtml, erledigt.bodyText ?? ""]) {
+      expect(teil).toMatch(/\{\{#ist_erledigt\}\}[\s\S]*wurde als erledigt markiert[\s\S]*?\{\{\/ist_erledigt\}\}/);
+      expect(teil).toMatch(/\{\{#nur_kommentar\}\}[\s\S]*einen Kommentar hinterlassen[\s\S]*?\{\{\/nur_kommentar\}\}/);
+    }
+    // Rohtext nie ins HTML, das maskierte Feld nie in den Text.
+    expect(erledigt.bodyHtml).not.toContain("kommentar_text");
+    expect(erledigt.bodyText).not.toMatch(/\{\{kommentar\}\}/);
+    const variablen = erledigt.variables?.map((v) => v.key) ?? [];
+    expect(variablen).toEqual(
+      expect.arrayContaining(["{{meldung_kurz}}", "{{ist_erledigt}}", "{{nur_kommentar}}", "{{hr_postfach}}"]),
+    );
+  });
+
+  it("die Sammelmail nennt Liste und Portal-Link nur im Text der Mail, nie im Betreff", () => {
+    const sammel = vorlage("onboarding-ausstattung-offen");
+    expect(sammel.bodyHtml).toContain("{{offene_liste_html}}");
+    expect(sammel.bodyHtml).toContain('href="{{portalLink}}"');
+    expect(sammel.bodyText).toContain("{{offene_liste}}");
+    expect(sammel.bodyText).toContain("{{portalLink}}");
+    expect(sammel.bodyHtml).not.toMatch(/\{\{offene_liste\}\}/);
+    expect(sammel.bodyText).not.toContain("offene_liste_html");
+    for (const name of ["offene_liste", "portalLink"]) expect(sammel.subject).not.toContain(name);
+    // Historischer Kopf, den applyCredoCi in die CREDO-Linie umsetzt.
+    expect(sammel.bodyHtml).toContain("background-color:#575756");
+    expect(sammel.bodyHtml).not.toContain("#1a1a2e");
+  });
+});
+
+/**
  * Ergaenzung Z3 der Feinplanung: Im Onboarding kann HR selbst nichts hochladen.
  * Die beiden HR-Mails zum Ablauf eines Titels verweisen deshalb auf die
  * Nachforderung — in HTML UND Textteil.

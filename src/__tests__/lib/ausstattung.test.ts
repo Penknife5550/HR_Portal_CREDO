@@ -24,6 +24,49 @@
  * und PDF (ausstattungsGruppen) und die Uebersicht samt Zustandsregel als
  * Matrix (ausstattungsZustand, ausstattungsUebersichtBauen).
  *
+ * Feinplan S12: Aufgaben je Option (sollAufgaben, hinweisSollAufgabe,
+ * fehlendeAusstattungsAufgaben), Faelligkeit beim Anlegen mit „Eilt“
+ * (ausstattungsFaelligkeit — Berliner Kalendertag, Sommerzeitwechsel), die
+ * Anhebung beim Versand (anzuhebendeAufgaben, F22) und die Vorlauf-Warnung.
+ *
+ * Feinplan S13: Angaben und Hinweis fuer die Mail an die Stelle (angabenFuer:
+ * eigene und freigegebene, ohne gestrichene, leere und geleerte;
+ * angabenMailFelder: Klartext roh, HTML maskiert). bemerkungLabel (drei
+ * Quellen) steht schon seit S10 unten bei den Herkunftstexten.
+ *
+ * Feinplan S14: der Fortschritt ohne entfallene Aufgaben (checklistFortschritt,
+ * F2 — auch „nur Entfallene“) und die Zeile im Dialog „Abteilungen
+ * informieren“ (ausstattungVorschauSatz).
+ *
+ * Feinplan S15: die HR-Karte — Regel 9 als Matrix (aenderungPruefen: je
+ * Aufgabenstand × Aenderung; hinweisAenderungPruefen), die Eintraege der
+ * Aenderungsliste (aenderungsEintraege: nur informierte Stellen, nur
+ * Inhaltsfelder, Stellenwechsel, keine reine Faelligkeit), ihre Staende
+ * (zeilenAenderungsStand, hinweisAenderungsStand), aufgabenStatus,
+ * waehlbareStellen und die Uebersicht mit Aufgabenstand, Aktionen,
+ * Vorlauf-Warnung und Hinweis-Aufgabe.
+ *
+ * Feinplan S16: die Anzeige im Portal — der Stand einer Aufgabe als Text
+ * (aufgabenStandText), je Option eine Zeile mit eigenem Stand (optionsZeilen)
+ * und die Bemerkung je Aufgabe fuer den Zusatz am Checklistenpunkt
+ * (bemerkungJeAufgabe, nur aus der Uebersicht von HR).
+ *
+ * Feinplan S18: die Sammelmail an HR (E-A18) — der letzte Werktag vor
+ * Dienstbeginn (letzterWerktagVor: Mo–Fr, Feiertage zaehlen als Werktag), das
+ * Fenster bis einschliesslich Dienstbeginn in Berliner Kalendertagen
+ * (sammelmailFaellig, auch ueber beide Zeitumstellungen) und die Liste
+ * „Titel – Stelle“ (sammelmailListenFelder).
+ *
+ * Feinplan S19: die Rueckfrage beim Abschluss (E-A19) — die offenen
+ * Ausstattungs- und Hinweis-Aufgaben als „Titel – Stelle“
+ * (abschlussOffeneAufgaben, stelleAmArbeitsort) und die Meldung der 409
+ * (abschlussOffenMeldung).
+ *
+ * Feinplan S20: die Loeschfrist der Freitexte (freitextGrenze — 6 Monate,
+ * Monatsende 31.08. → 28./29.02., Berliner Zeit, Zeitumstellung) und der
+ * Brief-Platzhalter {ausstattung_liste} (ausstattungListe — ohne Bemerkungen,
+ * Angaben und Gestrichenes, Reihenfolge wie im Formular).
+ *
  * Ohne Datenbank und ohne Uhr. Die Schema-Kommentare haelt
  * ausstattung-schema.test.ts, die Zod-Schemas ausstattung-validierung.test.ts.
  */
@@ -31,8 +74,37 @@
 import fs from "fs";
 import path from "path";
 import { DEPARTMENT_LABELS } from "@/lib/constants";
-import type { AbteilungsKonfig } from "@/lib/abteilungsaufgaben";
+import { WAECHTER_TAGE as WAECHTER_TAGE_ABTEILUNGEN, type AbteilungsKonfig } from "@/lib/abteilungsaufgaben";
 import {
+  FREITEXT_AUFBEWAHRUNG_MONATE,
+  ausstattungListe,
+  freitextGrenze,
+  type BriefListenZeile,
+  ABSCHLUSS_AUSSTATTUNG_OFFEN,
+  abschlussOffeneAufgaben,
+  abschlussOffenMeldung,
+  stelleAmArbeitsort,
+  LEERER_NACHTRAG,
+  nachtragListe,
+  nachtragMailFelder,
+  neuGemeldeteTitel,
+  WAECHTER_TAGE,
+  aenderungPruefen,
+  aenderungsEintraege,
+  aenderungsGrundText,
+  aufgabenStatus,
+  aufgabenStandText,
+  bemerkungJeAufgabe,
+  optionsZeilen,
+  type AusstattungsZeile,
+  hinweisAenderungPruefen,
+  hinweisAenderungsStand,
+  waehlbareStellen,
+  zeilenAenderungsStand,
+  type AenderungsStand,
+  type AufgabenStatus,
+  type UebersichtAufgabeDaten,
+  type UebersichtVerknuepfung,
   AEHNLICH_MIN_ZEICHEN,
   AENDERUNGEN_NACH_ABGABE_HINWEIS,
   AUSSTATTUNG_ENDSTATUS,
@@ -44,8 +116,13 @@ import {
   BEMERKUNG_HINWEIS,
   BEMERKUNG_QUELLEN,
   GRENZEN,
+  HINWEIS_ANGABE_LABEL,
+  HINWEIS_AUFGABE_BESCHREIBUNG,
+  HINWEIS_AUFGABE_TITEL,
+  HINWEIS_FAELLIG_TAGE,
   HINWEIS_ORDER_BASIS,
   KATALOG_FELDER,
+  KEINE_ANGABEN,
   MELDUNGEN,
   NICHT_ERLAUBTE_STELLEN,
   ORDER_BASIS,
@@ -53,16 +130,25 @@ import {
   VORSCHLAEGE,
   adressLuecken,
   aehnlicheVorlagenpunkte,
+  angabenFuer,
+  angabenMailFelder,
   arbeitsortSpeicherwert,
   arbeitsortSperrGrund,
+  anzuhebendeAufgaben,
   aufgabenTitel,
   ausstattungKurz,
+  ausstattungVorschauSatz,
+  checklistFortschritt,
+  AUSSTATTUNG_KATEGORIE,
+  ausstattungsFaelligkeit,
   ausstattungsGruppen,
   ausstattungsUebersichtBauen,
   ausstattungsZustand,
   bemerkungLabel,
   bemerkungQuelleNach,
+  fehlendeAusstattungsAufgaben,
   hinweisLabel,
+  hinweisSollAufgabe,
   namenAufzaehlen,
   faelligText,
   formularEingabe,
@@ -88,6 +174,12 @@ import {
   positionGiltAm,
   positionPruefen,
   positionenFuer,
+  sollAufgaben,
+  SAMMELMAIL_EVENT,
+  letzterWerktagVor,
+  sammelmailFaellig,
+  sammelmailListenFelder,
+  vorlaufWarnung,
   vorschlaegeMeldung,
   vorschlaegeVorschau,
   wahlPruefen,
@@ -104,6 +196,10 @@ import {
   type UebersichtHinweisDaten,
   type UebersichtVorgangStand,
   type UebersichtZeileDaten,
+  type AusstattungsStand,
+  type SollAufgabenZeile,
+  type AngabenHinweis,
+  type AngabenZeile,
 } from "@/lib/ausstattung";
 
 // =============================================
@@ -2985,6 +3081,805 @@ describe("ausstattungsZustand und ausstattungsUebersichtBauen (Zustandsregel 1.6
 });
 
 // =============================================
+// Aufgaben je Option, Faelligkeit, „Eilt“ (S12)
+// =============================================
+
+function sollZeile(teil: Partial<SollAufgabenZeile> = {}): SollAufgabenZeile {
+  return {
+    departmentKey: "IT",
+    art: "JA_NEIN",
+    bezeichnung: "Dienst-iPad (Lernmittel)",
+    aufgabeTitel: "Dienst-iPad (Lernmittel) bereitstellen",
+    hinweisStelle: null,
+    relativeDueDays: -5,
+    reihenfolge: 3,
+    auswahl: [],
+    gestrichenAm: null,
+    ...teil,
+  };
+}
+
+function schluesselZeile(teil: Partial<SollAufgabenZeile> = {}): SollAufgabenZeile {
+  return sollZeile({
+    departmentKey: "FACILITY",
+    art: "AUSWAHL",
+    bezeichnung: "Schlüssel",
+    aufgabeTitel: "Schlüssel ausgeben",
+    relativeDueDays: -7,
+    reihenfolge: 1,
+    auswahl: ["Haupteingang", "Lehrerzimmer"],
+    ...teil,
+  });
+}
+
+/** Mitternacht UTC eines Kalendertags — so stehen Faelligkeiten in der Datenbank. */
+const tag = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+describe("sollAufgaben (E-A12)", () => {
+  it("Ja/Nein: genau eine Aufgabe ohne Option, Titel aus der Momentaufnahme", () => {
+    expect(sollAufgaben(sollZeile({ hinweisStelle: "Inventarnummer notieren." }))).toEqual([
+      {
+        option: "",
+        titel: "Dienst-iPad (Lernmittel) bereitstellen",
+        orderIndex: ORDER_BASIS + 300,
+        relativeDueDays: -5,
+        description: "Inventarnummer notieren.",
+      },
+    ]);
+  });
+
+  it("Ja/Nein ohne gespeicherten Titel: „<Bezeichnung> bereitstellen“; ohne Tage bleibt die Frist leer", () => {
+    const [a] = sollAufgaben(sollZeile({ aufgabeTitel: "", relativeDueDays: null, hinweisStelle: "  " }));
+    expect(a.titel).toBe("Dienst-iPad (Lernmittel) bereitstellen");
+    expect(a.relativeDueDays).toBeNull();
+    expect(a.description).toBeNull();
+  });
+
+  it("Auswahl: je gewaehlter Option eine Aufgabe, Titel mit Option, orderIndex nach ORDER_BASIS", () => {
+    expect(sollAufgaben(schluesselZeile())).toEqual([
+      {
+        option: "Haupteingang",
+        titel: "Schlüssel ausgeben: Haupteingang",
+        orderIndex: ORDER_BASIS + 100,
+        relativeDueDays: -7,
+        description: null,
+      },
+      {
+        option: "Lehrerzimmer",
+        titel: "Schlüssel ausgeben: Lehrerzimmer",
+        orderIndex: ORDER_BASIS + 101,
+        relativeDueDays: -7,
+        description: null,
+      },
+    ]);
+  });
+
+  it("Auswahl: doppelte und leere Optionen fallen weg (Primaerschluessel ausstattungId/option)", () => {
+    const optionen = sollAufgaben(
+      schluesselZeile({ auswahl: ["Haupteingang", " Haupteingang ", "", "Lehrerzimmer"] }),
+    ).map((a) => a.option);
+    expect(optionen).toEqual(["Haupteingang", "Lehrerzimmer"]);
+  });
+
+  it("Angabe, gestrichene Zeile, leere Auswahl und nicht erlaubte Stellen: keine Aufgabe", () => {
+    expect(sollAufgaben(sollZeile({ art: "ANGABE", aufgabeTitel: "" }))).toEqual([]);
+    expect(sollAufgaben(sollZeile({ gestrichenAm: new Date("2026-09-20T10:00:00Z") }))).toEqual([]);
+    expect(sollAufgaben(schluesselZeile({ auswahl: [] }))).toEqual([]);
+    for (const stelle of NICHT_ERLAUBTE_STELLEN) {
+      expect(sollAufgaben(sollZeile({ departmentKey: stelle }))).toEqual([]);
+    }
+  });
+
+  it("jede Ausstattungsaufgabe steht vor den Hinweis-Aufgaben und vor allen Vorlagenpunkten", () => {
+    const [letzte] = sollAufgaben(sollZeile({ reihenfolge: REIHENFOLGE_MAX })).slice(-1);
+    expect(letzte.orderIndex).toBeLessThan(HINWEIS_ORDER_BASIS);
+    expect(HINWEIS_ORDER_BASIS).toBeLessThan(0);
+  });
+});
+
+describe("hinweisSollAufgabe (E-A14, F20)", () => {
+  it("Titel, ortsneutrale Beschreibung und −7 Tage", () => {
+    expect(hinweisSollAufgabe("IT", ["IT"])).toEqual({
+      option: "",
+      titel: HINWEIS_AUFGABE_TITEL,
+      orderIndex: HINWEIS_ORDER_BASIS,
+      relativeDueDays: HINWEIS_FAELLIG_TAGE,
+      description: HINWEIS_AUFGABE_BESCHREIBUNG,
+    });
+    expect(HINWEIS_FAELLIG_TAGE).toBe(-7);
+  });
+
+  it("orderIndex nach der Reihenfolge der Abteilungskarte, zwischen Ausstattung und Vorlage", () => {
+    const stellen = ["FACILITY", "IT", "HR"];
+    const it = hinweisSollAufgabe("IT", stellen).orderIndex;
+    const facility = hinweisSollAufgabe("FACILITY", stellen).orderIndex;
+    expect(it).toBeLessThan(facility);
+    expect(facility).toBeLessThan(0);
+    expect(it).toBeGreaterThanOrEqual(HINWEIS_ORDER_BASIS);
+  });
+});
+
+describe("fehlendeAusstattungsAufgaben (Regel 6, F23)", () => {
+  function stand(teil: Partial<AusstattungsStand> = {}): AusstattungsStand {
+    return {
+      zeilen: [
+        { id: "aus-ipad", ...sollZeile() },
+        { id: "aus-schluessel", ...schluesselZeile() },
+      ],
+      verknuepfungen: [],
+      hinweise: [],
+      ...teil,
+    };
+  }
+
+  it("ohne Verknuepfungen fehlen alle Soll-Aufgaben, mit Herkunft, Stelle und Zeile", () => {
+    const fehlend = fehlendeAusstattungsAufgaben(stand());
+    expect(fehlend.map((f) => [f.ausstattungId, f.option, f.departmentKey, f.herkunft])).toEqual([
+      ["aus-ipad", "", "IT", "AUSSTATTUNG"],
+      ["aus-schluessel", "Haupteingang", "FACILITY", "AUSSTATTUNG"],
+      ["aus-schluessel", "Lehrerzimmer", "FACILITY", "AUSSTATTUNG"],
+    ]);
+  });
+
+  it("eine vorhandene Verknuepfung — auch zu einer entfallenen Aufgabe — wird nie ein zweites Mal angelegt", () => {
+    const fehlend = fehlendeAusstattungsAufgaben(
+      stand({
+        verknuepfungen: [
+          { ausstattungId: "aus-ipad", option: "" },
+          { ausstattungId: "aus-schluessel", option: "Haupteingang" },
+        ],
+      }),
+    );
+    expect(fehlend.map((f) => f.titel)).toEqual(["Schlüssel ausgeben: Lehrerzimmer"]);
+  });
+
+  it("Hinweise: nur mit Text, ohne Aufgabe, nicht geleert, nie an MITARBEITER/VORGESETZTER — in der Reihenfolge der Karte", () => {
+    const fehlend = fehlendeAusstattungsAufgaben(
+      stand({
+        zeilen: [],
+        hinweise: [
+          { departmentKey: "FACILITY", text: "Bitte Spind im EG", checklistItemId: null },
+          { departmentKey: "IT", text: "Mac statt PC", checklistItemId: null },
+          { departmentKey: "VERWALTUNG", text: "schon da", checklistItemId: "i-9" },
+          { departmentKey: "DSB", text: "  ", checklistItemId: null },
+          { departmentKey: "BUCHHALTUNG", text: "geleert", checklistItemId: null, inhaltGeleertAm: new Date() },
+          { departmentKey: "VORGESETZTER", text: "nie", checklistItemId: null },
+        ],
+      }),
+    );
+    expect(fehlend.map((f) => [f.departmentKey, f.herkunft, f.ausstattungId, f.titel])).toEqual([
+      ["IT", "HINWEIS", null, HINWEIS_AUFGABE_TITEL],
+      ["FACILITY", "HINWEIS", null, HINWEIS_AUFGABE_TITEL],
+    ]);
+    expect(fehlend.every((f) => f.relativeDueDays === HINWEIS_FAELLIG_TAGE)).toBe(true);
+  });
+});
+
+describe("ausstattungsFaelligkeit (Regel 14)", () => {
+  const BEGINN = tag("2026-10-01");
+
+  it("regulaer: Vertragsbeginn + Tage, kein „Eilt“", () => {
+    expect(ausstattungsFaelligkeit(BEGINN, -7, new Date("2026-09-20T08:00:00Z"))).toEqual({
+      dueDate: tag("2026-09-24"),
+      eilt: false,
+    });
+  });
+
+  it("Frist schon verstrichen: heute und „Eilt“", () => {
+    expect(ausstattungsFaelligkeit(BEGINN, -7, new Date("2026-09-25T08:00:00Z"))).toEqual({
+      dueDate: tag("2026-09-25"),
+      eilt: true,
+    });
+  });
+
+  it("Frist ist heute: bleibt, kein „Eilt“", () => {
+    expect(ausstattungsFaelligkeit(BEGINN, -7, new Date("2026-09-24T15:00:00Z"))).toEqual({
+      dueDate: tag("2026-09-24"),
+      eilt: false,
+    });
+  });
+
+  it("Berliner Kalendertag: 23:30 UTC am Vortag ist dort schon der naechste Tag", () => {
+    // 24.09. 23:30 UTC = 25.09. 01:30 in Berlin (Sommerzeit)
+    expect(ausstattungsFaelligkeit(BEGINN, -7, new Date("2026-09-24T23:30:00Z"))).toEqual({
+      dueDate: tag("2026-09-25"),
+      eilt: true,
+    });
+    // Winterzeit: 14.01. 23:30 UTC = 15.01. 00:30 in Berlin
+    expect(ausstattungsFaelligkeit(tag("2027-01-20"), -7, new Date("2027-01-14T23:30:00Z"))).toEqual({
+      dueDate: tag("2027-01-15"),
+      eilt: true,
+    });
+  });
+
+  it("Sommerzeitwechsel Ende Maerz (28.03.2027) und Ende Oktober (25.10.2026)", () => {
+    // Samstag 27.03. 23:30 UTC = Sonntag 28.03. 00:30 (noch Winterzeit, UTC+1)
+    expect(ausstattungsFaelligkeit(tag("2027-04-01"), -7, new Date("2027-03-27T23:30:00Z"))).toEqual({
+      dueDate: tag("2027-03-28"),
+      eilt: true,
+    });
+    // Sonntag 28.03. 22:30 UTC = Montag 29.03. 00:30 (Sommerzeit, UTC+2)
+    expect(ausstattungsFaelligkeit(tag("2027-04-01"), -7, new Date("2027-03-28T22:30:00Z"))).toEqual({
+      dueDate: tag("2027-03-29"),
+      eilt: true,
+    });
+    // Samstag 24.10. 22:30 UTC = Sonntag 25.10. 00:30 (noch Sommerzeit)
+    expect(ausstattungsFaelligkeit(tag("2026-10-29"), -7, new Date("2026-10-24T22:30:00Z"))).toEqual({
+      dueDate: tag("2026-10-25"),
+      eilt: true,
+    });
+    // Sonntag 25.10. 22:30 UTC = Sonntag 25.10. 23:30 (Winterzeit, UTC+1) — noch derselbe Tag
+    expect(ausstattungsFaelligkeit(tag("2026-10-29"), -7, new Date("2026-10-25T22:30:00Z"))).toEqual({
+      dueDate: tag("2026-10-25"),
+      eilt: true,
+    });
+    // Sonntag 25.10. 23:30 UTC = Montag 26.10. 00:30
+    expect(ausstattungsFaelligkeit(tag("2026-10-29"), -7, new Date("2026-10-25T23:30:00Z"))).toEqual({
+      dueDate: tag("2026-10-26"),
+      eilt: true,
+    });
+  });
+
+  it("ohne Tage oder ohne Vertragsbeginn: null (keine Faelligkeit, nicht 0)", () => {
+    expect(ausstattungsFaelligkeit(BEGINN, null, new Date("2026-09-20T08:00:00Z"))).toBeNull();
+    expect(ausstattungsFaelligkeit(null, -7, new Date("2026-09-20T08:00:00Z"))).toBeNull();
+  });
+});
+
+describe("anzuhebendeAufgaben (F22)", () => {
+  const JETZT = new Date("2026-09-25T08:00:00Z");
+  type Eingabe = Parameters<typeof anzuhebendeAufgaben>[0][number];
+  const aufgabe = (teil: Partial<Eingabe> = {}): Eingabe => ({
+    id: "a",
+    dueDate: tag("2026-09-24"),
+    createdAt: new Date("2026-09-15T10:00:00Z"),
+    isCompleted: false,
+    entfaelltAm: null,
+    ...teil,
+  });
+
+  it("noch nie versendet: alle offenen, ueberfaelligen Aufgaben (heute faellig: keine)", () => {
+    expect(
+      anzuhebendeAufgaben(
+        [
+          aufgabe({ id: "alt" }),
+          aufgabe({ id: "heute", dueDate: tag("2026-09-25") }),
+          aufgabe({ id: "spaeter", dueDate: tag("2026-10-01") }),
+        ],
+        null,
+        JETZT,
+      ),
+    ).toEqual(["alt"]);
+  });
+
+  it("schon zugestellt (createdAt vor dem letzten Versand): keine — die Frist bleibt", () => {
+    expect(anzuhebendeAufgaben([aufgabe()], new Date("2026-09-16T09:00:00Z"), JETZT)).toEqual([]);
+  });
+
+  it("nach dem letzten Versand angelegt: wird angehoben", () => {
+    expect(anzuhebendeAufgaben([aufgabe({ id: "neu" })], new Date("2026-09-14T09:00:00Z"), JETZT)).toEqual(["neu"]);
+  });
+
+  it("erledigt, entfallen oder ohne Faelligkeit: keine", () => {
+    expect(
+      anzuhebendeAufgaben(
+        [
+          aufgabe({ id: "erledigt", isCompleted: true }),
+          aufgabe({ id: "entfaellt", isCompleted: true, entfaelltAm: new Date("2026-09-20T10:00:00Z") }),
+          aufgabe({ id: "entfaellt-offen", entfaelltAm: new Date("2026-09-20T10:00:00Z") }),
+          aufgabe({ id: "ohne", dueDate: null }),
+        ],
+        null,
+        JETZT,
+      ),
+    ).toEqual([]);
+  });
+
+  it("heute im Berliner Kalendertag (23:30 UTC am Vortag)", () => {
+    expect(anzuhebendeAufgaben([aufgabe()], null, new Date("2026-09-24T23:30:00Z"))).toEqual(["a"]);
+    expect(anzuhebendeAufgaben([aufgabe()], null, new Date("2026-09-24T21:30:00Z"))).toEqual([]);
+  });
+
+  it("Zeitstempel als ISO-Text (JSON) werden gleich gelesen", () => {
+    expect(
+      anzuhebendeAufgaben(
+        [aufgabe({ id: "json", dueDate: "2026-09-24T00:00:00.000Z", createdAt: "2026-09-20T10:00:00.000Z" })],
+        "2026-09-18T10:00:00.000Z",
+        JETZT,
+      ),
+    ).toEqual(["json"]);
+  });
+
+  it("vor dem letzten Versand angelegt, aber mit offenem Eintrag NEU (Stellenwechsel, F23): wird angehoben", () => {
+    const VERSAND = new Date("2026-09-16T09:00:00Z");
+    const neu = new Set(["Funkgerät bereitstellen"]);
+    expect(
+      anzuhebendeAufgaben(
+        [
+          aufgabe({ id: "zugezogen", title: "Funkgerät  bereitstellen " }),
+          aufgabe({ id: "zugestellt", title: "Spind bereitstellen" }),
+          aufgabe({ id: "ohne-titel" }),
+          aufgabe({ id: "noch-nicht-faellig", title: "Funkgerät bereitstellen", dueDate: tag("2026-09-30") }),
+          aufgabe({ id: "entfallen", title: "Funkgerät bereitstellen", entfaelltAm: new Date("2026-09-20T10:00:00Z") }),
+        ],
+        VERSAND,
+        JETZT,
+        neu,
+      ),
+    ).toEqual(["zugezogen"]);
+    // Ohne Eintrag bleibt es bei „schon zugestellt“.
+    expect(anzuhebendeAufgaben([aufgabe({ title: "Funkgerät bereitstellen" })], VERSAND, JETZT)).toEqual([]);
+  });
+});
+
+describe("neuGemeldeteTitel (F22)", () => {
+  const e = (art: string, titel: string, erfasstAm?: string) => ({
+    art,
+    titel,
+    ...(erfasstAm ? { erfasstAm: `2026-09-${erfasstAm}T10:00:00.000Z` } : {}),
+  });
+
+  it("nur Titel, deren LETZTER offener Eintrag NEU ist", () => {
+    expect(
+      neuGemeldeteTitel([
+        e("NEU", "Zugezogen"),
+        e("ENTFAELLT", "Wieder aufgenommen"),
+        e("NEU", "Wieder aufgenommen"),
+        e("NEU", "Gleich wieder weg"),
+        e("ENTFAELLT", "Gleich wieder weg"),
+        e("GEAENDERT", "Nur geaendert"),
+      ]),
+    ).toEqual(new Set(["Zugezogen", "Wieder aufgenommen"]));
+  });
+
+  it("Reihenfolge nach `erfasstAm`, Titel einzeilig wie in nachtragListe, leere fallen weg", () => {
+    expect(
+      neuGemeldeteTitel([e("NEU", "  Spind \n bereitstellen ", "22"), e("ENTFAELLT", "Spind bereitstellen", "21"), e("NEU", "  ")]),
+    ).toEqual(new Set(["Spind bereitstellen"]));
+    expect(neuGemeldeteTitel([e("ENTFAELLT", "Spind bereitstellen", "22"), e("NEU", "Spind bereitstellen", "21")])).toEqual(
+      new Set(),
+    );
+    expect(neuGemeldeteTitel([])).toEqual(new Set());
+  });
+});
+
+describe("vorlaufWarnung (Regel 14)", () => {
+  const BEGINN = tag("2026-10-01");
+
+  it("Vorlauf passt: keine Warnung", () => {
+    expect(vorlaufWarnung(-14, BEGINN, new Date("2026-09-10T08:00:00Z"))).toBeNull();
+    // Frist ist heute: passt noch
+    expect(vorlaufWarnung(-14, BEGINN, new Date("2026-09-17T08:00:00Z"))).toBeNull();
+  });
+
+  it("Vorlauf passt nicht: Warnung mit festem Wortlaut", () => {
+    expect(vorlaufWarnung(-14, BEGINN, new Date("2026-09-18T08:00:00Z"))).toBe(MELDUNGEN.VORLAUF_WARNUNG);
+    expect(MELDUNGEN.VORLAUF_WARNUNG).toBe("bis Dienstbeginn voraussichtlich nicht verfügbar – Übergangslösung klären");
+  });
+
+  it("ohne Vorlauf (keine Tage, Frist am oder nach dem Beginn) oder ohne Beginn: keine Warnung", () => {
+    const spaet = new Date("2026-12-01T08:00:00Z");
+    expect(vorlaufWarnung(null, BEGINN, spaet)).toBeNull();
+    expect(vorlaufWarnung(0, BEGINN, spaet)).toBeNull();
+    expect(vorlaufWarnung(5, BEGINN, spaet)).toBeNull();
+    expect(vorlaufWarnung(-14, null, spaet)).toBeNull();
+  });
+});
+
+// =============================================
+// Sammelmail an HR am Werktag vor Dienstbeginn (S18, E-A18)
+// =============================================
+
+describe("letzterWerktagVor (E-A18)", () => {
+  it("Mo → Fr, Di → Mo, Fr → Do; Sa und So → Fr", () => {
+    expect(letzterWerktagVor(tag("2026-10-05"))).toEqual(tag("2026-10-02")); // Montag
+    expect(letzterWerktagVor(tag("2026-10-06"))).toEqual(tag("2026-10-05")); // Dienstag
+    expect(letzterWerktagVor(tag("2026-10-02"))).toEqual(tag("2026-10-01")); // Freitag
+    expect(letzterWerktagVor(tag("2026-10-03"))).toEqual(tag("2026-10-02")); // Samstag
+    expect(letzterWerktagVor(tag("2026-10-04"))).toEqual(tag("2026-10-02")); // Sonntag
+  });
+
+  it("Feiertage zaehlen als Werktag (keine Feiertagsliste, Feinplan Abschnitt 5)", () => {
+    // Neujahr 01.01.2027 und 1. Weihnachtstag 25.12.2026 sind Freitage.
+    expect(letzterWerktagVor(tag("2027-01-04"))).toEqual(tag("2027-01-01"));
+    expect(letzterWerktagVor(tag("2026-12-28"))).toEqual(tag("2026-12-25"));
+  });
+
+  it("Berliner Kalendertag: ein als Berliner Mitternacht gespeicherter Beginn zaehlt als sein Tag", () => {
+    // 04.10. 22:00 UTC = Montag 05.10. 00:00 in Berlin (Sommerzeit)
+    expect(letzterWerktagVor(new Date("2026-10-04T22:00:00Z"))).toEqual(tag("2026-10-02"));
+    // Zeichenkette wie aus JSON
+    expect(letzterWerktagVor("2026-10-06")).toEqual(tag("2026-10-05"));
+  });
+
+  it("unlesbar: ungueltiges Datum", () => {
+    expect(Number.isNaN(letzterWerktagVor("kein Datum").getTime())).toBe(true);
+  });
+});
+
+describe("sammelmailFaellig (E-A18)", () => {
+  it("Dienstbeginn Montag: Freitag bis einschliesslich Montag, nicht Donnerstag, nicht Dienstag", () => {
+    const montag = tag("2026-10-05");
+    expect(sammelmailFaellig(montag, new Date("2026-10-01T10:00:00Z"))).toBe(false); // Do
+    expect(sammelmailFaellig(montag, new Date("2026-10-02T06:00:00Z"))).toBe(true); // Fr
+    expect(sammelmailFaellig(montag, new Date("2026-10-03T06:00:00Z"))).toBe(true); // Sa
+    expect(sammelmailFaellig(montag, new Date("2026-10-04T06:00:00Z"))).toBe(true); // So
+    expect(sammelmailFaellig(montag, new Date("2026-10-05T06:00:00Z"))).toBe(true); // Mo (Dienstbeginn)
+    expect(sammelmailFaellig(montag, new Date("2026-10-06T06:00:00Z"))).toBe(false); // Di
+  });
+
+  it("Dienstbeginn Mittwoch: nur Dienstag und Mittwoch", () => {
+    const mittwoch = tag("2026-10-07");
+    expect(sammelmailFaellig(mittwoch, new Date("2026-10-05T06:00:00Z"))).toBe(false);
+    expect(sammelmailFaellig(mittwoch, new Date("2026-10-06T06:00:00Z"))).toBe(true);
+    expect(sammelmailFaellig(mittwoch, new Date("2026-10-07T06:00:00Z"))).toBe(true);
+  });
+
+  it("Feiertag ignoriert: Dienstbeginn Mo 04.01.2027 → schon an Neujahr (Freitag) fällig", () => {
+    const beginn = tag("2027-01-04");
+    expect(sammelmailFaellig(beginn, new Date("2026-12-31T10:00:00Z"))).toBe(false);
+    expect(sammelmailFaellig(beginn, new Date("2027-01-01T10:00:00Z"))).toBe(true);
+  });
+
+  it("Sommerzeit Ende Oktober: Dienstbeginn Mo 26.10.2026, Fenster ab Fr 23.10. 00:00 Berliner Zeit", () => {
+    const beginn = tag("2026-10-26");
+    // Do 22.10. 21:59 UTC = 23:59 in Berlin (UTC+2)
+    expect(sammelmailFaellig(beginn, new Date("2026-10-22T21:59:00Z"))).toBe(false);
+    // Do 22.10. 22:30 UTC = Fr 23.10. 00:30 in Berlin
+    expect(sammelmailFaellig(beginn, new Date("2026-10-22T22:30:00Z"))).toBe(true);
+    // So 25.10. 23:30 UTC = Mo 26.10. 00:30 (nach der Umstellung UTC+1)
+    expect(sammelmailFaellig(beginn, new Date("2026-10-25T23:30:00Z"))).toBe(true);
+    // Mo 26.10. 22:59 UTC = 23:59 in Berlin: noch der Tag des Dienstbeginns
+    expect(sammelmailFaellig(beginn, new Date("2026-10-26T22:59:00Z"))).toBe(true);
+    // Mo 26.10. 23:00 UTC = Di 27.10. 00:00: vorbei
+    expect(sammelmailFaellig(beginn, new Date("2026-10-26T23:00:00Z"))).toBe(false);
+  });
+
+  it("Sommerzeit Ende Maerz: Dienstbeginn Mo 30.03.2026, Fenster ab Fr 27.03. 00:00 Berliner Zeit", () => {
+    const beginn = tag("2026-03-30");
+    // Do 26.03. 22:30 UTC = 23:30 in Berlin (UTC+1)
+    expect(sammelmailFaellig(beginn, new Date("2026-03-26T22:30:00Z"))).toBe(false);
+    // Do 26.03. 23:30 UTC = Fr 27.03. 00:30
+    expect(sammelmailFaellig(beginn, new Date("2026-03-26T23:30:00Z"))).toBe(true);
+    // So 29.03. 22:30 UTC = Mo 30.03. 00:30 (nach der Umstellung UTC+2)
+    expect(sammelmailFaellig(beginn, new Date("2026-03-29T22:30:00Z"))).toBe(true);
+  });
+
+  it("ohne oder mit unlesbarem Vertragsbeginn nie", () => {
+    expect(sammelmailFaellig(null, new Date("2026-10-02T06:00:00Z"))).toBe(false);
+    expect(sammelmailFaellig(undefined, new Date("2026-10-02T06:00:00Z"))).toBe(false);
+    expect(sammelmailFaellig("kein Datum", new Date("2026-10-02T06:00:00Z"))).toBe(false);
+  });
+});
+
+describe("sammelmailListenFelder (E-A18)", () => {
+  const ORT = "org-grundschule";
+
+  it("„Titel – Stelle“ je Zeile; Name am Arbeitsort vor dem zentralen, HR als Personalabteilung", () => {
+    const f = sammelmailListenFelder({
+      aufgaben: [
+        { title: "Dienst-iPad (Lernmittel) bereitstellen", assignee: "IT" },
+        { title: "Schlüssel ausgeben: Haupteingang", assignee: "FACILITY" },
+        { title: "Jobticket beantragen", assignee: "HR" },
+      ],
+      arbeitsortId: ORT,
+      konfigs: [
+        konfig({ departmentKey: "IT", departmentName: "IT-Support FES", organizationId: null }),
+        konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", organizationId: ORT }),
+        konfig({ departmentKey: "FACILITY", departmentName: "Facility zentral", organizationId: null }),
+      ],
+    });
+    expect(f.anzahl_offen).toBe(3);
+    expect(f.offene_liste).toBe(
+      "- Dienst-iPad (Lernmittel) bereitstellen – IT-Support FES\n" +
+        "- Schlüssel ausgeben: Haupteingang – Hausmeister Grundschule\n" +
+        "- Jobticket beantragen – Personalabteilung",
+    );
+    expect(f.offene_liste_html).toBe(
+      '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+        '<li style="margin:0 0 4px;">Dienst-iPad (Lernmittel) bereitstellen – IT-Support FES</li>' +
+        '<li style="margin:0 0 4px;">Schlüssel ausgeben: Haupteingang – Hausmeister Grundschule</li>' +
+        '<li style="margin:0 0 4px;">Jobticket beantragen – Personalabteilung</li>' +
+        "</ul>",
+    );
+  });
+
+  it("ohne Eintrag unter Einstellungen → Abteilungen: der bekannte Name, nie der Rohschluessel", () => {
+    const f = sammelmailListenFelder({
+      aufgaben: [{ title: "Hinweis der Führungskraft beachten", assignee: "FACILITY" }],
+      arbeitsortId: ORT,
+      konfigs: [],
+    });
+    expect(f.offene_liste).toBe("- Hinweis der Führungskraft beachten – Facility Management");
+  });
+
+  it("HTML maskiert, Klartext roh; ein Titel ist einzeilig", () => {
+    const f = sammelmailListenFelder({
+      aufgaben: [{ title: "Schrank <b>&</b>\nSchloss", assignee: null }],
+      arbeitsortId: ORT,
+      konfigs: [],
+    });
+    expect(f.offene_liste).toBe("- Schrank <b>&</b> Schloss");
+    expect(f.offene_liste_html).toContain(">Schrank &lt;b&gt;&amp;&lt;/b&gt; Schloss</li>");
+    expect(f.offene_liste_html).not.toContain("<b>");
+  });
+
+  it("ohne Aufgabe: 0 und leere Listen", () => {
+    expect(sammelmailListenFelder({ aufgaben: [], arbeitsortId: ORT, konfigs: [] })).toEqual({
+      anzahl_offen: 0,
+      offene_liste: "",
+      offene_liste_html: "",
+    });
+  });
+
+  it("das Ereignis ist die Sammelmail des Katalogs", () => {
+    expect(SAMMELMAIL_EVENT).toBe("onboarding-ausstattung-offen");
+  });
+});
+
+// =============================================
+// Abschluss mit offener Ausstattung (S19, E-A19)
+// =============================================
+
+describe("stelleAmArbeitsort / abschlussOffeneAufgaben / abschlussOffenMeldung (E-A19)", () => {
+  const ORT = "org-grundschule";
+  const KONFIGS = [
+    konfig({ departmentKey: "IT", departmentName: "IT-Support FES", organizationId: null }),
+    konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister Grundschule", organizationId: ORT }),
+    konfig({ departmentKey: "FACILITY", departmentName: "Facility zentral", organizationId: null }),
+  ];
+
+  it("Stelle wie in Karte und Sammelmail: am Arbeitsort vor zentral, HR als Personalabteilung, sonst das Label", () => {
+    expect(stelleAmArbeitsort("FACILITY", ORT, KONFIGS)).toBe("Hausmeister Grundschule");
+    expect(stelleAmArbeitsort("FACILITY", "org-andere", KONFIGS)).toBe("Facility zentral");
+    expect(stelleAmArbeitsort("HR", ORT, KONFIGS)).toBe("Personalabteilung");
+    expect(stelleAmArbeitsort("VERWALTUNG", ORT, [])).toBe(DEPARTMENT_LABELS.VERWALTUNG);
+    expect(stelleAmArbeitsort(null, ORT, KONFIGS)).toBe("");
+  });
+
+  it("je offene Aufgabe Titel (einzeilig) und Stelle — in der Reihenfolge der Abfrage", () => {
+    expect(
+      abschlussOffeneAufgaben({
+        aufgaben: [
+          { title: "Dienst-iPad (Lernmittel) bereitstellen", assignee: "IT" },
+          { title: "Hinweis der Führungskraft beachten", assignee: "FACILITY" },
+          { title: "Schrank\nSchloss", assignee: null },
+        ],
+        arbeitsortId: ORT,
+        konfigs: KONFIGS,
+      }),
+    ).toEqual([
+      { titel: "Dienst-iPad (Lernmittel) bereitstellen", stelle: "IT-Support FES" },
+      { titel: "Hinweis der Führungskraft beachten", stelle: "Hausmeister Grundschule" },
+      { titel: "Schrank Schloss", stelle: "" },
+    ]);
+    expect(abschlussOffeneAufgaben({ aufgaben: [], arbeitsortId: ORT, konfigs: KONFIGS })).toEqual([]);
+  });
+
+  it("die Meldung nennt die Zahl und die Folge — Einzahl und Mehrzahl", () => {
+    expect(abschlussOffenMeldung(1)).toBe(
+      "Aus „Ausstattung & Zugänge“ ist noch 1 Aufgabe offen. Nach dem Abschluss können die Stellen sie nicht mehr abhaken – abschließen nur mit Bestätigung.",
+    );
+    expect(abschlussOffenMeldung(4)).toContain("sind noch 4 Aufgaben offen.");
+    expect(ABSCHLUSS_AUSSTATTUNG_OFFEN).toBe("AUSSTATTUNG_OFFEN");
+  });
+
+  it("die Sammelmail nennt die Stellen nach derselben Regel (gemeinsame Hilfe)", () => {
+    const f = sammelmailListenFelder({
+      aufgaben: [{ title: "Hinweis der Führungskraft beachten", assignee: "FACILITY" }],
+      arbeitsortId: ORT,
+      konfigs: KONFIGS,
+    });
+    expect(f.offene_liste).toBe(`- Hinweis der Führungskraft beachten – ${stelleAmArbeitsort("FACILITY", ORT, KONFIGS)}`);
+  });
+});
+
+// =============================================
+// Mail an die Stelle: Angaben und Hinweis (S13, Regel 7)
+// =============================================
+
+describe("angabenFuer (Regel 7)", () => {
+  function angabe(teil: Partial<AngabenZeile> & Pick<AngabenZeile, "departmentKey">): AngabenZeile {
+    return {
+      art: "ANGABE",
+      angabeSchluessel: "DURCHWAHL",
+      bezeichnung: "Gewünschte Durchwahl",
+      angabe: "214",
+      sichtbarFuer: [],
+      reihenfolge: 0,
+      gestrichenAm: null,
+      inhaltGeleertAm: null,
+      ...teil,
+    };
+  }
+  const faecher = angabe({
+    departmentKey: "FACILITY",
+    angabeSchluessel: "UNTERRICHTSFAECHER",
+    bezeichnung: "Unterrichtsfächer",
+    angabe: "Chemie, Sport",
+    sichtbarFuer: ["IT"],
+    reihenfolge: 3,
+  });
+  const durchwahl = angabe({ departmentKey: "IT", reihenfolge: 4 });
+  const raum = angabe({
+    departmentKey: "VERWALTUNG",
+    angabeSchluessel: "ARBEITSPLATZ_RAUM",
+    bezeichnung: "Raum des Arbeitsplatzes",
+    angabe: "Lehrerzimmer",
+  });
+
+  it("eigene Angabe zuerst, fremde nur mit sichtbarFuer; Label aus ANGABEN_KATALOG", () => {
+    expect(angabenFuer("IT", [faecher, durchwahl, raum], [])).toEqual({
+      angaben: [
+        { label: "Gewünschte Durchwahl", wert: "214" },
+        { label: "Unterrichtsfächer", wert: "Chemie, Sport" },
+      ],
+      hinweis: null,
+    });
+    // Facility sieht seine eigenen Faecher, aber nicht die Durchwahl der IT.
+    expect(angabenFuer("FACILITY", [faecher, durchwahl, raum], []).angaben).toEqual([
+      { label: "Unterrichtsfächer", wert: "Chemie, Sport" },
+    ]);
+    // Eine Stelle ohne eigene oder freigegebene Angabe bekommt nichts.
+    expect(angabenFuer("BUCHHALTUNG", [faecher, durchwahl, raum], [])).toEqual({ angaben: [], hinweis: null });
+  });
+
+  it("gestrichene, leere und geleerte Angaben fehlen; nur Zeilen der Art ANGABE zaehlen", () => {
+    const zeilen = [
+      angabe({ departmentKey: "IT", gestrichenAm: new Date("2026-09-20T00:00:00Z") }),
+      angabe({ departmentKey: "IT", angabe: "   " }),
+      angabe({ departmentKey: "IT", angabe: null }),
+      angabe({ departmentKey: "IT", angabe: null, inhaltGeleertAm: new Date("2027-04-01T00:00:00Z") }),
+      angabe({ departmentKey: "IT", art: "JA_NEIN", angabe: "Text" }),
+    ];
+    expect(angabenFuer("IT", zeilen, [])).toEqual({ angaben: [], hinweis: null });
+  });
+
+  it("Label faellt ohne Katalogschluessel auf die Bezeichnung der Momentaufnahme zurueck; Werte getrimmt", () => {
+    const alt = angabe({ departmentKey: "IT", angabeSchluessel: null, bezeichnung: "Alte Angabe", angabe: "  x  " });
+    expect(angabenFuer("IT", [alt], []).angaben).toEqual([{ label: "Alte Angabe", wert: "x" }]);
+  });
+
+  it("Hinweis nur der eigenen Stelle; leerer und geleerter Hinweis fehlen", () => {
+    const hinweise: AngabenHinweis[] = [
+      { departmentKey: "IT", text: "  Bitte Drucker freischalten.  " },
+      { departmentKey: "FACILITY", text: "Nur für Facility" },
+    ];
+    expect(angabenFuer("IT", [], hinweise).hinweis).toBe("Bitte Drucker freischalten.");
+    expect(angabenFuer("VERWALTUNG", [], hinweise).hinweis).toBeNull();
+    expect(angabenFuer("IT", [], [{ departmentKey: "IT", text: "" }]).hinweis).toBeNull();
+    expect(angabenFuer("IT", [], [{ departmentKey: "IT", text: null }]).hinweis).toBeNull();
+    expect(
+      angabenFuer("IT", [], [{ departmentKey: "IT", text: "x", inhaltGeleertAm: new Date("2027-04-01T00:00:00Z") }]).hinweis,
+    ).toBeNull();
+  });
+});
+
+describe("angabenMailFelder (Regel 7)", () => {
+  it("Klartext roh in Zeilen, HTML als maskierte Zeilen des Infokastens", () => {
+    const f = angabenMailFelder({
+      angaben: [
+        { label: "Gewünschte Durchwahl", wert: "214" },
+        { label: "Unterrichtsfächer", wert: "Chemie & <b>Sport</b>" },
+      ],
+      hinweis: "Bitte \"Drucker\" freischalten.\nRaum 2.14",
+    });
+    expect(f.angaben).toBe(
+      [
+        "Gewünschte Durchwahl: 214",
+        "Unterrichtsfächer: Chemie & <b>Sport</b>",
+        `${HINWEIS_ANGABE_LABEL}: Bitte "Drucker" freischalten.`,
+        "  Raum 2.14",
+      ].join("\n"),
+    );
+    expect(f.angaben_html).toBe(
+      '<tr><td style="padding:0 16px 16px;"><p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Gewünschte Durchwahl</p>' +
+        '<p style="margin:0;color:#374151;font-size:14px;">214</p></td></tr>' +
+        '<tr><td style="padding:0 16px 16px;"><p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Unterrichtsfächer</p>' +
+        '<p style="margin:0;color:#374151;font-size:14px;">Chemie &amp; &lt;b&gt;Sport&lt;/b&gt;</p></td></tr>' +
+        '<tr><td style="padding:0 16px 16px;"><p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Hinweis der Führungskraft</p>' +
+        '<p style="margin:0;color:#374151;font-size:14px;">Bitte &quot;Drucker&quot; freischalten.<br>Raum 2.14</p></td></tr>',
+    );
+    expect(f.angaben_html).not.toContain("<b>");
+  });
+
+  it("ohne Angaben und Hinweis: beide leer (der Block der Vorlage entfaellt)", () => {
+    expect(angabenMailFelder(KEINE_ANGABEN)).toEqual({ angaben: "", angaben_html: "" });
+    expect(angabenMailFelder({ angaben: [{ label: "X", wert: "  " }], hinweis: "   " })).toEqual({
+      angaben: "",
+      angaben_html: "",
+    });
+  });
+
+  it("nur ein Hinweis: eine Zeile mit der Beschriftung wie der Titel seiner Aufgabe", () => {
+    const f = angabenMailFelder({ angaben: [], hinweis: "Bitte Drucker freischalten." });
+    expect(f.angaben).toBe("Hinweis der Führungskraft: Bitte Drucker freischalten.");
+    expect(HINWEIS_AUFGABE_TITEL.startsWith(HINWEIS_ANGABE_LABEL)).toBe(true);
+  });
+});
+
+// =============================================
+// S14: Fortschritt ohne Entfallene (F2), Zeile im Dialog (Mockup 6.4)
+// =============================================
+
+describe("checklistFortschritt (F2)", () => {
+  const GESTRICHEN = new Date("2026-09-20T09:00:00.000Z");
+
+  it("ohne Entfallene wie bisher: Zähler, Nenner, Prozent, alle erledigt", () => {
+    expect(checklistFortschritt([{ isCompleted: true }, { isCompleted: false }, { isCompleted: true }])).toEqual({
+      gesamt: 3,
+      erledigt: 2,
+      prozent: 67,
+      alleErledigt: false,
+    });
+    expect(checklistFortschritt([{ isCompleted: true }, { isCompleted: true, entfaelltAm: null }])).toEqual({
+      gesamt: 2,
+      erledigt: 2,
+      prozent: 100,
+      alleErledigt: true,
+    });
+  });
+
+  it("entfallene zählen weder im Zähler noch im Nenner (Datenbankzeile mit `entfaelltAm`)", () => {
+    // Zwei von sechs gestrichen — „2/4“, nicht „4/6“ und nicht „6/6“.
+    const items = [
+      { isCompleted: true },
+      { isCompleted: true },
+      { isCompleted: false },
+      { isCompleted: false },
+      { isCompleted: true, entfaelltAm: GESTRICHEN },
+      { isCompleted: true, entfaelltAm: GESTRICHEN.toISOString() },
+    ];
+    expect(checklistFortschritt(items)).toEqual({ gesamt: 4, erledigt: 2, prozent: 50, alleErledigt: false });
+  });
+
+  it("dasselbe mit dem Kennzeichen `entfaellt` der Link-Seite", () => {
+    expect(
+      checklistFortschritt([{ isCompleted: true }, { isCompleted: true, entfaellt: true }, { isCompleted: false, entfaellt: false }]),
+    ).toEqual({ gesamt: 2, erledigt: 1, prozent: 50, alleErledigt: false });
+  });
+
+  it("erledigte plus entfallene, keine offene: alle erledigt", () => {
+    expect(checklistFortschritt([{ isCompleted: true }, { isCompleted: true, entfaelltAm: GESTRICHEN }])).toEqual({
+      gesamt: 1,
+      erledigt: 1,
+      prozent: 100,
+      alleErledigt: true,
+    });
+  });
+
+  it("nur Entfallene → gesamt 0, alleErledigt false (nichts „erledigt“); leer ebenso", () => {
+    expect(checklistFortschritt([{ isCompleted: true, entfaelltAm: GESTRICHEN }])).toEqual({
+      gesamt: 0,
+      erledigt: 0,
+      prozent: 0,
+      alleErledigt: false,
+    });
+    expect(checklistFortschritt([])).toEqual({ gesamt: 0, erledigt: 0, prozent: 0, alleErledigt: false });
+  });
+});
+
+describe("ausstattungVorschauSatz (Mockup 6.4)", () => {
+  it("„davon N aus „Ausstattung & Zugänge“, M mit Bemerkung“", () => {
+    expect(ausstattungVorschauSatz({ ausstattung: 5, mitBemerkung: 2 })).toBe(
+      `davon 5 aus „${AUSSTATTUNG_KATEGORIE}“, 2 mit Bemerkung`,
+    );
+    expect(ausstattungVorschauSatz({ ausstattung: 1, mitBemerkung: 1 })).toBe(
+      "davon 1 aus „Ausstattung & Zugänge“, 1 mit Bemerkung",
+    );
+  });
+
+  it("ohne Bemerkung nur die Zahl, ohne Ausstattungsaufgabe keine Zeile", () => {
+    expect(ausstattungVorschauSatz({ ausstattung: 3, mitBemerkung: 0 })).toBe("davon 3 aus „Ausstattung & Zugänge“");
+    expect(ausstattungVorschauSatz({ ausstattung: 3 })).toBe("davon 3 aus „Ausstattung & Zugänge“");
+    expect(ausstattungVorschauSatz({ ausstattung: 0, mitBemerkung: 0 })).toBeNull();
+    expect(ausstattungVorschauSatz({})).toBeNull();
+    expect(ausstattungVorschauSatz(null)).toBeNull();
+    expect(ausstattungVorschauSatz(undefined)).toBeNull();
+  });
+});
+
+// =============================================
 // Grenzen, Meldungen, Reinheit
 // =============================================
 
@@ -3010,19 +3905,845 @@ describe("Reinheit der Datei", () => {
   it("ausstattung.ts importiert weder Prisma noch die Datenbank noch Node-Module (client-sicher)", () => {
     const importe = [...quelle("src/lib/ausstattung.ts").matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
     // Seit S10 auch onboarding-spuren (eingereicht?) und format (Datum in
-    // deutscher Zeit) — beide selbst ohne jeden Import, also ebenso rein.
+    // deutscher Zeit), seit S13 email-layout (escapeHtml fuer die Angaben im
+    // HTML-Teil der Mail), seit S20 minijob-fristen (Berliner Kalendertag,
+    // Monate mit Monatsende) — alle vier selbst ohne jeden Import, also ebenso
+    // rein — und vorgangsjahr (Beginn eines Berliner Tages), das nur
+    // minijob-fristen importiert. Alles fuer die Loeschfrist (freitextGrenze).
     expect(importe.sort()).toEqual([
       "@/lib/abteilungsaufgaben",
       "@/lib/constants",
+      "@/lib/email-layout",
       "@/lib/format",
+      "@/lib/minijob-fristen",
       "@/lib/onboarding-spuren",
+      "@/lib/vorgangsjahr",
     ]);
-    for (const datei of ["src/lib/format.ts", "src/lib/onboarding-spuren.ts"]) {
+    for (const datei of [
+      "src/lib/email-layout.ts",
+      "src/lib/format.ts",
+      "src/lib/onboarding-spuren.ts",
+      "src/lib/minijob-fristen.ts",
+    ]) {
       expect(`${datei}: ${quelle(datei).match(/^import\s/m)?.[0] ?? "ohne Importe"}`).toBe(`${datei}: ohne Importe`);
     }
+    const vorgangsjahrImporte = [...quelle("src/lib/vorgangsjahr.ts").matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
+    expect(vorgangsjahrImporte).toEqual(["@/lib/minijob-fristen"]);
   });
 
   it("abteilungsaufgaben.ts importiert ausstattung.ts nicht (kein Kreis)", () => {
     expect(quelle("src/lib/abteilungsaufgaben.ts")).not.toMatch(/from\s+"@\/lib\/ausstattung"/);
+  });
+});
+
+// =============================================
+// HR-Karte (S15): Regel 9, Aenderungsliste, Uebersicht mit Aufgabenstand
+// =============================================
+
+describe("aufgabenStatus (F2)", () => {
+  it("entfällt vor erledigt — eine entfallene Aufgabe ist zugleich isCompleted", () => {
+    expect(aufgabenStatus({ isCompleted: false })).toBe("offen");
+    expect(aufgabenStatus({ isCompleted: true, entfaelltAm: null })).toBe("erledigt");
+    expect(aufgabenStatus({ isCompleted: true, entfaelltAm: new Date() })).toBe("entfaellt");
+    expect(aufgabenStatus({ isCompleted: false, entfaelltAm: "2027-01-20T10:00:00.000Z" })).toBe("entfaellt");
+  });
+});
+
+describe("aenderungPruefen (Regel 9 als Matrix)", () => {
+  type Wunsch = Parameters<typeof aenderungPruefen>[2];
+  const AENDERUNGEN: [string, Wunsch][] = [
+    ["Option abwählen", { abwaehlen: ["A"] }],
+    ["Option hinzufügen", { hinzu: ["C"] }],
+    ["Bemerkung", { bemerkung: true }],
+    ["Angabe", { angabe: true }],
+    ["Stellenwechsel", { stelle: true }],
+    ["Streichen", { streichen: true }],
+  ];
+  const STAENDE: [string, string, { option: string; status: AufgabenStatus }[]][] = [
+    ["offen", "AUSWAHL", [{ option: "A", status: "offen" }]],
+    ["erledigt", "AUSWAHL", [{ option: "A", status: "erledigt" }]],
+    ["entfallen", "AUSWAHL", [{ option: "A", status: "entfaellt" }]],
+    ["keine Aufgaben (Angabe)", "ANGABE", []],
+  ];
+  // Erwartung nach Regel 9: Nur eine ERLEDIGTE Aufgabe sperrt — Streichen,
+  // Stellenwechsel, das Abwaehlen ihrer Option und die Bemerkung (keine offene
+  // Aufgabe mehr). Hinzufuegen und Angabe gehen immer; entfallene zaehlen nie.
+  const GESPERRT: Record<string, string[]> = {
+    erledigt: ["Option abwählen", "Bemerkung", "Stellenwechsel", "Streichen"],
+  };
+  const FAELLE = STAENDE.flatMap(([stand, art, aufgaben]) =>
+    AENDERUNGEN.map(([name, wunsch]) => [stand, name, art, aufgaben, wunsch] as const),
+  );
+
+  it.each(FAELLE)("%s × %s", (stand, name, art, aufgaben, wunsch) => {
+    const soll = (GESPERRT[stand] ?? []).includes(name) ? "AUFGABE_ERLEDIGT" : null;
+    expect(aenderungPruefen({ art, gestrichenAm: null }, aufgaben, wunsch)).toBe(soll);
+  });
+
+  it("gemischt: eine offene Aufgabe genügt für die Bemerkung; nur die erledigte Option ist gesperrt", () => {
+    const aufgaben = [
+      { option: "A", status: "erledigt" as const },
+      { option: "B", status: "offen" as const },
+    ];
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { bemerkung: true })).toBeNull();
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { abwaehlen: ["B"] })).toBeNull();
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { abwaehlen: ["A", "B"] })).toBe("AUFGABE_ERLEDIGT");
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { streichen: true })).toBe("AUFGABE_ERLEDIGT");
+  });
+
+  it("gestrichene Zeile: jede Änderung GESTRICHEN", () => {
+    for (const [, wunsch] of AENDERUNGEN) {
+      expect(aenderungPruefen({ art: "JA_NEIN", gestrichenAm: new Date() }, [], wunsch)).toBe("GESTRICHEN");
+    }
+  });
+
+  it("Fälligkeit nur an einer offenen Aufgabe", () => {
+    const aufgaben = [
+      { option: "A", status: "offen" as const },
+      { option: "B", status: "erledigt" as const },
+      { option: "C", status: "entfaellt" as const },
+    ];
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { faelligkeiten: ["A"] })).toBeNull();
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { faelligkeiten: ["B"] })).toBe("AUFGABE_ERLEDIGT");
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { faelligkeiten: ["C"] })).toBe("OHNE_OFFENE_AUFGABE");
+    expect(aenderungPruefen({ art: "AUSWAHL" }, aufgaben, { faelligkeiten: ["D"] })).toBe("OHNE_OFFENE_AUFGABE");
+  });
+
+  it("jeder Grund hat einen Text aus MELDUNGEN", () => {
+    expect(aenderungsGrundText("AUFGABE_ERLEDIGT")).toBe(MELDUNGEN.AUFGABE_ERLEDIGT);
+    expect(aenderungsGrundText("GESTRICHEN")).toBe(MELDUNGEN.POSITION_GESTRICHEN);
+    expect(aenderungsGrundText("OHNE_OFFENE_AUFGABE")).toBe(MELDUNGEN.OHNE_OFFENE_AUFGABE);
+  });
+});
+
+describe("hinweisAenderungPruefen (Regel 9 für Hinweise, F20)", () => {
+  const MIT_TEXT = { text: "Bitte Mac statt PC" };
+  it.each([
+    ["offen", MIT_TEXT, { status: "offen" as const }, null, null],
+    ["erledigt", MIT_TEXT, { status: "erledigt" as const }, "AUFGABE_ERLEDIGT", "AUFGABE_ERLEDIGT"],
+    ["entfallen (Text entfernt)", { text: "" }, { status: "entfaellt" as const }, null, "OHNE_OFFENE_AUFGABE"],
+    ["kein Hinweis", null, null, null, "OHNE_OFFENE_AUFGABE"],
+    ["Hinweis noch ohne Aufgabe", MIT_TEXT, null, null, "OHNE_OFFENE_AUFGABE"],
+  ])("%s: Text %s, Fälligkeit %s", (_name, hinweis, aufgabe, text, faellig) => {
+    expect(hinweisAenderungPruefen(hinweis, aufgabe, { text: true })).toBe(text);
+    expect(hinweisAenderungPruefen(hinweis, aufgabe, { dueDate: true })).toBe(faellig);
+  });
+
+  it("ein neuer Hinweis geht immer, auch wenn eine entfallene Aufgabe verknüpft ist (F23)", () => {
+    expect(hinweisAenderungPruefen({ text: "  " }, { status: "entfaellt" }, { text: true })).toBeNull();
+    expect(hinweisAenderungPruefen(null, null, { text: true })).toBeNull();
+  });
+});
+
+describe("zeilenAenderungsStand und hinweisAenderungsStand", () => {
+  const basis = {
+    departmentKey: "FACILITY",
+    art: "AUSWAHL",
+    bezeichnung: "Schlüssel",
+    aufgabeTitel: "Schlüssel ausgeben",
+    reihenfolge: 1,
+    auswahl: ["Haupteingang", "Lehrerzimmer"],
+    bemerkung: "  Erst nach der Unterweisung ",
+  };
+
+  it("Auswahl: je Option ein Titel aus der Momentaufnahme, Bemerkung getrimmt", () => {
+    expect(zeilenAenderungsStand(basis)).toEqual({
+      departmentKey: "FACILITY",
+      aufgaben: [
+        { option: "Haupteingang", titel: "Schlüssel ausgeben: Haupteingang" },
+        { option: "Lehrerzimmer", titel: "Schlüssel ausgeben: Lehrerzimmer" },
+      ],
+      titel: "Schlüssel",
+      bemerkung: "Erst nach der Unterweisung",
+    });
+  });
+
+  it("gestrichen, leere Angabe und eine nicht erlaubte Stelle sind „nicht da“", () => {
+    expect(zeilenAenderungsStand({ ...basis, gestrichenAm: new Date() })).toBeNull();
+    expect(zeilenAenderungsStand({ ...basis, art: "ANGABE", auswahl: [], angabe: "  " })).toBeNull();
+    expect(zeilenAenderungsStand({ ...basis, departmentKey: "VORGESETZTER" })).toBeNull();
+  });
+
+  it("Angabe: Label aus dem Katalog, Stellen unter „sichtbar für“", () => {
+    expect(
+      zeilenAenderungsStand({
+        departmentKey: "FACILITY",
+        art: "ANGABE",
+        angabeSchluessel: "UNTERRICHTSFAECHER",
+        bezeichnung: "Fächer (alt)",
+        reihenfolge: 0,
+        auswahl: [],
+        angabe: " Chemie, Sport ",
+        sichtbarFuer: ["IT"],
+      }),
+    ).toEqual({ departmentKey: "FACILITY", sichtbarFuer: ["IT"], aufgaben: [], titel: "Unterrichtsfächer", angabe: "Chemie, Sport" });
+  });
+
+  it("Hinweis: Titel der Hinweis-Aufgabe, leer → null", () => {
+    expect(hinweisAenderungsStand("IT", " Bitte Mac ")).toEqual({
+      departmentKey: "IT",
+      aufgaben: [{ option: "", titel: HINWEIS_AUFGABE_TITEL }],
+      titel: HINWEIS_AUFGABE_TITEL,
+      hinweis: "Bitte Mac",
+    });
+    expect(hinweisAenderungsStand("IT", "")).toBeNull();
+    expect(hinweisAenderungsStand("IT", null)).toBeNull();
+  });
+});
+
+describe("aenderungsEintraege (Regel 10)", () => {
+  const ALLE = new Set(["IT", "FACILITY", "VERWALTUNG"]);
+  const schluessel = (auswahl: string[], teil: Partial<AenderungsStand> = {}): AenderungsStand => ({
+    departmentKey: "FACILITY",
+    aufgaben: auswahl.map((o) => ({ option: o, titel: `Schlüssel ausgeben: ${o}` })),
+    titel: "Schlüssel",
+    bemerkung: null,
+    ...teil,
+  });
+
+  it("neue Position: NEU je Aufgabe — nur für informierte Stellen", () => {
+    const nachher = schluessel(["Haupteingang", "Lehrerzimmer"]);
+    expect(aenderungsEintraege(null, nachher, ALLE)).toEqual([
+      { departmentKey: "FACILITY", art: "NEU", titel: "Schlüssel ausgeben: Haupteingang" },
+      { departmentKey: "FACILITY", art: "NEU", titel: "Schlüssel ausgeben: Lehrerzimmer" },
+    ]);
+    expect(aenderungsEintraege(null, nachher, new Set(["IT"]))).toEqual([]);
+  });
+
+  it("gestrichen: ENTFAELLT je Aufgabe", () => {
+    expect(aenderungsEintraege(schluessel(["Haupteingang"]), null, ALLE)).toEqual([
+      { departmentKey: "FACILITY", art: "ENTFAELLT", titel: "Schlüssel ausgeben: Haupteingang" },
+    ]);
+  });
+
+  it("Option ab- und angewählt: ENTFAELLT und NEU, die übrigen ohne Eintrag", () => {
+    expect(
+      aenderungsEintraege(schluessel(["Haupteingang", "Lehrerzimmer"]), schluessel(["Lehrerzimmer", "Sporthalle"]), ALLE),
+    ).toEqual([
+      { departmentKey: "FACILITY", art: "ENTFAELLT", titel: "Schlüssel ausgeben: Haupteingang" },
+      { departmentKey: "FACILITY", art: "NEU", titel: "Schlüssel ausgeben: Sporthalle" },
+    ]);
+  });
+
+  it("Bemerkung geändert: GEAENDERT je Aufgabe, die bleibt — Leerzeichen allein ändern nichts", () => {
+    const vorher = schluessel(["Haupteingang", "Lehrerzimmer"], { bemerkung: "Alt" });
+    expect(aenderungsEintraege(vorher, schluessel(["Haupteingang"], { bemerkung: "Neu" }), ALLE)).toEqual([
+      { departmentKey: "FACILITY", art: "ENTFAELLT", titel: "Schlüssel ausgeben: Lehrerzimmer" },
+      { departmentKey: "FACILITY", art: "GEAENDERT", titel: "Schlüssel ausgeben: Haupteingang" },
+    ]);
+    expect(aenderungsEintraege(vorher, { ...vorher, bemerkung: "  Alt " }, ALLE)).toEqual([]);
+    // Entfernen ist auch eine Aenderung.
+    expect(aenderungsEintraege(vorher, { ...vorher, bemerkung: null }, ALLE).map((e) => e.art)).toEqual([
+      "GEAENDERT",
+      "GEAENDERT",
+    ]);
+  });
+
+  it("Stellenwechsel: ENTFAELLT für die alte, NEU für die neue Stelle — jeweils nur, wenn informiert", () => {
+    const vorher = schluessel(["Haupteingang"]);
+    const nachher = schluessel(["Haupteingang"], { departmentKey: "VERWALTUNG" });
+    expect(aenderungsEintraege(vorher, nachher, ALLE)).toEqual([
+      { departmentKey: "FACILITY", art: "ENTFAELLT", titel: "Schlüssel ausgeben: Haupteingang" },
+      { departmentKey: "VERWALTUNG", art: "NEU", titel: "Schlüssel ausgeben: Haupteingang" },
+    ]);
+    expect(aenderungsEintraege(vorher, nachher, new Set(["FACILITY"]))).toEqual([
+      { departmentKey: "FACILITY", art: "ENTFAELLT", titel: "Schlüssel ausgeben: Haupteingang" },
+    ]);
+  });
+
+  it("nur Inhaltsfelder: eine reine Fälligkeitsänderung ergibt keinen Eintrag", () => {
+    const zeile = {
+      departmentKey: "IT",
+      art: "JA_NEIN",
+      bezeichnung: "Dienst-iPad",
+      aufgabeTitel: "Dienst-iPad bereitstellen",
+      reihenfolge: 0,
+      auswahl: [],
+      relativeDueDays: -7,
+      bemerkung: "Mit Stift",
+    };
+    expect(
+      aenderungsEintraege(zeilenAenderungsStand(zeile), zeilenAenderungsStand({ ...zeile, relativeDueDays: -14 }), ALLE),
+    ).toEqual([]);
+  });
+
+  it("Angabe: GEAENDERT mit ihrem Label für die eigene Stelle und „sichtbar für“", () => {
+    const vorher: AenderungsStand = {
+      departmentKey: "FACILITY",
+      sichtbarFuer: ["IT"],
+      aufgaben: [],
+      titel: "Unterrichtsfächer",
+      angabe: "Chemie",
+    };
+    expect(aenderungsEintraege(vorher, { ...vorher, angabe: "Chemie, Sport" }, ALLE)).toEqual([
+      { departmentKey: "FACILITY", art: "GEAENDERT", titel: "Unterrichtsfächer" },
+      { departmentKey: "IT", art: "GEAENDERT", titel: "Unterrichtsfächer" },
+    ]);
+    expect(aenderungsEintraege(vorher, null, new Set(["IT"]))).toEqual([
+      { departmentKey: "IT", art: "ENTFAELLT", titel: "Unterrichtsfächer" },
+    ]);
+  });
+
+  it("Hinweis: neu, geändert, entfernt", () => {
+    const alt = hinweisAenderungsStand("IT", "Bitte Mac");
+    const neu = hinweisAenderungsStand("IT", "Bitte Mac mit Dock");
+    expect(aenderungsEintraege(null, alt, ALLE)).toEqual([{ departmentKey: "IT", art: "NEU", titel: HINWEIS_AUFGABE_TITEL }]);
+    expect(aenderungsEintraege(alt, neu, ALLE)).toEqual([
+      { departmentKey: "IT", art: "GEAENDERT", titel: HINWEIS_AUFGABE_TITEL },
+    ]);
+    expect(aenderungsEintraege(alt, null, ALLE)).toEqual([
+      { departmentKey: "IT", art: "ENTFAELLT", titel: HINWEIS_AUFGABE_TITEL },
+    ]);
+  });
+
+  it("nie für MITARBEITER oder VORGESETZTER (Regel 11)", () => {
+    for (const key of NICHT_ERLAUBTE_STELLEN) {
+      expect(aenderungsEintraege(null, schluessel(["A"], { departmentKey: key }), new Set([key]))).toEqual([]);
+    }
+  });
+});
+
+describe("waehlbareStellen", () => {
+  it("feste und angelegte Stellen in der Reihenfolge der Karte, HR dahinter — nie MITARBEITER oder VORGESETZTER", () => {
+    const konfigs = [
+      { departmentKey: "IT" },
+      { departmentKey: "HAUSTECHNIK" },
+      { departmentKey: "ARCHIV" },
+      { departmentKey: "kaputt-klein" },
+    ];
+    expect(waehlbareStellen(konfigs)).toEqual([
+      "IT",
+      "VERWALTUNG",
+      "FACILITY",
+      "BUCHHALTUNG",
+      "DSB",
+      "ARCHIV",
+      "HAUSTECHNIK",
+      "HR",
+    ]);
+  });
+});
+
+describe("ausstattungsUebersichtBauen mit Aufgabenstand (S15)", () => {
+  const JETZT = new Date("2027-01-25T08:00:00.000Z");
+  const BEGINN = new Date("2027-02-01T00:00:00.000Z");
+  const tag = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+  const vorgang = (status = "SUPERVISOR_SUBMITTED"): UebersichtVorgangStand => ({
+    status,
+    supervisorSubmittedAt: new Date("2027-01-14T09:30:00.000Z"),
+    supervisorData: { isComplete: true, mitAusstattung: true, vertragsbeginn: BEGINN },
+  });
+
+  const zeilen: UebersichtZeileDaten[] = [
+    zeileDaten({ id: "z-ipad", positionId: "pos-1", relativeDueDays: -14 }),
+    zeileDaten({
+      id: "z-schl",
+      positionId: "pos-schluessel",
+      departmentKey: "FACILITY",
+      art: "AUSWAHL",
+      bezeichnung: "Schlüssel",
+      auswahl: ["Haupteingang", "Lehrerzimmer", "Werkraum"],
+      relativeDueDays: -3,
+    }),
+    zeileDaten({ id: "z-tel", positionId: "pos-2", bezeichnung: "Telefon mit Durchwahl", relativeDueDays: -30 }),
+    zeileDaten({
+      id: "z-weg",
+      positionId: "pos-weg",
+      bezeichnung: "Parkplatz",
+      gestrichenAm: tag("2027-01-20"),
+      relativeDueDays: -30,
+    }),
+  ];
+  const aufgaben: UebersichtAufgabeDaten[] = [
+    { id: "i-ipad", title: "Dienst-iPad (Lernmittel) bereitstellen", isCompleted: false, dueDate: tag("2027-01-25"), eilt: true },
+    {
+      id: "i-chemie",
+      title: "Schlüssel ausgeben: Fachraum Chemie",
+      isCompleted: true,
+      completedAt: tag("2027-01-21"),
+      entfaelltAm: tag("2027-01-21"),
+    },
+    { id: "i-lehrer", title: "Schlüssel ausgeben: Lehrerzimmer", isCompleted: false, dueDate: tag("2027-01-29") },
+    {
+      id: "i-haupt",
+      title: "Schlüssel ausgeben: Haupteingang",
+      isCompleted: true,
+      completedAt: new Date("2027-01-20T09:00:00.000Z"),
+      dueDate: tag("2027-01-29"),
+    },
+    { id: "i-tel", title: "Telefon mit Durchwahl bereitstellen", isCompleted: true, completedAt: tag("2027-01-22") },
+    { id: "i-park", title: "Parkplatz bereitstellen", isCompleted: true, entfaelltAm: tag("2027-01-20") },
+    { id: "i-hinweis", title: HINWEIS_AUFGABE_TITEL, isCompleted: false, dueDate: tag("2027-01-25"), eilt: true },
+  ];
+  const verknuepfungen: UebersichtVerknuepfung[] = [
+    { ausstattungId: "z-ipad", option: "", checklistItemId: "i-ipad" },
+    { ausstattungId: "z-schl", option: "Fachraum Chemie", checklistItemId: "i-chemie" },
+    { ausstattungId: "z-schl", option: "Lehrerzimmer", checklistItemId: "i-lehrer" },
+    { ausstattungId: "z-schl", option: "Haupteingang", checklistItemId: "i-haupt" },
+    { ausstattungId: "z-tel", option: "", checklistItemId: "i-tel" },
+    { ausstattungId: "z-weg", option: "", checklistItemId: "i-park" },
+  ];
+
+  function bauen(teil: { vorgang?: UebersichtVorgangStand; darfBearbeiten?: boolean; ohneJetzt?: boolean } = {}) {
+    return ausstattungsUebersichtBauen({
+      vorgang: teil.vorgang ?? vorgang(),
+      darfBearbeiten: teil.darfBearbeiten ?? true,
+      zeilen,
+      hinweise: [hinweisDaten({ checklistItemId: "i-hinweis" })],
+      arbeitsortId: GYM,
+      konfigs: [konfig({}), konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister" })],
+      katalog: [position({ id: "pos-1" }), position({ id: "pos-2", bezeichnung: "Telefon mit Durchwahl" }), auswahl()],
+      aufgaben,
+      verknuepfungen,
+      jetzt: teil.ohneJetzt ? undefined : JETZT,
+    });
+  }
+  function zeile(u: ReturnType<typeof bauen>, id: string) {
+    const z = u.gruppen.flatMap((g) => g.zeilen).find((x) => x.id === id);
+    if (!z) throw new Error(`Zeile ${id} fehlt`);
+    return z;
+  }
+
+  it("je Zeile die Aufgaben: gewählte Optionen in ihrer Reihenfolge, entfallene dahinter", () => {
+    const schl = zeile(bauen(), "z-schl");
+    expect(schl.aufgaben).toEqual([
+      {
+        option: "Haupteingang",
+        checklistItemId: "i-haupt",
+        titel: "Schlüssel ausgeben: Haupteingang",
+        status: "erledigt",
+        faelligAm: "2027-01-29T00:00:00.000Z",
+        eilt: false,
+        erledigtAm: "2027-01-20T09:00:00.000Z",
+      },
+      {
+        option: "Lehrerzimmer",
+        checklistItemId: "i-lehrer",
+        titel: "Schlüssel ausgeben: Lehrerzimmer",
+        status: "offen",
+        faelligAm: "2027-01-29T00:00:00.000Z",
+        eilt: false,
+        erledigtAm: null,
+      },
+      {
+        option: "Fachraum Chemie",
+        checklistItemId: "i-chemie",
+        titel: "Schlüssel ausgeben: Fachraum Chemie",
+        status: "entfaellt",
+        faelligAm: null,
+        eilt: false,
+        erledigtAm: null,
+      },
+    ]);
+    // Wählbar: der Katalog, dahinter die gewählte Option, die er nicht mehr kennt.
+    expect(schl.optionen).toEqual(["Haupteingang", "Lehrerzimmer", "Fachraum Chemie", "Werkraum"]);
+  });
+
+  it("Aktionen nach Regel 9 — mit dem Grund, warum etwas gesperrt ist", () => {
+    const u = bauen();
+    expect(zeile(u, "z-ipad").aktionen).toEqual({ aendern: true, streichen: true, sperrGrund: null });
+    // Auswahl mit erledigter Option: ergänzen geht, streichen nicht.
+    expect(zeile(u, "z-schl").aktionen).toEqual({ aendern: true, streichen: false, sperrGrund: MELDUNGEN.AUFGABE_ERLEDIGT });
+    // Ja/Nein mit erledigter Aufgabe: nichts mehr, bis sie wieder offen ist.
+    expect(zeile(u, "z-tel").aktionen).toEqual({ aendern: false, streichen: false, sperrGrund: MELDUNGEN.AUFGABE_ERLEDIGT });
+    expect(zeile(u, "z-weg").aktionen).toEqual({ aendern: false, streichen: false, sperrGrund: MELDUNGEN.POSITION_GESTRICHEN });
+  });
+
+  it("Vorlauf-Warnung (Regel 14): nur mit offener Aufgabe, nicht gestrichen, nur mit `jetzt`", () => {
+    const u = bauen();
+    // Vertragsbeginn 01.02., Vorlauf 14 Tage → Frist 18.01. liegt vor heute (25.01.).
+    expect(zeile(u, "z-ipad").vorlaufWarnung).toBe(MELDUNGEN.VORLAUF_WARNUNG);
+    // Vorlauf 3 Tage → 29.01. liegt noch vor uns.
+    expect(zeile(u, "z-schl").vorlaufWarnung).toBeNull();
+    // Erledigt bzw. gestrichen: keine Warnung mehr.
+    expect(zeile(u, "z-tel").vorlaufWarnung).toBeNull();
+    expect(zeile(u, "z-weg").vorlaufWarnung).toBeNull();
+    expect(zeile(bauen({ ohneJetzt: true }), "z-ipad").vorlaufWarnung).toBeNull();
+  });
+
+  it("Hinweis mit Stand, Fälligkeit, „Eilt“ und Aktion; erledigt → gesperrt", () => {
+    const it = bauen().gruppen.find((g) => g.departmentKey === "IT");
+    expect(it?.hinweis).toMatchObject({
+      checklistItemId: "i-hinweis",
+      status: "offen",
+      faelligAm: "2027-01-25T00:00:00.000Z",
+      eilt: true,
+      aktionen: { aendern: true, sperrGrund: null },
+    });
+
+    const erledigt = ausstattungsUebersichtBauen({
+      vorgang: vorgang(),
+      darfBearbeiten: true,
+      zeilen: [],
+      hinweise: [hinweisDaten({ checklistItemId: "i-h" })],
+      arbeitsortId: GYM,
+      konfigs: [konfig({})],
+      katalog: [],
+      aufgaben: [{ id: "i-h", title: HINWEIS_AUFGABE_TITEL, isCompleted: true, completedAt: tag("2027-01-22") }],
+      verknuepfungen: [],
+      jetzt: JETZT,
+    });
+    expect(erledigt.gruppen[0].hinweis).toMatchObject({
+      status: "erledigt",
+      aktionen: { aendern: false, sperrGrund: MELDUNGEN.AUFGABE_ERLEDIGT },
+    });
+  });
+
+  it("wählbare Stellen nur im Zustand BEARBEITBAR — Name und Adresse am Arbeitsort", () => {
+    const u = bauen();
+    expect(u.stellen.slice(0, 3)).toEqual([
+      { departmentKey: "IT", name: "IT-Support FES", adresseFehlt: false },
+      { departmentKey: "VERWALTUNG", name: DEPARTMENT_LABELS.VERWALTUNG, adresseFehlt: true },
+      { departmentKey: "FACILITY", name: "Hausmeister", adresseFehlt: false },
+    ]);
+    expect(u.stellen[u.stellen.length - 1]).toEqual({ departmentKey: "HR", name: DEPARTMENT_LABELS.HR, adresseFehlt: false });
+    expect(u.stellen.map((s) => s.departmentKey)).not.toContain("VORGESETZTER");
+    expect(u.stellen.map((s) => s.departmentKey)).not.toContain("MITARBEITER");
+  });
+
+  it.each([
+    ["abgeschlossen", { vorgang: vorgang("COMPLETED") }],
+    ["ohne Bearbeitungsrecht", { darfBearbeiten: false }],
+  ])("%s: Aufgabenstand sichtbar, aber keine Aktion, keine Warnung, keine Stellen", (_name, teil) => {
+    const u = bauen(teil);
+    expect(u.zustand).toBe("NUR_LESEN");
+    expect(zeile(u, "z-schl").aufgaben).toHaveLength(3);
+    for (const z of u.gruppen.flatMap((g) => g.zeilen)) {
+      expect(z.aktionen).toEqual({ aendern: false, streichen: false, sperrGrund: null });
+      expect(z.vorlaufWarnung).toBeNull();
+    }
+    expect(u.gruppen.find((g) => g.departmentKey === "IT")?.hinweis?.aktionen).toEqual({ aendern: false, sperrGrund: null });
+    expect(u.stellen).toEqual([]);
+  });
+
+  it("bleibt reines JSON — und gibt die Tagesangabe der Momentaufnahme nicht heraus", () => {
+    const u = bauen();
+    expect(JSON.parse(JSON.stringify(u))).toEqual(u);
+    expect(JSON.stringify(u)).not.toContain("relativeDueDays");
+  });
+});
+
+// =============================================
+// Karte und Checkliste im Portal (S16; Mockup 6.3)
+// =============================================
+
+describe("aufgabenStandText (Mockup 6.3)", () => {
+  it.each<[string, Parameters<typeof aufgabenStandText>[0], string]>([
+    ["offen mit Fälligkeit", { status: "offen", faelligAm: "2027-01-27T00:00:00.000Z" }, "offen · fällig 27.01.2027"],
+    ["offen ohne Fälligkeit", { status: "offen", faelligAm: null }, "offen"],
+    ["erledigt mit Datum", { status: "erledigt", faelligAm: null, erledigtAm: "2027-01-20T09:00:00.000Z" }, "erledigt 20.01.2027"],
+    ["erledigt ohne Datum", { status: "erledigt", faelligAm: null, erledigtAm: null }, "erledigt"],
+    // Entfallen nennt weder Fälligkeit noch Datum — die Aufgabe gibt es für die Stelle nicht mehr.
+    ["entfällt", { status: "entfaellt", faelligAm: "2027-01-27T00:00:00.000Z", erledigtAm: "2027-01-20T09:00:00.000Z" }, "entfällt"],
+  ])("%s", (_name, aufgabe, erwartet) => {
+    expect(aufgabenStandText(aufgabe)).toBe(erwartet);
+  });
+
+  it("rechnet in deutscher Zeit: 23:30 UTC am 26.01. ist schon der 27.01.", () => {
+    expect(aufgabenStandText({ status: "offen", faelligAm: "2027-01-26T23:30:00.000Z" })).toBe("offen · fällig 27.01.2027");
+  });
+});
+
+describe("optionsZeilen (je Option eine Zeile mit eigenem Stand, E-A12)", () => {
+  function aufgabe(option: string, status: AufgabenStatus) {
+    return { option, checklistItemId: `i-${option}`, titel: `Schlüssel ausgeben: ${option}`, status, faelligAm: null, eilt: false, erledigtAm: null };
+  }
+  const zeile = (teil: Partial<AusstattungsZeile>): Pick<AusstattungsZeile, "art" | "auswahl" | "aufgaben"> => ({
+    art: "AUSWAHL",
+    auswahl: [],
+    aufgaben: [],
+    ...teil,
+  });
+
+  it("gewählte Optionen in ihrer Reihenfolge, frühere (entfallene) dahinter", () => {
+    const z = zeile({
+      auswahl: ["Haupteingang", "Lehrerzimmer"],
+      aufgaben: [aufgabe("Lehrerzimmer", "offen"), aufgabe("Haupteingang", "erledigt"), aufgabe("Fachraum Chemie", "entfaellt")],
+    });
+    expect(optionsZeilen(z).map((o) => [o.option, o.aufgabe?.status ?? null])).toEqual([
+      ["Haupteingang", "erledigt"],
+      ["Lehrerzimmer", "offen"],
+      ["Fachraum Chemie", "entfaellt"],
+    ]);
+  });
+
+  it("eine gewählte Option ohne Aufgabe (noch nicht nachgeholt) steht ohne Stand da", () => {
+    expect(optionsZeilen(zeile({ auswahl: ["Haupteingang"] }))).toEqual([{ option: "Haupteingang", aufgabe: null }]);
+  });
+
+  it("Ja/Nein und Angabe haben keine Optionszeilen", () => {
+    expect(optionsZeilen(zeile({ art: "JA_NEIN", aufgaben: [aufgabe("", "offen")] }))).toEqual([]);
+    expect(optionsZeilen(zeile({ art: "ANGABE" }))).toEqual([]);
+  });
+});
+
+describe("bemerkungJeAufgabe (Zusatz am Checklistenpunkt, Regel 8 und 16)", () => {
+  const JETZT = new Date("2027-01-25T08:00:00.000Z");
+  function uebersicht() {
+    return ausstattungsUebersichtBauen({
+      vorgang: {
+        status: "SUPERVISOR_SUBMITTED",
+        supervisorSubmittedAt: new Date("2027-01-14T09:30:00.000Z"),
+        supervisorData: { isComplete: true, mitAusstattung: true },
+      },
+      darfBearbeiten: true,
+      zeilen: [
+        zeileDaten({ id: "z-ipad", bemerkung: "Mit Stift und Hülle", bemerkungQuelle: "BEIDE" }),
+        zeileDaten({
+          id: "z-schl",
+          positionId: "pos-schluessel",
+          departmentKey: "FACILITY",
+          art: "AUSWAHL",
+          bezeichnung: "Schlüssel",
+          auswahl: ["Haupteingang", "Lehrerzimmer"],
+          bemerkung: "Sammlung erst nach der Sicherheitsunterweisung",
+          bemerkungQuelle: "FUEHRUNGSKRAFT",
+        }),
+        zeileDaten({ id: "z-tel", positionId: "pos-2", bezeichnung: "Telefon mit Durchwahl", bemerkung: "   " }),
+      ],
+      hinweise: [hinweisDaten({ checklistItemId: "i-hinweis" })],
+      arbeitsortId: GYM,
+      konfigs: [konfig({}), konfig({ departmentKey: "FACILITY", departmentName: "Hausmeister" })],
+      katalog: null,
+      aufgaben: [
+        { id: "i-ipad", title: "Dienst-iPad (Lernmittel) bereitstellen", isCompleted: false },
+        { id: "i-haupt", title: "Schlüssel ausgeben: Haupteingang", isCompleted: true },
+        { id: "i-lehrer", title: "Schlüssel ausgeben: Lehrerzimmer", isCompleted: false },
+        { id: "i-tel", title: "Telefon mit Durchwahl bereitstellen", isCompleted: false },
+        { id: "i-hinweis", title: HINWEIS_AUFGABE_TITEL, isCompleted: false },
+      ],
+      verknuepfungen: [
+        { ausstattungId: "z-ipad", option: "", checklistItemId: "i-ipad" },
+        { ausstattungId: "z-schl", option: "Haupteingang", checklistItemId: "i-haupt" },
+        { ausstattungId: "z-schl", option: "Lehrerzimmer", checklistItemId: "i-lehrer" },
+        { ausstattungId: "z-tel", option: "", checklistItemId: "i-tel" },
+      ],
+      jetzt: JETZT,
+    });
+  }
+
+  it("jede Aufgabe einer Position trägt ihre Bemerkung samt Beschriftung nach Herkunft", () => {
+    expect(bemerkungJeAufgabe(uebersicht())).toEqual({
+      "i-ipad": { text: "Mit Stift und Hülle", label: bemerkungLabel("BEIDE") },
+      "i-haupt": { text: "Sammlung erst nach der Sicherheitsunterweisung", label: bemerkungLabel("FUEHRUNGSKRAFT") },
+      "i-lehrer": { text: "Sammlung erst nach der Sicherheitsunterweisung", label: bemerkungLabel("FUEHRUNGSKRAFT") },
+    });
+  });
+
+  it("ohne Bemerkung (auch nur Leerzeichen) und für die Hinweis-Aufgabe nichts", () => {
+    const b = bemerkungJeAufgabe(uebersicht());
+    expect(b["i-tel"]).toBeUndefined();
+    expect(b["i-hinweis"]).toBeUndefined();
+  });
+
+  it("ohne Übersicht (keine HR-Rolle, Regel 16) ein leeres Objekt", () => {
+    expect(bemerkungJeAufgabe(null)).toEqual({});
+    expect(bemerkungJeAufgabe(undefined)).toEqual({});
+  });
+});
+
+// =============================================
+// Nachtrag senden (S17; Regel 10, F7)
+// =============================================
+
+describe("nachtragListe (Regel 10)", () => {
+  const e = (art: string, titel: string, erfasstAm?: string) => ({
+    art,
+    titel,
+    ...(erfasstAm ? { erfasstAm: `2027-01-${erfasstAm}T10:00:00.000Z` } : {}),
+  });
+
+  it("je Titel zusammengefasst: NEU+ENTFAELLT faellt weg, NEU+GEAENDERT wird NEU, GEAENDERT+ENTFAELLT wird ENTFAELLT", () => {
+    expect(
+      nachtragListe([
+        e("NEU", "Parkplatz bereitstellen"),
+        e("ENTFAELLT", "Parkplatz bereitstellen"),
+        e("NEU", "Dienst-Laptop/PC bereitstellen"),
+        e("GEAENDERT", "Dienst-Laptop/PC bereitstellen"),
+        e("GEAENDERT", "Zugang einrichten: WebUntis"),
+        e("ENTFAELLT", "Zugang einrichten: WebUntis"),
+      ]),
+    ).toEqual({
+      neu: ["Dienst-Laptop/PC bereitstellen"],
+      geaendert: [],
+      entfaellt: ["Zugang einrichten: WebUntis"],
+    });
+  });
+
+  it("einzelne Eintraege bleiben, wie sie sind; zweimal GEAENDERT ist einmal", () => {
+    expect(
+      nachtragListe([
+        e("NEU", "A"),
+        e("GEAENDERT", "B"),
+        e("GEAENDERT", "B"),
+        e("ENTFAELLT", "C"),
+      ]),
+    ).toEqual({ neu: ["A"], geaendert: ["B"], entfaellt: ["C"] });
+  });
+
+  it("wieder aufgenommen (ENTFAELLT, dann NEU) heisst „Geändert“; NEU→ENTFAELLT→NEU bleibt NEU", () => {
+    expect(nachtragListe([e("ENTFAELLT", "Spind bereitstellen"), e("NEU", "Spind bereitstellen")])).toEqual({
+      neu: [],
+      geaendert: ["Spind bereitstellen"],
+      entfaellt: [],
+    });
+    expect(
+      nachtragListe([e("NEU", "Spind bereitstellen"), e("ENTFAELLT", "Spind bereitstellen"), e("NEU", "Spind bereitstellen")]),
+    ).toEqual({ neu: ["Spind bereitstellen"], geaendert: [], entfaellt: [] });
+  });
+
+  it("sortiert nach `erfasstAm` (bei Gleichstand wie uebergeben), Titel einzeilig, leere fallen weg", () => {
+    expect(
+      nachtragListe([
+        e("ENTFAELLT", "Parkplatz bereitstellen", "21"),
+        e("NEU", "Parkplatz bereitstellen", "20"),
+        e("NEU", "  Dienst-iPad   bereitstellen ", "22"),
+        e("NEU", "   ", "22"),
+      ]),
+    ).toEqual({ neu: ["Dienst-iPad bereitstellen"], geaendert: [], entfaellt: [] });
+  });
+
+  it("ohne Eintraege leer — gleich LEERER_NACHTRAG", () => {
+    expect(nachtragListe([])).toEqual(LEERER_NACHTRAG);
+    expect(LEERER_NACHTRAG).toEqual({ neu: [], geaendert: [], entfaellt: [] });
+  });
+});
+
+describe("nachtragMailFelder (Regel 10)", () => {
+  it("ohne Aenderung: alle drei Felder leer (der Block {{#nachtrag}} entfaellt)", () => {
+    expect(nachtragMailFelder(LEERER_NACHTRAG)).toEqual({ nachtrag: "", nachtrag_liste: "", nachtrag_liste_html: "" });
+  });
+
+  it("Merker „ja“, flache Zeilen „Neu/Geändert/Entfällt: …“ in dieser Reihenfolge, HTML maskiert", () => {
+    const f = nachtragMailFelder({
+      neu: ["Notebook & Zubehör bereitstellen"],
+      geaendert: ["Zugang einrichten: <b>WebUntis</b>"],
+      entfaellt: ["Spind bereitstellen"],
+    });
+    expect(f.nachtrag).toBe("ja");
+    expect(f.nachtrag_liste).toBe(
+      "Neu: Notebook & Zubehör bereitstellen\nGeändert: Zugang einrichten: <b>WebUntis</b>\nEntfällt: Spind bereitstellen",
+    );
+    expect(f.nachtrag_liste_html).toBe(
+      '<ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+        '<li style="margin:0 0 4px;"><strong>Neu:</strong> Notebook &amp; Zubehör bereitstellen</li>' +
+        '<li style="margin:0 0 4px;"><strong>Geändert:</strong> Zugang einrichten: &lt;b&gt;WebUntis&lt;/b&gt;</li>' +
+        '<li style="margin:0 0 4px;"><strong>Entfällt:</strong> Spind bereitstellen</li>' +
+        "</ul>",
+    );
+  });
+
+  it("keine verschachtelten Marker: weder Bloecke noch Platzhalter in den fertigen Feldern", () => {
+    const f = nachtragMailFelder({ neu: ["A"], geaendert: [], entfaellt: ["B"] });
+    for (const wert of Object.values(f)) expect(wert).not.toMatch(/\{\{/);
+    // Ein Titel mit Klammern bleibt Text (renderTemplate setzt in einem Durchgang ein).
+    expect(nachtragMailFelder({ neu: ["{{link}}"], geaendert: [], entfaellt: [] }).nachtrag_liste).toBe("Neu: {{link}}");
+  });
+
+  it("WAECHTER_TAGE ist dieselbe Zahl wie in abteilungsaufgaben.ts (Regel 15)", () => {
+    expect(WAECHTER_TAGE).toBe(WAECHTER_TAGE_ABTEILUNGEN);
+    expect(WAECHTER_TAGE).toBe(7);
+  });
+});
+
+// =============================================
+// S20: Loeschfrist der Freitexte (E-A22) und Brief-Platzhalter (E-A25)
+// =============================================
+
+describe("freitextGrenze (E-A22)", () => {
+  it("sechs Monate vor dem heutigen Berliner Kalendertag, ab dessen Mitternacht deutscher Zeit", () => {
+    expect(FREITEXT_AUFBEWAHRUNG_MONATE).toBe(6);
+    // 15.03.2027 → 15.09.2026, Sommerzeit: Mitternacht = 22:00 UTC des Vortags
+    expect(freitextGrenze(new Date("2027-03-15T10:00:00Z")).toISOString()).toBe("2026-09-14T22:00:00.000Z");
+    // 15.09.2027 → 15.03.2027, Winterzeit: 23:00 UTC des Vortags
+    expect(freitextGrenze(new Date("2027-09-15T10:00:00Z")).toISOString()).toBe("2027-03-14T23:00:00.000Z");
+  });
+
+  it("Monatsende: 31.08. → 28.02., im Schaltjahr 29.02. (nie in den Maerz hinein)", () => {
+    expect(freitextGrenze(new Date("2027-08-31T10:00:00Z")).toISOString()).toBe("2027-02-27T23:00:00.000Z");
+    expect(freitextGrenze(new Date("2027-08-30T10:00:00Z")).toISOString()).toBe("2027-02-27T23:00:00.000Z");
+    expect(freitextGrenze(new Date("2028-08-31T10:00:00Z")).toISOString()).toBe("2028-02-28T23:00:00.000Z");
+    // 31.12. → 30.06. (der Juni hat keinen 31.)
+    expect(freitextGrenze(new Date("2026-12-31T10:00:00Z")).toISOString()).toBe("2026-06-29T22:00:00.000Z");
+  });
+
+  it("Berliner Zeit, nicht die UTC-Uhr des Containers", () => {
+    // 31.08. 23:30 Uhr in Berlin (21:30 UTC) — noch der 31.08.
+    expect(freitextGrenze(new Date("2027-08-31T21:30:00Z")).toISOString()).toBe("2027-02-27T23:00:00.000Z");
+    // 22:30 UTC = 01.09. 00:30 Uhr in Berlin — schon der 01.09. → 01.03.
+    expect(freitextGrenze(new Date("2027-08-31T22:30:00Z")).toISOString()).toBe("2027-02-28T23:00:00.000Z");
+  });
+
+  it("ueber den Tag der Zeitumstellung: Mitternacht des 29.03.2026 liegt noch in der Winterzeit", () => {
+    expect(freitextGrenze(new Date("2026-09-29T08:00:00Z")).toISOString()).toBe("2026-03-28T23:00:00.000Z");
+  });
+
+  it("ein Lauf am selben Tag rechnet dieselbe Grenze — frueh wie spaet", () => {
+    const frueh = freitextGrenze(new Date("2027-05-10T03:00:00Z")).getTime();
+    const spaet = freitextGrenze(new Date("2027-05-10T21:00:00Z")).getTime();
+    expect(spaet).toBe(frueh);
+  });
+});
+
+describe("ausstattungListe (E-A25, Platzhalter {ausstattung_liste})", () => {
+  const zeile = (z: Partial<BriefListenZeile> & Pick<BriefListenZeile, "bezeichnung">): BriefListenZeile => ({
+    departmentKey: "IT",
+    art: "JA_NEIN",
+    auswahl: [],
+    reihenfolge: 0,
+    gestrichenAm: null,
+    ...z,
+  });
+
+  it("Ja/Nein als Bezeichnung, Auswahl als „Bezeichnung: Option, Option“, eine Zeile je Position", () => {
+    expect(
+      ausstattungListe([
+        zeile({ bezeichnung: "Dienst-iPad (Lernmittel)", reihenfolge: 1 }),
+        zeile({ bezeichnung: "Zugänge", art: "AUSWAHL", auswahl: ["Dienst-E-Mail", "WebUntis"], reihenfolge: 2 }),
+      ]),
+    ).toBe("Dienst-iPad (Lernmittel)\nZugänge: Dienst-E-Mail, WebUntis");
+  });
+
+  it("ohne Angaben, gestrichene Positionen und Auswahl ohne Option", () => {
+    expect(
+      ausstattungListe([
+        zeile({ bezeichnung: "Gewünschte Durchwahl", art: "ANGABE" }),
+        zeile({ bezeichnung: "Spind", gestrichenAm: new Date("2027-01-10T10:00:00Z") }),
+        zeile({ bezeichnung: "Schlüssel", art: "AUSWAHL", auswahl: [] }),
+        zeile({ bezeichnung: "Schlüssel 2", art: "AUSWAHL", auswahl: ["  "] }),
+      ]),
+    ).toBe("");
+  });
+
+  it("nie Bemerkung, Angabe oder Hinweis — auch wenn die Zeile sie mitbraechte", () => {
+    const mitFreitext = {
+      ...zeile({ bezeichnung: "Dienst-Laptop/PC" }),
+      bemerkung: "Bitte mit Dockingstation – Rücken",
+      angabe: "Chemie, Religion",
+    } as BriefListenZeile;
+    const text = ausstattungListe([mitFreitext]);
+    expect(text).toBe("Dienst-Laptop/PC");
+    expect(text).not.toMatch(/Dockingstation|Religion/);
+  });
+
+  it("Reihenfolge wie im Formular: Stelle (IT vor Facility, HR hinten), dann Katalogreihenfolge, dann Bezeichnung", () => {
+    expect(
+      ausstattungListe([
+        zeile({ bezeichnung: "Jobticket", departmentKey: "HR", reihenfolge: 0 }),
+        zeile({ bezeichnung: "Parkplatz", departmentKey: "FACILITY", reihenfolge: 0 }),
+        zeile({ bezeichnung: "Telefon mit Durchwahl", departmentKey: "IT", reihenfolge: 5 }),
+        zeile({ bezeichnung: "Dienst-iPad", departmentKey: "IT", reihenfolge: 1 }),
+        zeile({ bezeichnung: "BYOD freischalten", departmentKey: "IT", reihenfolge: 5 }),
+      ]).split("\n"),
+    ).toEqual(["Dienst-iPad", "BYOD freischalten", "Telefon mit Durchwahl", "Parkplatz", "Jobticket"]);
+  });
+
+  it("Zeilenumbrueche im Titel und doppelte Optionen fallen weg (eine Zeile je Position)", () => {
+    expect(
+      ausstattungListe([
+        zeile({ bezeichnung: "Schlüssel\nHaupteingang", art: "AUSWAHL", auswahl: ["Lehrer-\nzimmer", "Lehrer-\nzimmer"] }),
+      ]),
+    ).toBe("Schlüssel Haupteingang: Lehrer- zimmer");
   });
 });

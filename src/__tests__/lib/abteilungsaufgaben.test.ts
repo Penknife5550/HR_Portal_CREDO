@@ -19,8 +19,13 @@ import {
 } from "@/lib/constants";
 import {
   GUELTIG_MIN_TAGE,
+  MELDUNGEN,
   SPERRZEIT_MINUTEN,
   VORLAGE_DEAKTIVIERT_DETAIL,
+  absageEmpfaenger,
+  absageInformiert,
+  absageOffen,
+  absageStand,
   abteilungKonfigDto,
   abteilungsReihenfolge,
   abteilungsSchluesselBekannt,
@@ -28,10 +33,12 @@ import {
   abteilungsZeilenBauen,
   aufgabenlisteMailFelder,
   berichtMeldung,
+  eiltDeckeln,
   empfaengerAufloesen,
   erinnerungsBezug,
   erinnerungsMerkerSetzen,
   erinnerungsStufe,
+  erledigteListeMailFelder,
   erledigtVonBestimmen,
   faelligkeitVerschoben,
   fehlendeAdressen,
@@ -44,7 +51,12 @@ import {
   kommentarMailFelder,
   linkAnzeige,
   meldungNachweisFehlt,
+  nachtragAnzahl,
+  nachtragZeilenText,
+  NACHTRAG_TITEL_MAX,
   onboardingEmpfaengerEinrichtung,
+  waechterHinweis,
+  WAECHTER_TAGE,
   sperrzeitBis,
   stufeBerechnen,
   stufenMailFelder,
@@ -57,6 +69,7 @@ import {
   type LinkFuerZeile,
   type VersandBericht,
 } from "@/lib/abteilungsaufgaben";
+import { nachtragListe } from "@/lib/ausstattung";
 
 const TAG = 86_400_000;
 const JETZT = new Date("2027-07-20T08:00:00.000Z");
@@ -381,6 +394,53 @@ describe("stufeBerechnen / erinnerungsStufe", () => {
 });
 
 // =============================================
+// „Eilt“ (Ausstattung & Zugaenge, Regel 14)
+// =============================================
+
+describe("eiltDeckeln / erinnerungsStufe mit eilender Aufgabe (Regel 14)", () => {
+  const eilend = [{ dueDate: tage(-6), eilt: true }];
+  const normal = [{ dueDate: tage(-6), eilt: false }];
+
+  it("erste Erinnerung (reminderCount 0) mit eilender Aufgabe: ESCALATION wird WARNING", () => {
+    expect(eiltDeckeln("ESCALATION", eilend, 0)).toBe("WARNING");
+    // Eine eilende reicht, auch neben einer gewoehnlichen.
+    expect(eiltDeckeln("ESCALATION", [...normal, ...eilend], 0)).toBe("WARNING");
+  });
+
+  it("alles andere bleibt: ab der zweiten Erinnerung, ohne eilende Aufgabe, ohne Zaehler, andere Stufen", () => {
+    expect(eiltDeckeln("ESCALATION", eilend, 1)).toBe("ESCALATION");
+    expect(eiltDeckeln("ESCALATION", normal, 0)).toBe("ESCALATION");
+    expect(eiltDeckeln("ESCALATION", [{ eilt: undefined }], 0)).toBe("ESCALATION");
+    expect(eiltDeckeln("ESCALATION", eilend, undefined)).toBe("ESCALATION");
+    expect(eiltDeckeln("ESCALATION", eilend, null)).toBe("ESCALATION");
+    expect(eiltDeckeln("WARNING", eilend, 0)).toBe("WARNING");
+    expect(eiltDeckeln("INFO", eilend, 0)).toBe("INFO");
+    expect(eiltDeckeln(null, eilend, 0)).toBeNull();
+  });
+
+  it("erinnerungsStufe: reminderCount 0 und eilende Aufgabe ergeben WARNING samt dessen Abstand", () => {
+    // Versand vor 3 Tagen, Aufgabe seit 6 Tagen ueberfaellig: ESCALATION verlangte 5 Tage Abstand.
+    const link = { sentAt: tage(-3), lastSentAt: tage(-3), lastReminderAt: null, allTasksComplete: false, reminderCount: 0 };
+    const e = erinnerungsStufe(link, eilend, JETZT);
+    expect(e.erinnern && e.stufe.level).toBe("WARNING");
+    expect(e.stufe).toMatchObject({ overdueItems: 1, tageUeberfaellig: 6 });
+
+    // Ohne „Eilt“ waere es eine Eskalation — und dafuer ist es noch zu frueh.
+    expect(erinnerungsStufe(link, normal, JETZT)).toMatchObject({ erinnern: false, warum: "ZU_FRUEH" });
+    // Die zweite Erinnerung eskaliert wieder normal.
+    const zweite = { ...link, sentAt: tage(-10), lastSentAt: tage(-10), lastReminderAt: tage(-5), reminderCount: 1 };
+    const e2 = erinnerungsStufe(zweite, eilend, JETZT);
+    expect(e2.erinnern && e2.stufe.level).toBe("ESCALATION");
+  });
+
+  it("Links ohne reminderCount (Offboarding-Regeln wie bisher) werden nie gedeckelt", () => {
+    const link = { sentAt: tage(-10), lastReminderAt: null, allTasksComplete: false };
+    const e = erinnerungsStufe(link, eilend, JETZT);
+    expect(e.erinnern && e.stufe.level).toBe("ESCALATION");
+  });
+});
+
+// =============================================
 // Mailfelder
 // =============================================
 
@@ -411,6 +471,74 @@ describe("aufgabenlisteMailFelder", () => {
       aufgabenliste_html: "",
       anzahl_aufgaben: 0,
       naechste_faelligkeit: "",
+    });
+  });
+
+  describe("Bemerkung und „Eilt“ (Ausstattung & Zugaenge, Regel 8 und 14)", () => {
+    const basis = [
+      { title: "Konto anlegen", dueDate: new Date("2027-07-29T00:00:00.000Z"), description: "M365 & Lizenz" },
+      { title: "Ohne Frist", dueDate: null },
+    ];
+
+    it("ohne Bemerkung und ohne eilt: Byte fuer Byte wie vorher (auch mit null/false/leeren Feldern)", () => {
+      const vorher = aufgabenlisteMailFelder(basis);
+      expect(vorher.aufgabenliste).toBe("- Konto anlegen – fällig 29.07.2027\n  M365 & Lizenz\n- Ohne Frist");
+      expect(
+        aufgabenlisteMailFelder(
+          basis.map((a) => ({ ...a, bemerkung: null, eilt: false })),
+        ),
+      ).toEqual(vorher);
+      expect(
+        aufgabenlisteMailFelder(basis.map((a) => ({ ...a, bemerkung: { text: "   ", label: "Bemerkung der Führungskraft" } }))),
+      ).toEqual(vorher);
+    });
+
+    it("eilt: „(eilt)“ hinter der Faelligkeit — ohne Faelligkeit nichts", () => {
+      const f = aufgabenlisteMailFelder([
+        { title: "Dienst-iPad bereitstellen", dueDate: new Date("2027-07-20T00:00:00.000Z"), eilt: true },
+        { title: "Ohne Frist", dueDate: null, eilt: true },
+      ]);
+      expect(f.aufgabenliste).toBe("- Dienst-iPad bereitstellen – fällig 20.07.2027 (eilt)\n- Ohne Frist");
+      expect(f.aufgabenliste_html).toContain(
+        '<li style="margin:0 0 4px;">Dienst-iPad bereitstellen – fällig 20.07.2027 (eilt)</li>',
+      );
+      expect(f.naechste_faelligkeit).toBe("20.07.2027");
+    });
+
+    it("Bemerkung: eigene eingerueckte Zeile „<Label>: <Text>“ unter dem Hinweis, im HTML maskiert", () => {
+      const f = aufgabenlisteMailFelder([
+        {
+          title: "Zugang einrichten: Dienst-E-Mail",
+          dueDate: new Date("2027-07-25T00:00:00.000Z"),
+          description: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+          bemerkung: { text: "Mit Stift <und>\nHülle & Apps", label: "Bemerkung der Führungskraft" },
+          eilt: true,
+        },
+        {
+          title: "Dienst-iPad bereitstellen",
+          dueDate: null,
+          bemerkung: { text: "Bitte bis Montag", label: "Bemerkung der Personalabteilung" },
+        },
+      ]);
+      expect(f.aufgabenliste).toBe(
+        [
+          "- Zugang einrichten: Dienst-E-Mail – fällig 25.07.2027 (eilt)",
+          "  Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+          "  Bemerkung der Führungskraft: Mit Stift <und> Hülle & Apps",
+          "- Dienst-iPad bereitstellen",
+          "  Bemerkung der Personalabteilung: Bitte bis Montag",
+        ].join("\n"),
+      );
+      expect(f.aufgabenliste_html).toContain(
+        '<li style="margin:0 0 4px;">Zugang einrichten: Dienst-E-Mail – fällig 25.07.2027 (eilt)' +
+          '<br><span style="color:#6b7280;font-size:13px;">Erst nach Verpflichtung auf Vertraulichkeit freischalten.</span>' +
+          '<br><span style="color:#6b7280;font-size:13px;">Bemerkung der Führungskraft: Mit Stift &lt;und&gt; Hülle &amp; Apps</span></li>',
+      );
+      expect(f.aufgabenliste_html).toContain(
+        '<li style="margin:0 0 4px;">Dienst-iPad bereitstellen' +
+          '<br><span style="color:#6b7280;font-size:13px;">Bemerkung der Personalabteilung: Bitte bis Montag</span></li>',
+      );
+      expect(f.aufgabenliste_html).not.toContain("<und>");
     });
   });
 });
@@ -897,3 +1025,384 @@ describe("onboardingEmpfaengerEinrichtung (E-A10)", () => {
     ).toMatchObject({ ok: true, email: "facility@example.org", quelle: "ZENTRAL" });
   });
 });
+
+// =============================================
+// Ausstattung & Zugaenge (Paket A3, S17): Nachtrag und Waechter
+// =============================================
+
+describe("waechterHinweis (Regel 15)", () => {
+  // JETZT = 20.07.2027, 10:00 Uhr deutscher Zeit; die Grenze ist der 27.07.
+  const faellig = (iso: string) => ({ dueDate: new Date(`${iso}T00:00:00.000Z`) });
+  const basis = {
+    link: null,
+    offene: [faellig("2027-07-26")],
+    nachtragOffen: false,
+    gesperrt: false,
+    abgeschlossen: false,
+    jetzt: JETZT,
+  };
+
+  it("nicht informiert und Frist in weniger als 7 Tagen: Text mit dem Datum", () => {
+    expect(waechterHinweis(basis)).toBe("Früheste Fälligkeit 26.07.2027 – Stelle noch nicht informiert");
+    // Ein nie zugestellter Link (sentAt null) zaehlt wie keiner.
+    expect(waechterHinweis({ ...basis, link: { sentAt: null } })).toBe(
+      "Früheste Fälligkeit 26.07.2027 – Stelle noch nicht informiert",
+    );
+  });
+
+  it("schon verstrichen: ebenfalls — die frueheste offene Faelligkeit zaehlt", () => {
+    expect(
+      waechterHinweis({ ...basis, offene: [faellig("2027-08-30"), { dueDate: null }, faellig("2027-07-10")] }),
+    ).toBe("Früheste Fälligkeit 10.07.2027 – Stelle noch nicht informiert");
+  });
+
+  it("genau eine Woche oder mehr entfernt, oder ohne Faelligkeit: kein Waechter", () => {
+    expect(WAECHTER_TAGE).toBe(7);
+    expect(waechterHinweis({ ...basis, offene: [faellig("2027-07-27")] })).toBeNull();
+    expect(waechterHinweis({ ...basis, offene: [faellig("2027-08-15")] })).toBeNull();
+    expect(waechterHinweis({ ...basis, offene: [{ dueDate: null }] })).toBeNull();
+    expect(waechterHinweis({ ...basis, offene: [] })).toBeNull();
+  });
+
+  it("informiert: nur mit offenem Nachtrag — „Nachtrag noch nicht gesendet“", () => {
+    const informiert = { ...basis, link: { sentAt: tage(-5) } };
+    expect(waechterHinweis(informiert)).toBeNull();
+    expect(waechterHinweis({ ...informiert, nachtragOffen: true })).toBe(
+      "Früheste Fälligkeit 26.07.2027 – Nachtrag noch nicht gesendet",
+    );
+  });
+
+  it("abgeschlossener Vorgang oder fehlende Modalitaeten: nie", () => {
+    expect(waechterHinweis({ ...basis, abgeschlossen: true })).toBeNull();
+    expect(waechterHinweis({ ...basis, gesperrt: true })).toBeNull();
+    expect(waechterHinweis({ ...basis, link: { sentAt: tage(-5) }, nachtragOffen: true, abgeschlossen: true })).toBeNull();
+  });
+});
+
+describe("nachtragAnzahl / nachtragZeilenText (Regel 10)", () => {
+  it("zaehlt alle Arten; ohne Liste 0", () => {
+    expect(nachtragAnzahl(null)).toBe(0);
+    expect(nachtragAnzahl({ neu: ["a"], geaendert: ["b", "c"], entfaellt: ["d"] })).toBe(4);
+  });
+
+  it("Zeile der Karte: je Art ein Verb, zweiter Satz nach Knopf bzw. naechster Mail", () => {
+    const liste = { neu: ["Dienst-Laptop/PC bereitstellen"], geaendert: ["Zugang einrichten: WebUntis"], entfaellt: ["Spind bereitstellen"] };
+    expect(nachtragZeilenText(liste, true)).toBe(
+      "Nach der Information geändert: „Dienst-Laptop/PC bereitstellen“ hinzugefügt, „Zugang einrichten: WebUntis“ geändert, „Spind bereitstellen“ entfällt. Die Stelle erfährt davon erst mit „Nachtrag senden“.",
+    );
+    expect(nachtragZeilenText(liste, false)).toMatch(/Die Stelle erfährt davon erst mit der nächsten Aufgaben-E-Mail \(„Erneut senden“\)\.$/);
+  });
+
+  it("nennt hoechstens NACHTRAG_TITEL_MAX Titel, den Rest als Anzahl", () => {
+    const neu = ["A", "B", "C", "D", "E", "F"];
+    const text = nachtragZeilenText({ neu, geaendert: [], entfaellt: [] }, true);
+    expect(NACHTRAG_TITEL_MAX).toBe(4);
+    expect(text).toContain("„A“ hinzugefügt, „B“ hinzugefügt, „C“ hinzugefügt, „D“ hinzugefügt und 2 weitere.");
+    expect(text).not.toContain("„E“");
+  });
+});
+
+describe("abteilungsZeilenBauen mit Nachtrag und Waechter (nur Onboarding)", () => {
+  /** Informiert vor acht Tagen — keine Sperrzeit. */
+  const linkIt: LinkFuerZeile = {
+    ...linkStand({ sentAt: tage(-8), lastSentAt: tage(-8) }),
+    id: "l-it",
+    departmentKey: "IT",
+    departmentName: "IT-Abteilung",
+    email: "it@example.org",
+    token: "tok-it",
+    zugestelltAn: "it@example.org",
+  };
+
+  function bauen(teil: Partial<Parameters<typeof abteilungsZeilenBauen>[0]> = {}) {
+    return abteilungsZeilenBauen({
+      aufgaben: [{ assigneeDepartment: "IT", isCompleted: false, dueDate: new Date("2027-07-24T00:00:00Z") }],
+      links: [linkIt],
+      konfigs: [konfig({})],
+      organizationId: "org-1",
+      fuehrungskraft: null,
+      vorgangAbgeschlossen: false,
+      linkUrl: (t) => `https://hr.example.org/onboarding-tasks/${t}`,
+      jetzt: JETZT,
+      ...teil,
+    });
+  }
+
+  const NUR_ENTFAELLT = { IT: { neu: [], geaendert: [], entfaellt: ["Spind bereitstellen"] } };
+
+  it("ohne die beiden Optionen bleibt die Zeile wie bisher (Offboarding): keine neuen Schluessel", () => {
+    const [z] = bauen({ links: [{ ...linkIt, sentAt: null }] }).zeilen;
+    expect(z).not.toHaveProperty("nachtrag");
+    expect(z.aktionen).not.toHaveProperty("nachtrag");
+    expect(z.aktionen).not.toHaveProperty("nachtragGesperrt");
+    // Kein Waechter, obwohl die Stelle nicht informiert ist und die Frist naht.
+    expect(z.anzeige).not.toHaveProperty("hinweisTon");
+  });
+
+  it("„Nachtrag senden“ auch ohne offene Aufgabe (nur „Entfällt“), mit der Zeile der Karte", () => {
+    const [z] = bauen({
+      aufgaben: [{ assigneeDepartment: "IT", isCompleted: true, dueDate: null, entfaellt: true }],
+      links: [{ ...linkIt, allTasksComplete: true, completedAt: tage(-1) }],
+      nachtraege: NUR_ENTFAELLT,
+    }).zeilen;
+    expect(z.aktionen).toMatchObject({ nachtrag: true, nachtragGesperrt: false, erneutSenden: false });
+    expect(z.nachtrag).toEqual({
+      anzahl: 1,
+      text: "Nach der Information geändert: „Spind bereitstellen“ entfällt. Die Stelle erfährt davon erst mit „Nachtrag senden“.",
+    });
+  });
+
+  it("waehrend der Sperrzeit: sichtbar, aber gesperrt", () => {
+    const [z] = bauen({
+      links: [{ ...linkIt, lastSentAt: new Date(JETZT.getTime() - 3 * 60_000) }],
+      nachtraege: NUR_ENTFAELLT,
+    }).zeilen;
+    expect(z.aktionen).toMatchObject({ nachtrag: false, nachtragGesperrt: true });
+  });
+
+  it("kein Nachtrag ohne Liste, ohne zugestellten Link, ohne Empfaenger, bei abgeschlossenem oder gesperrtem Vorgang", () => {
+    const ohneListe = bauen({ nachtraege: {} }).zeilen[0];
+    expect(ohneListe.aktionen).toMatchObject({ nachtrag: false, nachtragGesperrt: false });
+    expect(ohneListe.nachtrag).toBeNull();
+
+    const nieZugestellt = bauen({ links: [{ ...linkIt, sentAt: null }], nachtraege: NUR_ENTFAELLT }).zeilen[0];
+    expect(nieZugestellt.aktionen.nachtrag).toBe(false);
+    // Die Zeile steht trotzdem — mit dem Hinweis auf die naechste Mail (F7).
+    expect(nieZugestellt.nachtrag?.text).toContain("mit der nächsten Aufgaben-E-Mail");
+
+    const ohneEmpfaenger = bauen({ konfigs: [konfig({ isActive: false })], nachtraege: NUR_ENTFAELLT }).zeilen[0];
+    expect(ohneEmpfaenger.aktionen.nachtrag).toBe(false);
+
+    const abgeschlossen = bauen({ vorgangAbgeschlossen: true, nachtraege: NUR_ENTFAELLT }).zeilen[0];
+    expect(abgeschlossen.aktionen).toMatchObject({ nachtrag: false, nachtragGesperrt: false });
+    expect(abgeschlossen.nachtrag).toBeNull();
+
+    const gesperrt = bauen({ gesperrt: true, nachtraege: NUR_ENTFAELLT }).zeilen[0];
+    expect(gesperrt.aktionen.nachtrag).toBe(false);
+  });
+
+  it("nachtragListe zusammengefasst: was sich aufhebt, zaehlt nicht und loest keinen Knopf aus", () => {
+    const liste = nachtragListe([
+      { art: "NEU", titel: "Parkplatz bereitstellen" },
+      { art: "ENTFAELLT", titel: "Parkplatz bereitstellen" },
+    ]);
+    const [z] = bauen({ nachtraege: { IT: liste } }).zeilen;
+    expect(nachtragAnzahl(liste)).toBe(0);
+    expect(z.aktionen.nachtrag).toBe(false);
+    expect(z.nachtrag).toBeNull();
+  });
+
+  it("Waechter: roter Hinweis vorn, ein bestehender Hinweis der Zeile bleibt dahinter", () => {
+    const [z] = bauen({
+      konfigs: [konfig({ email: "it-neu@example.org" })],
+      nachtraege: NUR_ENTFAELLT,
+      waechter: true,
+    }).zeilen;
+    expect(z.anzeige.hinweisTon).toBe("rot");
+    expect(z.anzeige.hinweis).toMatch(
+      /^Früheste Fälligkeit 24\.07\.2027 – Nachtrag noch nicht gesendet · Adresse geändert \(jetzt it-neu@example\.org\)/,
+    );
+  });
+
+  it("Waechter auch in einer uebersprungenen Zeile (keine Adresse) — dort steht sonst kein Hinweis", () => {
+    const { zeilen } = bauen({
+      aufgaben: [{ assigneeDepartment: "FACILITY", isCompleted: false, dueDate: new Date("2027-07-21T00:00:00Z") }],
+      links: [],
+      waechter: true,
+      nachtraege: {},
+    });
+    expect(zeilen[0]).toMatchObject({
+      departmentKey: "FACILITY",
+      anzeige: {
+        status: "UEBERSPRUNGEN",
+        hinweis: "Früheste Fälligkeit 21.07.2027 – Stelle noch nicht informiert",
+        hinweisTon: "rot",
+      },
+    });
+  });
+});
+
+describe("berichtMeldung: Nachtrag", () => {
+  const it_ = { departmentKey: "IT", departmentName: "IT-Abteilung", email: "it@example.org" };
+
+  it("Erfolg mit gleichem bzw. neuem Link", () => {
+    expect(berichtMeldung({ aktion: "nachtrag", versendet: [{ ...it_, status: "SENT" }], uebersprungen: [] }).meldung).toBe(
+      "Nachtrag an IT-Abteilung gesendet. Der Link ist unverändert.",
+    );
+    expect(
+      berichtMeldung({ aktion: "nachtrag", versendet: [{ ...it_, status: "SENT", neuerLink: true }], uebersprungen: [] })
+        .meldung,
+    ).toBe("Nachtrag mit neuem Link an IT-Abteilung (neue Adresse it@example.org) gesendet. Der bisherige Link ist ungültig.");
+  });
+
+  it("nichts nachzutragen: 409 mit Grund — kein Problem, aber auch kein Versand", () => {
+    const b: VersandBericht = { aktion: "nachtrag", versendet: [], uebersprungen: [{ ...it_, grund: "KEIN_NACHTRAG" }] };
+    expect(httpStatusAusBericht(b)).toBe(409);
+    expect(berichtMeldung(b).meldung).toBe(
+      "Nachtrag senden nicht möglich. IT-Abteilung: seit der letzten E-Mail nichts geändert – kein Nachtrag nötig.",
+    );
+    // Als „Problem“ zaehlt KEIN_NACHTRAG nicht (kein gelber Grund in der Zeile).
+    expect(linkAnzeige(null, JETZT, { grund: "KEIN_NACHTRAG", offeneAufgaben: 1 }).status).toBe("NICHT_INFORMIERT");
+  });
+});
+
+// =============================================
+// Absage an die Stellen (Paket A3, S19; E-A20, F13, F17)
+// =============================================
+
+describe("absageInformiert / absageOffen / absageStand (E-A20)", () => {
+  const it_ = { departmentKey: "IT", departmentName: "IT-Abteilung" };
+  const fm = { departmentKey: "FACILITY", departmentName: "Facility Management" };
+  const fk = { departmentKey: "VORGESETZTER", departmentName: "Führungskraft" };
+
+  it("informiert heisst `sentAt ?? lastSentAt` — auch nach einem gescheiterten „Link erneuern“", () => {
+    expect(absageInformiert({ ...it_, sentAt: tage(-5) })).toBe(true);
+    expect(absageInformiert({ ...it_, sentAt: null, lastSentAt: tage(-6) })).toBe(true);
+    expect(absageInformiert({ ...it_, sentAt: null, lastSentAt: null })).toBe(false);
+    expect(absageInformiert({ ...it_, sentAt: "kein Datum" })).toBe(false);
+  });
+
+  it("offen heisst informiert und noch ohne Absage (F13)", () => {
+    expect(absageOffen({ ...it_, sentAt: tage(-5), abgesagtAm: null })).toBe(true);
+    expect(absageOffen({ ...it_, sentAt: tage(-5) })).toBe(true);
+    expect(absageOffen({ ...it_, sentAt: tage(-5), abgesagtAm: tage(-1) })).toBe(false);
+    expect(absageOffen({ ...it_, sentAt: null, abgesagtAm: null })).toBe(false);
+  });
+
+  it("nur bei EXPIRED und mit mindestens einer informierten Stelle", () => {
+    const links = [{ ...it_, sentAt: tage(-5) }];
+    for (const status of ["SUPERVISOR_SUBMITTED", "REVIEWED", "COMPLETED"]) {
+      expect({ status, stand: absageStand({ status, links }) }).toEqual({ status, stand: null });
+    }
+    expect(absageStand({ status: "EXPIRED", links: [] })).toBeNull();
+    expect(absageStand({ status: "EXPIRED", links: [{ ...it_, sentAt: null, lastSentAt: null }] })).toBeNull();
+  });
+
+  it("Stellen in der Reihenfolge der Karte (Fuehrungskraft zuletzt), Namen wie am Link, juengste Absage", () => {
+    const stand = absageStand({
+      status: "EXPIRED",
+      links: [
+        { ...fk, sentAt: tage(-5) },
+        { ...fm, sentAt: null, lastSentAt: tage(-6), abgesagtAm: null },
+        { ...it_, sentAt: tage(-5), abgesagtAm: null },
+      ],
+    });
+    expect(stand).toEqual({ moeglich: true, stellen: ["IT-Abteilung", "Facility Management", "Führungskraft"], gesendetAm: null });
+
+    const teilweise = absageStand({
+      status: "EXPIRED",
+      links: [
+        { ...it_, sentAt: tage(-5), abgesagtAm: tage(-2) },
+        { ...fm, sentAt: tage(-5), abgesagtAm: null },
+        { ...fk, sentAt: tage(-5), abgesagtAm: tage(-1) },
+      ],
+    });
+    expect(teilweise).toEqual({ moeglich: true, stellen: ["Facility Management"], gesendetAm: tage(-1).toISOString() });
+
+    const fertig = absageStand({
+      status: "EXPIRED",
+      links: [{ ...it_, sentAt: tage(-5), abgesagtAm: tage(-2).toISOString() }],
+    });
+    expect(fertig).toEqual({ moeglich: false, stellen: [], gesendetAm: tage(-2).toISOString() });
+  });
+});
+
+describe("absageEmpfaenger (F16)", () => {
+  it("die zuletzt zugestellte Adresse — `link.email` nur, wenn die Mail an sie ging", () => {
+    // Normalfall: zugestellt an die Adresse am Link.
+    expect(absageEmpfaenger({ email: "it@example.org", zugestelltAn: "it@example.org" })).toBe("it@example.org");
+    // Gross/klein und weitere An-Adressen der Zuweisungsvorlage: bleibt bei `email`.
+    expect(absageEmpfaenger({ email: "IT@example.org", zugestelltAn: "it@example.org, it-leitung@example.org" })).toBe(
+      "IT@example.org",
+    );
+    // Adresswechsel, Mail an die neue gescheitert: `email` bekam nie etwas.
+    expect(absageEmpfaenger({ email: "it-neu@example.org", zugestelltAn: "it@example.org" })).toBe("it@example.org");
+    expect(absageEmpfaenger({ email: "it-neu@example.org", zugestelltAn: "it@example.org; it-leitung@example.org" })).toBe(
+      "it@example.org, it-leitung@example.org",
+    );
+  });
+
+  it("ohne `zugestelltAn` (Bestand vor Paket 1b): `link.email`", () => {
+    expect(absageEmpfaenger({ email: "it@example.org", zugestelltAn: null })).toBe("it@example.org");
+    expect(absageEmpfaenger({ email: "it@example.org", zugestelltAn: " , " })).toBe("it@example.org");
+    expect(absageEmpfaenger({ email: "it@example.org" })).toBe("it@example.org");
+  });
+});
+
+describe("erledigteListeMailFelder (F17)", () => {
+  it("Titel einzeilig, Klartext roh, HTML maskiert, Merker als Zeichenkette", () => {
+    expect(erledigteListeMailFelder([{ title: "Konto anlegen" }, { title: "Schlüssel &\n<b>Chip</b>" }])).toEqual({
+      erledigte_liste: "- Konto anlegen\n- Schlüssel & <b>Chip</b>",
+      erledigte_liste_html:
+        '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+        '<li style="margin:0 0 4px;">Konto anlegen</li>' +
+        '<li style="margin:0 0 4px;">Schlüssel &amp; &lt;b&gt;Chip&lt;/b&gt;</li>' +
+        "</ul>",
+      anzahl_erledigt: 2,
+      hat_erledigte: "ja",
+    });
+  });
+
+  it("ohne erledigte Aufgabe (oder nur mit leeren Titeln): alles leer, Merker leer", () => {
+    const leer = { erledigte_liste: "", erledigte_liste_html: "", anzahl_erledigt: 0, hat_erledigte: "" };
+    expect(erledigteListeMailFelder([])).toEqual(leer);
+    expect(erledigteListeMailFelder([{ title: "  " }])).toEqual(leer);
+  });
+});
+
+describe("berichtMeldung: Absage", () => {
+  const it_ = { departmentKey: "IT", departmentName: "IT-Abteilung", email: "it@example.org" };
+  const fm = { departmentKey: "FACILITY", departmentName: "Facility Management", email: "fm@example.org" };
+
+  it("Erfolg nennt die Stellen; eine nicht zugestellte steht als Hinweis „Absage nicht zugestellt“", () => {
+    expect(berichtMeldung({ aktion: "absage", versendet: [{ ...it_, status: "SENT" }], uebersprungen: [] })).toEqual({
+      meldung: "Absage an 1 Stelle gesendet: IT-Abteilung.",
+      hinweis: null,
+    });
+    const teil: VersandBericht = {
+      aktion: "absage",
+      versendet: [{ ...it_, status: "SENT" }],
+      uebersprungen: [{ ...fm, grund: "MAIL_FEHLGESCHLAGEN", detail: "Timeout" }],
+    };
+    expect(httpStatusAusBericht(teil)).toBe(201);
+    expect(berichtMeldung(teil)).toEqual({
+      meldung: "Absage an 1 Stelle gesendet: IT-Abteilung.",
+      hinweis: "Absage nicht zugestellt: Facility Management (Versand fehlgeschlagen: Timeout).",
+    });
+  });
+
+  it("zweiter Klick: 409 BEREITS_ABGESAGT — kein Problem, eigene Meldung", () => {
+    const b: VersandBericht = {
+      aktion: "absage",
+      versendet: [],
+      uebersprungen: [
+        { ...it_, grund: "BEREITS_ABGESAGT" },
+        { ...fm, grund: "BEREITS_ABGESAGT" },
+      ],
+    };
+    expect(httpStatusAusBericht(b)).toBe(409);
+    expect(berichtMeldung(b)).toEqual({ meldung: MELDUNGEN.ABSAGE_BEREITS_GESENDET, hinweis: null });
+    expect(grundText("BEREITS_ABGESAGT")).toBe("Absage bereits gesendet");
+    // Als „Problem“ zaehlt BEREITS_ABGESAGT nicht (kein gelber Grund in der Zeile).
+    expect(linkAnzeige(null, JETZT, { grund: "BEREITS_ABGESAGT", offeneAufgaben: 1 }).status).toBe("NICHT_INFORMIERT");
+  });
+
+  it("niemand informiert: eigene Meldung; alle Mails gescheitert: 502 mit Grund je Stelle", () => {
+    expect(berichtMeldung({ aktion: "absage", versendet: [], uebersprungen: [] }).meldung).toBe(
+      MELDUNGEN.ABSAGE_NIEMAND_INFORMIERT,
+    );
+    const gescheitert: VersandBericht = {
+      aktion: "absage",
+      versendet: [],
+      uebersprungen: [
+        { ...it_, grund: "BEREITS_ABGESAGT" },
+        { ...fm, grund: "MAIL_FEHLGESCHLAGEN", detail: "Timeout" },
+      ],
+    };
+    expect(httpStatusAusBericht(gescheitert)).toBe(502);
+    expect(berichtMeldung(gescheitert).meldung).toBe(
+      "Absage nicht gesendet. Facility Management: Versand fehlgeschlagen: Timeout.",
+    );
+  });
+});
+

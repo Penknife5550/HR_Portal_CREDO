@@ -298,6 +298,8 @@ export async function GET(
         assignee: c.assignee,
         notes: c.notes,
         dueDate: c.dueDate?.toISOString() || null,
+        // Von HR gestrichen (Ausstattung & Zugaenge, F2): „entfällt“, zaehlt nicht.
+        entfaelltAm: c.entfaelltAm?.toISOString() ?? null,
       })),
       abteilungsNamen,
       // `?? []`: Aeltere Testgerueste liefern die Relationen nicht mit.

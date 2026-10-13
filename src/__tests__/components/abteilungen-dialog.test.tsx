@@ -21,6 +21,9 @@
  *     Escape schliesst wie „Abbrechen" — waehrend des Versands nicht.
  *  5. Die Gueltigkeit im Einleitungssatz; bei verschiedenen Daten die
  *     frueheste als Untergrenze.
+ *  5a. Ausstattung & Zugaenge (Paket A3, S14, Mockup 6.4): je Stelle „davon N
+ *     aus „Ausstattung & Zugänge“, M mit Bemerkung“ und der Satz unter „Was
+ *     die Empfänger sehen“ — nur fuer die Empfaenger dieses Versands.
  */
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import {
@@ -352,6 +355,75 @@ describe("Gültigkeit", () => {
 
   it("ohne Vorschau: kein erfundenes Datum", () => {
     expect(gueltigkeitsText([])).toBe("");
+  });
+});
+
+// =============================================
+// 5a. Ausstattung & Zugaenge (Paket A3, S14, Mockup 6.4)
+// =============================================
+
+describe("Ausstattung & Zugänge", () => {
+  const MIT_AUSSTATTUNG: AufgabeFuerZeile[] = [
+    ...AUFGABEN,
+    { id: "ai1", title: "Zugang einrichten: Dienst-E-Mail", assigneeDepartment: "IT", isCompleted: false, dueDate: "2026-09-25T00:00:00.000Z", herkunft: "AUSSTATTUNG", mitBemerkung: false },
+    { id: "ai2", title: "Zugang einrichten: Schulportal", assigneeDepartment: "IT", isCompleted: false, dueDate: "2026-09-25T00:00:00.000Z", herkunft: "AUSSTATTUNG", mitBemerkung: false },
+    { id: "ai3", title: "Dienst-iPad bereitstellen", assigneeDepartment: "IT", isCompleted: false, dueDate: null, herkunft: "AUSSTATTUNG", mitBemerkung: true },
+    { id: "ai4", title: "Telefon mit Durchwahl bereitstellen", assigneeDepartment: "IT", isCompleted: false, dueDate: null, herkunft: "AUSSTATTUNG", mitBemerkung: true },
+    { id: "ai5", title: "Hinweis der Führungskraft beachten", assigneeDepartment: "IT", isCompleted: false, dueDate: null, herkunft: "HINWEIS" },
+    // erledigt bzw. entfallen: zaehlt in der Vorschau nicht mit
+    { id: "ai6", title: "Parkplatz bereitstellen", assigneeDepartment: "IT", isCompleted: true, dueDate: null, herkunft: "AUSSTATTUNG", mitBemerkung: true, entfaellt: true },
+  ];
+
+  it("je Stelle „davon N aus „Ausstattung & Zugänge“, M mit Bemerkung“ — gezählt über alle offenen, nicht nur die drei sichtbaren", () => {
+    zeige(daten({ aufgaben: MIT_AUSSTATTUNG }));
+    const zeile = block("IT").querySelector('[data-zeile="ausstattung"]') as HTMLElement;
+    expect(zeile.textContent).toBe("davon 5 aus „Ausstattung & Zugänge“, 2 mit Bemerkung");
+    // Die Vorschau zeigt wie heute höchstens drei Aufgaben; Zugänge einzeln.
+    expect(block("IT").textContent).toContain("…und 6 weitere");
+    expect(block("IT").textContent).not.toContain("Parkplatz");
+    // Stellen ohne Ausstattungsaufgabe bekommen die Zeile nicht.
+    expect(block("BUCHHALTUNG").querySelector('[data-zeile="ausstattung"]')).toBeNull();
+  });
+
+  it("ohne Ausstattung: keine Zeile und kein Satz — der Dialog bleibt wie vorher", () => {
+    zeige(daten());
+    expect(document.querySelector('[data-zeile="ausstattung"]')).toBeNull();
+    expect(document.querySelector('[data-satz="ausstattung"]')).toBeNull();
+  });
+
+  it("„Was die Empfänger sehen“: Satz zu Bemerkungen, Angaben und Hinweis — vor dem Schlusssatz", () => {
+    const d: AbteilungsUebersichtDaten = {
+      ...daten({ aufgaben: MIT_AUSSTATTUNG }),
+      ausstattungSicht: {
+        stellen: {
+          IT: { angaben: ["Unterrichtsfächer"], hinweis: true },
+          // Facility hat keine Adresse und wird nicht informiert — sie steht nicht im Satz.
+          FACILITY: { angaben: ["Unterrichtsfächer"], hinweis: true },
+        },
+      },
+    };
+    zeige(d);
+    const b = document.querySelector('[data-block="sichtbarkeit"]') as HTMLElement;
+    const satz = b.querySelector('[data-satz="ausstattung"]') as HTMLElement;
+    expect(satz.textContent).toBe(
+      "Zu ihren Aufgaben: die Bemerkungen der Führungskraft bzw. der Personalabteilung. " +
+        "Dazu die Angaben „Unterrichtsfächer“ (IT-Abteilung) und der Hinweis an die eigene Stelle (IT-Abteilung).",
+    );
+    expect(satz.textContent).not.toContain("Facility");
+    // Reihenfolge wie im Mockup: zusätzlich …, dann der Satz, dann „Keine Angaben aus dem Personalfragebogen.“
+    const text = b.textContent ?? "";
+    expect(text.indexOf("IT-Abteilung zusätzlich")).toBeLessThan(text.indexOf("Zu ihren Aufgaben"));
+    expect(text.indexOf("Zu ihren Aufgaben")).toBeLessThan(text.indexOf("Keine Angaben aus dem Personalfragebogen."));
+  });
+
+  it("nennt nie Werte oder Texte — nur Beschriftungen (die Übersicht trägt keine)", () => {
+    const d: AbteilungsUebersichtDaten = {
+      ...daten({ aufgaben: MIT_AUSSTATTUNG }),
+      ausstattungSicht: { stellen: { IT: { angaben: ["Unterrichtsfächer"], hinweis: true } } },
+    };
+    zeige(d);
+    expect(dialogtext()).not.toContain("Chemie");
+    expect(JSON.stringify(d)).not.toContain("Chemie");
   });
 });
 

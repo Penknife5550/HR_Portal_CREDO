@@ -723,6 +723,22 @@ describe("offboarding-task-completed", () => {
     expect(payloadsVon("offboarding-task-completed")).toHaveLength(1);
   });
 
+  it("nur Kommentar über den Link: keine Mail — E-A17 (Paket A3) gilt nur im Onboarding", async () => {
+    // Auch mit gepflegtem HR-Postfach bleibt die Payload des Offboardings ohne
+    // `hr_postfach`, `ist_erledigt`, `nur_kommentar` und `meldung_kurz`.
+    db.replyToEmail = "personal@example.org";
+    const r = await perLink(ZUGAENGE.id, { comment: "Laptop kommt morgen zurück." });
+    expect(r.status).toBe(200);
+    expect(payloadsVon("offboarding-task-completed")).toHaveLength(0);
+
+    await perLink(ZUGAENGE.id, { isCompleted: true }, new Date(T_ERLEDIGT.getTime() + MINUTE));
+    const payload = payloadVon("offboarding-task-completed");
+    expect(schluessel(payload)).toEqual(schluessel(beispiel("offboarding-task-completed")));
+    for (const feld of ["hr_postfach", "ist_erledigt", "nur_kommentar", "meldung_kurz"]) {
+      expect(payload).not.toHaveProperty(feld);
+    }
+  });
+
   it("Portal, Aufgabe der IT: dieselbe Vorlage mit „Erledigt über: Portal“, dazu die alten Portal-Felder", async () => {
     const r = await imPortal(ZUGAENGE.id, { isCompleted: true });
     expect(r.status).toBe(200);

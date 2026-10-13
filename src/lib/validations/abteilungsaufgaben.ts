@@ -2,7 +2,8 @@
  * Validierung: Abteilungsaufgaben (Paket 1b, erweitert in Paket 5)
  *
  *   - abteilungsAktionSchema        POST  /api/offboarding/[id]/department-links
- *                                   POST  /api/onboarding/[id]/abteilungen (Paket 5, dieselbe Form)
+ *   - onboardingAbteilungsAktionSchema POST /api/onboarding/[id]/abteilungen (Paket 5, dieselbe
+ *                                   Form; seit Paket A3 zusaetzlich `nachtrag` und `absage`)
  *   - aufgabeLinkPatchSchema        PATCH /api/offboarding-tasks/[token]/[itemId]  (oeffentlich)
  *                                   PATCH /api/onboarding-tasks/[token]/[itemId]   (oeffentlich, Paket 5)
  *   - portalAufgabePatchSchema      PATCH /api/offboarding/[id]/checklist/[itemId]
@@ -86,38 +87,69 @@ const linkSchluesselFeld = schluesselFeld.refine(
 );
 
 /**
- * Aktion der Versandroute.
- *
- * Leerer Body (oder `{}`) heisst "informieren". Der alte Aufruf
- * `{ action: "remind", departmentKey }` bleibt gueltig und heisst "erinnern".
- * Die Vorverarbeitung macht aus beidem die neue Form `{ aktion, departmentKey }`.
+ * Vorverarbeitung beider Aktions-Schemata: Leerer Body (oder `{}`) heisst
+ * "informieren". Der alte Aufruf `{ action: "remind", departmentKey }` bleibt
+ * gueltig und heisst "erinnern". Daraus wird die Form `{ aktion, departmentKey }`.
+ */
+function aktionVorverarbeiten(roh: unknown): unknown {
+  if (roh === undefined || roh === null) return { aktion: "informieren" };
+  if (typeof roh !== "object" || Array.isArray(roh)) return roh;
+  const r = roh as Record<string, unknown>;
+  if (r.aktion === undefined && r.action === "remind") {
+    return { aktion: "erinnern", departmentKey: r.departmentKey };
+  }
+  if (r.aktion === undefined && r.action === undefined) {
+    return { ...r, aktion: "informieren" };
+  }
+  return r;
+}
+
+const UNBEKANNTE_AKTION = { errorMap: () => ({ message: "Unbekannte Aktion." }) };
+
+const INFORMIEREN = z.object({ aktion: z.literal("informieren") });
+const ERNEUT_SENDEN = z.object({ aktion: z.literal("erneut-senden"), departmentKey: linkSchluesselFeld });
+const ERINNERN = z.object({ aktion: z.literal("erinnern"), departmentKey: linkSchluesselFeld });
+const LINK_ERNEUERN = z.object({ aktion: z.literal("link-erneuern"), departmentKey: linkSchluesselFeld });
+/** Ausstattung & Zugaenge (Regel 10): nur im Onboarding. */
+const NACHTRAG = z.object({ aktion: z.literal("nachtrag"), departmentKey: linkSchluesselFeld });
+/**
+ * Ausstattung & Zugaenge (E-A20): Absage an ALLE informierten Stellen, nur im
+ * Onboarding und nur bei EXPIRED (das prueft der Adapter, 409 `NICHT_ABGESAGT`).
+ * Ohne `departmentKey` — ein mitgeschickter wird verworfen.
+ */
+const ABSAGE = z.object({ aktion: z.literal("absage") });
+
+/**
+ * Aktion der Versandroute im OFFBOARDING (POST …/department-links) —
+ * unveraendert seit Paket 1b. `nachtrag` und `absage` kennt es nicht: 400
+ * „Unbekannte Aktion.“ (Feinplan 1.4).
  */
 export const abteilungsAktionSchema = z.preprocess(
-  (roh) => {
-    if (roh === undefined || roh === null) return { aktion: "informieren" };
-    if (typeof roh !== "object" || Array.isArray(roh)) return roh;
-    const r = roh as Record<string, unknown>;
-    if (r.aktion === undefined && r.action === "remind") {
-      return { aktion: "erinnern", departmentKey: r.departmentKey };
-    }
-    if (r.aktion === undefined && r.action === undefined) {
-      return { ...r, aktion: "informieren" };
-    }
-    return r;
-  },
+  aktionVorverarbeiten,
+  z.discriminatedUnion("aktion", [INFORMIEREN, ERNEUT_SENDEN, ERINNERN, LINK_ERNEUERN], UNBEKANNTE_AKTION),
+);
+
+/**
+ * Aktion der Versandroute im ONBOARDING (POST /api/onboarding/[id]/abteilungen):
+ * dieselben Aktionen plus `{ aktion: "nachtrag", departmentKey }` (Ausstattung
+ * & Zugaenge, Regel 10 — die Aenderungen nach der Information an die Stelle)
+ * und `{ aktion: "absage" }` (E-A20 — nach EXPIRED an alle informierten Stellen).
+ */
+export const onboardingAbteilungsAktionSchema = z.preprocess(
+  aktionVorverarbeiten,
   z.discriminatedUnion(
     "aktion",
-    [
-      z.object({ aktion: z.literal("informieren") }),
-      z.object({ aktion: z.literal("erneut-senden"), departmentKey: linkSchluesselFeld }),
-      z.object({ aktion: z.literal("erinnern"), departmentKey: linkSchluesselFeld }),
-      z.object({ aktion: z.literal("link-erneuern"), departmentKey: linkSchluesselFeld }),
-    ],
-    { errorMap: () => ({ message: "Unbekannte Aktion." }) },
+    [INFORMIEREN, ERNEUT_SENDEN, ERINNERN, LINK_ERNEUERN, NACHTRAG, ABSAGE],
+    UNBEKANNTE_AKTION,
   ),
 );
 
-export type AbteilungsAktionInput = z.infer<typeof abteilungsAktionSchema>;
+/**
+ * Eine gepruefte Aktion — die BREITERE Form beider Schemata (mit `nachtrag` und `absage`).
+ * Der Versandkern nimmt sie fuer beide Module; das Offboarding-Schema liefert
+ * nur eine Teilmenge davon.
+ */
+export type AbteilungsAktionInput = z.infer<typeof onboardingAbteilungsAktionSchema>;
 
 // =============================================
 // PATCH /api/offboarding-tasks/[token]/[itemId] (oeffentlich)
@@ -304,9 +336,13 @@ export const fuehrungskraftAenderungFelder = {
 // PATCH /api/onboarding/[id]/checklist/[itemId] (Portal, Paket 5)
 // =============================================
 
-/** Datum als YYYY-MM-DD mit Rueckprobe (kein 31.02.). */
+/**
+ * Datum als YYYY-MM-DD mit Rueckprobe (kein 31.02.). Exportiert fuer die Karte
+ * „Ausstattung & Zugänge" (validations/ausstattung.ts) — dieselbe Regel fuer
+ * die Faelligkeit dort wie im Portal-PATCH.
+ */
 const TAGESDATUM = /^\d{4}-\d{2}-\d{2}$/;
-function tagesdatumGueltig(text: string): boolean {
+export function tagesdatumGueltig(text: string): boolean {
   if (!TAGESDATUM.test(text)) return false;
   const d = new Date(`${text}T00:00:00.000Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === text;

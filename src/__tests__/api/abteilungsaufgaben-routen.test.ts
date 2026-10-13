@@ -426,6 +426,24 @@ describe("POST /api/offboarding/[id]/department-links", () => {
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: "Unbekannte Aktion." });
     });
+
+    it("„nachtrag“ gibt es nur im Onboarding (Ausstattung & Zugänge, Regel 10) → im Offboarding 400", async () => {
+      db.links = [link({ token: "tok-nachtrag" })];
+      const res = await post({ body: { aktion: "nachtrag", departmentKey: "IT" } });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Unbekannte Aktion." });
+      expect(mockTrigger).not.toHaveBeenCalled();
+      expect(db.links[0].token).toBe("tok-nachtrag");
+    });
+
+    it("„absage“ gibt es nur im Onboarding (E-A20) → im Offboarding 400, auch bei CANCELLED", async () => {
+      db.links = [link({ token: "tok-absage" })];
+      db.vorgaenge = [vorgang({ status: "CANCELLED" })];
+      const res = await post({ body: { aktion: "absage" } });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Unbekannte Aktion." });
+      expect(mockTrigger).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -496,6 +514,11 @@ describe("GET /api/offboarding-tasks/[token]", () => {
     expect(data.aufgaben[0].description).toBe("alt");
     expect(JSON.stringify(data)).not.toContain("Intern: Rücksprache");
     expect(data).not.toHaveProperty("progress");
+    // Ausstattung & Zugaenge (Paket A3, S14) gibt es nur im Onboarding: Das
+    // Offboarding bekommt weder Arbeitsort noch Angaben noch Hinweis.
+    expect(data).not.toHaveProperty("arbeitsort");
+    expect(data).not.toHaveProperty("angaben");
+    expect(data).not.toHaveProperty("hinweis");
     expect(db.links[0].openCount).toBe(1);
   });
 

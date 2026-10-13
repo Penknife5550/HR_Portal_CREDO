@@ -20,6 +20,20 @@
  *     stehen NUR in der Zuweisungsmail und NUR bei Schluesseln, denen
  *     ONBOARDING_ZUSATZFELDER sie erlaubt (Buchhaltung bekommt keine).
  *   - {{mitarbeiter_name}} ist nie leer und nie eine Adresse.
+ *
+ * Paket A3 (Ausstattung & Zugaenge, Feinplan S13): Bemerkung und „(eilt)“ in
+ * der Aufgabenliste, Angaben und Hinweis der eigenen bzw. freigegebenen Stelle
+ * im Infokasten der Zuweisungsmail (nie in der Erinnerung), `arbeitsort` (F15)
+ * in allen vier Ereignissen — auch auf dem Link-Weg.
+ *
+ * Feinplan S18 (E-A17): onboarding-task-completed geht an das HR-Postfach
+ * (`{{hr_postfach}}`) und auch bei einem reinen Kommentar der Stelle; abhaken
+ * plus Kommentar gibt genau eine Mail, ein leerer oder unveraenderter
+ * Kommentar keine. Kommentar und Liste nie im Betreff (F19).
+ *
+ * Feinplan S19 (E-A20): die Absage onboarding-department-abgesagt — echte
+ * Payload = Katalogbeispiel, erledigte Aufgaben maskiert im HTML und roh im
+ * Text, kein Link in keinem Teil, ohne erledigte Aufgaben kein Rueckbau-Absatz.
  */
 
 type MailErgebnis = { status: "SENT" | "FAILED" | "SKIPPED"; detail?: string; recipient?: string };
@@ -30,17 +44,29 @@ jest.mock("@/lib/db", () => ({
 }));
 jest.mock("@/lib/webhooks", () => ({ triggerWebhooks: mockTriggerWebhooks }));
 
-import { db, dbLeeren, naechsteId, neuerLink, type Zeile } from "../hilfen/abteilungs-fake-db";
+import {
+  db,
+  dbLeeren,
+  naechsteId,
+  neueAusstattungsZeile,
+  neuerLink,
+  neuerStellenHinweis,
+  type Zeile,
+} from "../hilfen/abteilungs-fake-db";
 import { renderEventEmail } from "@/lib/mailer";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import {
   EVENT_CATALOG,
+  ONBOARDING_ABSAGE_BEISPIEL_ERLEDIGT,
+  ONBOARDING_ABTEILUNG_BEISPIEL_ANGABEN,
   ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN,
   ONBOARDING_ABTEILUNG_BEISPIEL_KOMMENTAR,
 } from "@/lib/events";
+import { HINWEIS_AUFGABE_BESCHREIBUNG, HINWEIS_AUFGABE_TITEL, angabenFuer, angabenMailFelder } from "@/lib/ausstattung";
 import { onboardingAbteilungsMailFelder } from "@/lib/onboarding-abteilung-mail";
 import {
   aufgabenlisteMailFelder,
+  erledigteListeMailFelder,
   kommentarMailFelder,
   stufeBerechnen,
   stufenMailFelder,
@@ -51,6 +77,7 @@ import {
   onboardingErinnerungenSenden,
 } from "@/lib/abteilungsaufgaben-onboarding";
 import {
+  erledigtMeldungFelder,
   oeffentlicheOnboardingAufgabeAendern,
   onboardingAufgabeImPortalAendern,
 } from "@/lib/abteilungsaufgaben-uebergaenge";
@@ -128,6 +155,11 @@ function aufgabe(teil: Zeile): Zeile {
     notes: null,
     abteilungKommentar: null,
     abteilungKommentarAm: null,
+    // Paket A3 (S14): Spalten mit den Standardwerten des Schemas — der Link-
+    // PATCH schaltet nur mit `entfaelltAm: null` im WHERE um.
+    herkunft: null,
+    eilt: false,
+    entfaelltAm: null,
     ...teil,
   };
 }
@@ -143,6 +175,24 @@ function beispielAufgaben(erledigt: string[] = []): Zeile[] {
       dueDate: a.dueDate ? new Date(a.dueDate) : null,
       isCompleted: erledigt.includes(a.id),
       completedAt: erledigt.includes(a.id) ? T_ERINNERT : null,
+    }),
+  );
+}
+
+/**
+ * Die Angaben aus „Ausstattung & Zugänge“ aus dem Katalog-Beispiel als
+ * Datenbankzeilen (Durchwahl der IT, Unterrichtsfaecher des Facility
+ * Managements, fuer die IT freigegeben). Angaben werden keine Aufgabe —
+ * die Aufgabenliste des Beispiels bleibt dieselbe.
+ */
+function beispielAngaben(): Zeile[] {
+  return ONBOARDING_ABTEILUNG_BEISPIEL_ANGABEN.map((a, i) =>
+    neueAusstattungsZeile({
+      id: `aus-angabe-${i}`,
+      onboardingId: VORGANG_ID,
+      positionId: `pos-angabe-${i}`,
+      quelle: "FUEHRUNGSKRAFT",
+      ...a,
     }),
   );
 }
@@ -306,6 +356,8 @@ describe("onboarding-department-assigned (onboardingAbteilungsAktionAusfuehren)"
       // Personalabteilung arbeitet im Portal und bekommt keinen Link.
       aufgabe({ title: "Personalakte anlegen", assignee: "HR" }),
     ];
+    // Paket A3: die Angaben aus dem Katalog-Beispiel (Infokasten der IT).
+    db.ausstattungZeilen = beispielAngaben();
   });
 
   it("Erstmail: genau der Beispiel-Payload aus dem Katalog; Liste, Hinweis, Gültigkeit und Link stimmen", async () => {
@@ -355,6 +407,154 @@ describe("onboarding-department-assigned (onboardingAbteilungsAktionAusfuehren)"
     expect(mail.text).toContain("Vertragsbeginn: 01.10.2026");
     expect(mail.text).toContain("Vorgangsnummer: ONB-2026-031");
     expect(mail.text).toContain(`Aufgaben öffnen: ${BASIS}/onboarding-tasks/${token}`);
+    // Paket A3: Angaben im Infokasten — eigene und freigegebene, im HTML maskiert.
+    expect(mail.html).toContain(
+      '<p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Unterrichtsfächer</p>' +
+        '<p style="margin:0;color:#374151;font-size:14px;">Chemie &amp; Sport</p>',
+    );
+    expect(mail.html).toContain(">Gewünschte Durchwahl</p>");
+    expect(mail.text).toContain("Gewünschte Durchwahl: 214\nUnterrichtsfächer: Chemie & Sport\n");
+    // Einrichtung = Arbeitsort: kein Arbeitsort-Satz, keine Arbeitsort-Zeile.
+    for (const teil of [mail.html, mail.text ?? ""]) expect(teil).not.toContain("Arbeitsort");
+  });
+
+  it("Bemerkung, „eilt“ und Hinweis der Führungskraft kommen im echten Render an", async () => {
+    // Eine Ausstattungsaufgabe der IT mit Bemerkung (angehobene Frist, „eilt“)
+    // und ein Hinweis an die IT samt seiner Aufgabe — beides schon angelegt.
+    db.ausstattungZeilen.push(
+      neueAusstattungsZeile({
+        id: "aus-ipad",
+        onboardingId: VORGANG_ID,
+        positionId: "pos-ipad",
+        departmentKey: "IT",
+        art: "JA_NEIN",
+        bezeichnung: "Dienst-iPad (Lernmittel)",
+        aufgabeTitel: "Dienst-iPad (Lernmittel) bereitstellen",
+        relativeDueDays: -7,
+        bemerkung: "Mit Stift & Hülle,\nApps: <WebUntis>",
+        bemerkungQuelle: "BEIDE",
+        quelle: "FUEHRUNGSKRAFT",
+      }),
+    );
+    db.onboardingAufgaben.push(
+      aufgabe({
+        id: "i-ipad",
+        title: "Dienst-iPad (Lernmittel) bereitstellen",
+        category: "Ausstattung & Zugänge",
+        orderIndex: -100000,
+        dueDate: new Date("2026-09-22T00:00:00.000Z"),
+        relativeDueDays: -7,
+        herkunft: "AUSSTATTUNG",
+        eilt: true,
+        entfaelltAm: null,
+      }),
+      aufgabe({
+        id: "i-hinweis",
+        title: HINWEIS_AUFGABE_TITEL,
+        category: "Ausstattung & Zugänge",
+        orderIndex: -1000,
+        description: HINWEIS_AUFGABE_BESCHREIBUNG,
+        dueDate: new Date("2026-09-24T00:00:00.000Z"),
+        relativeDueDays: -7,
+        herkunft: "HINWEIS",
+        eilt: false,
+        entfaelltAm: null,
+      }),
+    );
+    db.ausstattungAufgaben.push({ ausstattungId: "aus-ipad", option: "", checklistItemId: "i-ipad", createdAt: T_INFORMIERT });
+    db.stellenHinweise.push(
+      neuerStellenHinweis({
+        onboardingId: VORGANG_ID,
+        departmentKey: "IT",
+        text: "Bitte den Drucker im Lehrerzimmer freischalten.",
+        quelle: "FUEHRUNGSKRAFT",
+        checklistItemId: "i-hinweis",
+      }),
+    );
+
+    const r = await aktion(undefined, T_INFORMIERT);
+    expect(r.status).toBe(201);
+
+    const payload = payloadVon("onboarding-department-assigned");
+    expect(payload.aufgabenliste).toBe(
+      [
+        "- Dienst-iPad (Lernmittel) bereitstellen – fällig 22.09.2026 (eilt)",
+        "  Bemerkung der Führungskraft, ergänzt durch die Personalabteilung: Mit Stift & Hülle, Apps: <WebUntis>",
+        // Gleiche Faelligkeit: Reihenfolge der Checkliste (Hinweis-Aufgaben vor den Vorlagenpunkten).
+        `- ${HINWEIS_AUFGABE_TITEL} – fällig 24.09.2026`,
+        `  ${HINWEIS_AUFGABE_BESCHREIBUNG}`,
+        "- Benutzerkonto und E-Mail-Adresse anlegen – fällig 24.09.2026",
+        "  Konto in der Schulverwaltung und in Microsoft 365 anlegen",
+        "- Notebook & Zubehör bereitstellen – fällig 01.10.2026",
+        "- WLAN-Zugang einrichten",
+      ].join("\n"),
+    );
+    expect(payload.angaben).toBe(
+      "Gewünschte Durchwahl: 214\nUnterrichtsfächer: Chemie & Sport\n" +
+        "Hinweis der Führungskraft: Bitte den Drucker im Lehrerzimmer freischalten.",
+    );
+    // Die Bemerkung steht nie in der Beschreibung der Aufgabe, nie im Betreff.
+    expect(db.onboardingAufgaben.find((a) => a.id === "i-ipad")?.description).toBeNull();
+
+    const mail = pruefeVollstaendig("onboarding-department-assigned", payload);
+    expect(mail.subject).toBe("Onboarding-Aufgaben für IT-Abteilung: Dienstbeginn 01.10.2026 (FES Minden)");
+    expect(mail.html).toContain(
+      '<li style="margin:0 0 4px;">Dienst-iPad (Lernmittel) bereitstellen – fällig 22.09.2026 (eilt)' +
+        '<br><span style="color:#6b7280;font-size:13px;">Bemerkung der Führungskraft, ergänzt durch die Personalabteilung: ' +
+        "Mit Stift &amp; Hülle, Apps: &lt;WebUntis&gt;</span></li>",
+    );
+    expect(mail.html).not.toContain("<WebUntis>");
+    expect(mail.html).toContain(
+      '<p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Hinweis der Führungskraft</p>' +
+        '<p style="margin:0;color:#374151;font-size:14px;">Bitte den Drucker im Lehrerzimmer freischalten.</p>',
+    );
+    expect(mail.text).toContain("Hinweis der Führungskraft: Bitte den Drucker im Lehrerzimmer freischalten.");
+    expect(mail.text).toContain("Apps: <WebUntis>");
+    for (const teil of [mail.subject, mail.html, mail.text ?? ""]) expect(teil).not.toMatch(/\{\{|\}\}/);
+  });
+
+  it("Angaben nur für die eigene und die freigegebene Stelle — die anderen bekommen keine", async () => {
+    db.konfigs.push(
+      konfig({ departmentKey: "FACILITY", departmentName: "Facility Management", email: "facility@example.org" }),
+      konfig({ departmentKey: "BUCHHALTUNG", departmentName: "Buchhaltung", email: "buha@example.org" }),
+    );
+    db.onboardingAufgaben.push(
+      aufgabe({ title: "Schlüssel ausgeben", assignee: "FACILITY", dueDate: new Date("2026-09-28T00:00:00.000Z") }),
+      aufgabe({ title: "Bezüge anlegen", assignee: "BUCHHALTUNG", dueDate: new Date("2026-09-25T00:00:00.000Z") }),
+    );
+    db.stellenHinweise.push(
+      neuerStellenHinweis({ onboardingId: VORGANG_ID, departmentKey: "FACILITY", text: "Spind im Keller", quelle: "FUEHRUNGSKRAFT" }),
+    );
+
+    await aktion(undefined, T_INFORMIERT);
+    const an = (key: string) => payloadsVon("onboarding-department-assigned").find((p) => p.departmentKey === key)!;
+
+    expect(an("IT").angaben).toBe("Gewünschte Durchwahl: 214\nUnterrichtsfächer: Chemie & Sport");
+    // Facility: die eigenen Faecher und der eigene Hinweis — nicht die Durchwahl der IT.
+    expect(an("FACILITY").angaben).toBe("Unterrichtsfächer: Chemie & Sport\nHinweis der Führungskraft: Spind im Keller");
+    expect(an("IT").angaben).not.toContain("Spind");
+    // Buchhaltung: nichts — beide Felder leer, der Block der Vorlage entfaellt.
+    expect(an("BUCHHALTUNG")).toMatchObject({ angaben: "", angaben_html: "" });
+    const mail = pruefeVollstaendig("onboarding-department-assigned", an("BUCHHALTUNG"));
+    for (const teil of [mail.html, mail.text ?? ""]) {
+      expect(teil).not.toContain("Unterrichtsfächer");
+      expect(teil).not.toContain("Durchwahl");
+      expect(teil).not.toContain("Hinweis der Führungskraft");
+    }
+  });
+
+  it("Arbeitsort (F15): weicht er ab, nennen ihn Satz und Infokasten", async () => {
+    db.onboardingVorgaenge = [vorgang({ arbeitsortId: "org-gs", arbeitsort: { name: "Grundschule Minden" } })];
+
+    await aktion(undefined, T_INFORMIERT);
+    const payload = payloadVon("onboarding-department-assigned");
+    expect(payload).toMatchObject({ einrichtung: "FES Minden", arbeitsort: "Grundschule Minden" });
+
+    const mail = pruefeVollstaendig("onboarding-department-assigned", payload);
+    expect(mail.html).toContain("am 01.10.2026 in FES Minden (Arbeitsort: Grundschule Minden) vor.");
+    expect(mail.html).toMatch(/>Arbeitsort<\/p>\s*<p style="margin:0;color:#374151;font-size:14px;">Grundschule Minden<\/p>/);
+    expect(mail.text).toContain("am 01.10.2026 in FES Minden (Arbeitsort: Grundschule Minden) vor.");
+    expect(mail.text).toContain("\nArbeitsort: Grundschule Minden\n");
   });
 
   it("Infobox: IT sieht Stellenbezeichnung, Betriebsstätte und Ansprechpartner", async () => {
@@ -517,6 +717,84 @@ describe("onboarding-department-assigned (onboardingAbteilungsAktionAusfuehren)"
     expect(mail.text).toContain('Stellenbezeichnung: <a href="https://boese.example.org">Lehrkraft</a>');
     expect(mail.text).toContain("Betriebsstätte: Minden & Umgebung");
   });
+
+  // ---- Paket A3, S17: Nachtrag (Regel 10, F7) ----
+
+  /** Ein noch nicht gesendeter Eintrag der Aenderungsliste der IT. */
+  function aenderung(art: string, titel: string, erfasstAm: Date): Zeile {
+    return { id: `aen-${naechsteId()}`, onboardingId: VORGANG_ID, departmentKey: "IT", art, titel, erfasstAm, gesendetAm: null };
+  }
+
+  it("Erstmail: kein Nachtrags-Kasten, die Aufgabenliste steht im Block {{#hat_offene_aufgaben}}", async () => {
+    await aktion(undefined, T_INFORMIERT);
+    const payload = payloadVon("onboarding-department-assigned");
+    expect(payload).toMatchObject({ nachtrag: "", nachtrag_liste: "", nachtrag_liste_html: "", hat_offene_aufgaben: "ja" });
+    const mail = pruefeVollstaendig("onboarding-department-assigned", payload);
+    for (const teil of [mail.html, mail.text ?? ""]) {
+      expect(teil).not.toContain("seit der letzten Nachricht");
+      expect(teil).toContain("Folgende Aufgaben sind für Sie vorgesehen (zuständig: IT-Abteilung):");
+    }
+  });
+
+  it("Nachtrag senden: echter Render — Kasten mit „Neu“ und „Entfällt“, maskiert, gleicher Link, ohne verwaiste Marker", async () => {
+    await aktion(undefined, T_INFORMIERT);
+    const erstLink = String(payloadVon("onboarding-department-assigned").link);
+    const spaeter = new Date(T_INFORMIERT.getTime() + 2 * 86_400_000);
+    db.ausstattungAenderungen = [
+      aenderung("NEU", "Dienst-Laptop/PC bereitstellen", new Date(T_INFORMIERT.getTime() + 60 * MINUTE)),
+      aenderung("ENTFAELLT", "Schlüssel & Chip ausgeben", new Date(T_INFORMIERT.getTime() + 90 * MINUTE)),
+    ];
+    mockTriggerWebhooks.mockClear();
+
+    const r = await aktion({ aktion: "nachtrag", departmentKey: "IT" }, spaeter);
+    expect(r.status).toBe(201);
+
+    const payload = payloadVon("onboarding-department-assigned");
+    // Gleicher Token — die Stelle oeffnet denselben Link.
+    expect(payload.link).toBe(erstLink);
+    expect(payload).toMatchObject({
+      nachtrag: "ja",
+      nachtrag_liste: "Neu: Dienst-Laptop/PC bereitstellen\nEntfällt: Schlüssel & Chip ausgeben",
+      hat_offene_aufgaben: "ja",
+      erneut_gesendet: "",
+      neuer_link: "",
+    });
+    const mail = pruefeVollstaendig("onboarding-department-assigned", payload);
+    expect(mail.subject).toBe("Onboarding-Aufgaben für IT-Abteilung: Dienstbeginn 01.10.2026 (FES Minden)");
+    expect(mail.html).toContain("Ihre Aufgaben wurden seit der letzten Nachricht ergänzt oder geändert:");
+    expect(mail.html).toContain("<strong>Neu:</strong> Dienst-Laptop/PC bereitstellen</li>");
+    expect(mail.html).toContain("<strong>Entfällt:</strong> Schlüssel &amp; Chip ausgeben</li>");
+    expect(mail.html).not.toContain("&amp;amp;");
+    expect(mail.text).toContain(
+      "Ihre Aufgaben wurden seit der letzten Nachricht ergänzt oder geändert:\nNeu: Dienst-Laptop/PC bereitstellen\nEntfällt: Schlüssel & Chip ausgeben\n",
+    );
+    // Die offenen Aufgaben stehen weiter in der Mail.
+    expect(mail.text).toContain("- Benutzerkonto und E-Mail-Adresse anlegen – fällig 24.09.2026");
+    expect(db.ausstattungAenderungen.every((e) => e.gesendetAm instanceof Date)).toBe(true);
+  });
+
+  it("Nachtrag mit nur „Entfällt“ und ohne offene Aufgabe: kein „Folgende Aufgaben …“, keine leere Liste", async () => {
+    await aktion(undefined, T_INFORMIERT);
+    for (const a of db.onboardingAufgaben) if (a.assignee === "IT") Object.assign(a, { isCompleted: true, completedAt: T_ERLEDIGT });
+    Object.assign(linkVon("IT"), { allTasksComplete: true, completedAt: T_ERLEDIGT });
+    db.ausstattungAenderungen = [aenderung("ENTFAELLT", "Spind bereitstellen", new Date(T_ERLEDIGT.getTime() + MINUTE))];
+    mockTriggerWebhooks.mockClear();
+
+    const r = await aktion({ aktion: "nachtrag", departmentKey: "IT" }, new Date(T_ERLEDIGT.getTime() + 60 * MINUTE));
+    expect(r.status).toBe(201);
+
+    const payload = payloadVon("onboarding-department-assigned");
+    expect(payload).toMatchObject({ hat_offene_aufgaben: "", aufgabenliste: "", nachtrag_liste: "Entfällt: Spind bereitstellen" });
+    const mail = pruefeVollstaendig("onboarding-department-assigned", payload);
+    for (const teil of [mail.html, mail.text ?? ""]) {
+      expect(teil).not.toContain("Folgende Aufgaben");
+      expect(teil).toContain("Ihre Aufgaben wurden seit der letzten Nachricht ergänzt oder geändert:");
+      expect(teil).toContain("Spind bereitstellen");
+      expect(teil).not.toContain("Benutzerkonto");
+    }
+    expect(mail.html).not.toContain("<ul style=\"margin:0 0 16px;");
+    expect(mail.text).toContain("am 01.10.2026 in FES Minden vor.\n");
+  });
 });
 
 // =============================================
@@ -611,6 +889,44 @@ describe("onboarding-department-reminder (onboardingErinnerungenSenden und Knopf
     }
   });
 
+  it("Erinnerung: Bemerkung und „(eilt)“ in der Liste, Arbeitsort im Payload — Angaben nicht", async () => {
+    db.onboardingVorgaenge = [vorgang({ arbeitsortId: "org-gs", arbeitsort: { name: "Grundschule Minden" } })];
+    db.ausstattungZeilen = [
+      ...beispielAngaben(),
+      neueAusstattungsZeile({
+        id: "aus-ipad",
+        onboardingId: VORGANG_ID,
+        departmentKey: "IT",
+        art: "JA_NEIN",
+        bezeichnung: "Dienst-iPad (Lernmittel)",
+        bemerkung: "Mit Stift",
+        bemerkungQuelle: "HR",
+        quelle: "HR",
+      }),
+    ];
+    db.onboardingAufgaben.push(
+      aufgabe({
+        id: "i-ipad",
+        title: "Dienst-iPad (Lernmittel) bereitstellen",
+        dueDate: new Date("2026-09-24T00:00:00.000Z"),
+        herkunft: "AUSSTATTUNG",
+        eilt: true,
+        entfaelltAm: null,
+      }),
+    );
+    db.ausstattungAufgaben.push({ ausstattungId: "aus-ipad", option: "", checklistItemId: "i-ipad", createdAt: T_INFORMIERT });
+
+    await onboardingErinnerungenSenden(T_ERINNERT);
+    const payload = payloadVon("onboarding-department-reminder");
+    expect(payload.arbeitsort).toBe("Grundschule Minden");
+    expect(String(payload.aufgabenliste)).toContain(
+      "- Dienst-iPad (Lernmittel) bereitstellen – fällig 24.09.2026 (eilt)\n  Bemerkung der Personalabteilung: Mit Stift",
+    );
+    expect(payload).not.toHaveProperty("angaben");
+    expect(payload).not.toHaveProperty("angaben_html");
+    pruefeVollstaendig("onboarding-department-reminder", payload);
+  });
+
   it("Erinnerung an die Führungskraft: derselbe Text trägt auch sie", async () => {
     db.onboardingAufgaben.push(
       aufgabe({
@@ -656,6 +972,8 @@ describe("onboarding-task-completed", () => {
       aufgabe({ title: "Arbeitsvertrag ausfertigen", assignee: "HR" }),
     ];
     db.links = [itLink()];
+    // Das HR-Postfach (SmtpConfig.replyToEmail) — Empfaenger seit S18 (E-A17).
+    db.replyToEmail = "personal@example.org";
   });
 
   const perLink = (itemId: string, body: unknown, jetzt = T_ERLEDIGT) =>
@@ -667,12 +985,17 @@ describe("onboarding-task-completed", () => {
 
     const payload = payloadVon("onboarding-task-completed");
     expect(payload).toEqual(beispiel("onboarding-task-completed"));
-    // Kein Empfaengerfeld: HR steht im An-Feld der Vorlage.
+    // Kein `email`-Feld: Empfaenger ist das HR-Postfach (`hr_postfach`).
     expect(payload).not.toHaveProperty("email");
+    expect(payload).toMatchObject({ hr_postfach: "personal@example.org", ist_erledigt: "ja", nur_kommentar: "" });
     expect(JSON.stringify(payload)).not.toContain(PRIVATE_ADRESSE);
 
     const mail = pruefeVollstaendig("onboarding-task-completed", payload);
-    expect(mail.subject).toBe("Onboarding-Aufgabe erledigt: Benutzerkonto und E-Mail-Adresse anlegen (IT-Abteilung)");
+    expect(mail.subject).toBe(
+      "Onboarding-Aufgabe erledigt, mit Kommentar: Benutzerkonto und E-Mail-Adresse anlegen (IT-Abteilung)",
+    );
+    // Der Kommentar steht nie im Betreff (F19).
+    expect(mail.subject).not.toContain("Konto angelegt");
     expect(mail.html).toContain("Kommentar der Abteilung:");
     expect(mail.html).toContain("Konto angelegt &amp; Postfach eingerichtet.<br>Das Notebook kommt nächste Woche.");
     expect(mail.text).toContain(
@@ -688,6 +1011,11 @@ describe("onboarding-task-completed", () => {
     expect(mail.text).toContain("Erledigt über: Link der Abteilung");
     expect(mail.text).toContain("Vertragsbeginn: 01.10.2026");
     expect(mail.text).toContain("Noch offen im Vorgang: 5 Aufgabe(n)");
+    // Nur der Block „erledigt“ — der Satz zum reinen Kommentar fehlt.
+    expect(mail.text).not.toContain("einen Kommentar hinterlassen");
+    expect(mail.text).not.toContain("Gemeldet über");
+    expect(mail.html).toContain(">Aufgabe erledigt</span>");
+    expect(mail.html).not.toContain("Rückmeldung zur Aufgabe");
   });
 
   it("<script> im Kommentar: im HTML nur maskiert, im Text roh", async () => {
@@ -703,10 +1031,122 @@ describe("onboarding-task-completed", () => {
     await perLink(KONTO.id, { isCompleted: true });
 
     const payload = payloadVon("onboarding-task-completed");
-    expect(payload).toMatchObject({ kommentar: "", kommentar_text: "" });
+    expect(payload).toMatchObject({ kommentar: "", kommentar_text: "", meldung_kurz: "erledigt" });
     const mail = pruefeVollstaendig("onboarding-task-completed", payload);
+    expect(mail.subject).toBe("Onboarding-Aufgabe erledigt: Benutzerkonto und E-Mail-Adresse anlegen (IT-Abteilung)");
     expect(mail.html).not.toContain("Kommentar");
     expect(mail.text).not.toContain("Kommentar");
+  });
+
+  // ---- E-A17 (S18): jeder Kommentar einer Stelle erreicht das HR-Postfach ----
+
+  it("Kommentar ohne Abhaken: genau eine Mail „kommentiert“ an das HR-Postfach; die Aufgabe bleibt offen", async () => {
+    const r = await perLink(NOTEBOOK.id, { comment: "Kommt erst am 03.10. – Lieferverzug." });
+    expect(r.status).toBe(200);
+    expect(db.onboardingAufgaben.find((a) => a.id === NOTEBOOK.id)?.isCompleted).toBe(false);
+
+    const payload = payloadVon("onboarding-task-completed");
+    expect(payload).toMatchObject({
+      hr_postfach: "personal@example.org",
+      ist_erledigt: "",
+      nur_kommentar: "ja",
+      meldung_kurz: "kommentiert",
+      aufgabe: "Notebook & Zubehör bereitstellen",
+      kommentar_text: "Kommt erst am 03.10. – Lieferverzug.",
+      offene_aufgaben_abteilung: 3,
+    });
+    // Dieselbe Form wie beim Abhaken (Positivliste = Katalogbeispiel).
+    expect(schluessel(payload)).toEqual(schluessel(beispiel("onboarding-task-completed")));
+
+    const mail = pruefeVollstaendig("onboarding-task-completed", payload);
+    expect(mail.subject).toBe("Onboarding-Aufgabe kommentiert: Notebook & Zubehör bereitstellen (IT-Abteilung)");
+    expect(mail.subject).not.toContain("Lieferverzug");
+    expect(mail.text).toContain(
+      "Zur Aufgabe „Notebook & Zubehör bereitstellen“ für Anna Beispiel hat die zuständige Stelle einen Kommentar hinterlassen.",
+    );
+    expect(mail.text).toContain("Gemeldet über: Link der Abteilung");
+    expect(mail.text).toContain("Kommentar der Abteilung: Kommt erst am 03.10. – Lieferverzug.");
+    expect(mail.text).not.toContain("wurde als erledigt markiert");
+    expect(mail.text).not.toContain("Erledigt über");
+    expect(mail.html).toContain(">Rückmeldung zur Aufgabe</span>");
+    expect(mail.html).not.toContain(">Aufgabe erledigt</span>");
+    // Der An-Default des Katalogs ergibt das HR-Postfach.
+    const { rendered } = renderEventEmail(
+      { ...standardVorlage("onboarding-task-completed"), ...LEERE_EMPFAENGER },
+      "onboarding-task-completed",
+      payload,
+    );
+    expect(rendered?.to).toBe("personal@example.org");
+  });
+
+  it("Abhaken mit Kommentar: genau EINE Mail („erledigt, mit Kommentar“)", async () => {
+    await perLink(KONTO.id, { isCompleted: true, comment: "Konto steht." });
+    const mails = payloadsVon("onboarding-task-completed");
+    expect(mails).toHaveLength(1);
+    expect(mails[0]).toMatchObject({ ist_erledigt: "ja", nur_kommentar: "", meldung_kurz: "erledigt, mit Kommentar" });
+  });
+
+  it("Kommentar leer oder unverändert: keine Mail", async () => {
+    await perLink(NOTEBOOK.id, { comment: "Kommt nächste Woche." });
+    expect(payloadsVon("onboarding-task-completed")).toHaveLength(1);
+
+    // Derselbe Text noch einmal (auch mit Leerraum drumherum): nichts geaendert.
+    await perLink(NOTEBOOK.id, { comment: "  Kommt nächste Woche.  " }, new Date(T_ERLEDIGT.getTime() + MINUTE));
+    // Kommentar geloescht: kein Hinweis an HR.
+    await perLink(NOTEBOOK.id, { comment: "" }, new Date(T_ERLEDIGT.getTime() + 2 * MINUTE));
+    // Nur Leerraum ist ebenfalls leer.
+    await perLink(WLAN.id, { comment: "   " }, new Date(T_ERLEDIGT.getTime() + 3 * MINUTE));
+    expect(payloadsVon("onboarding-task-completed")).toHaveLength(1);
+    expect(db.onboardingAufgaben.find((a) => a.id === NOTEBOOK.id)?.abteilungKommentar).toBeNull();
+  });
+
+  it("Kommentar zu einer schon erledigten Aufgabe: Mail „kommentiert“", async () => {
+    await perLink(KONTO.id, { isCompleted: true });
+    await perLink(KONTO.id, { comment: "Passwort liegt im Sekretariat." }, new Date(T_ERLEDIGT.getTime() + MINUTE));
+    const mails = payloadsVon("onboarding-task-completed");
+    expect(mails.map((m) => m.meldung_kurz)).toEqual(["erledigt", "kommentiert"]);
+  });
+
+  it("Wiederöffnen mit Kommentar: eine Mail „kommentiert“ — Wiederöffnen allein meldet nichts", async () => {
+    db.onboardingAufgaben = beispielAufgaben([KONTO.id]);
+    await perLink(KONTO.id, { isCompleted: false });
+    expect(payloadsVon("onboarding-task-completed")).toHaveLength(0);
+
+    await perLink(KONTO.id, { isCompleted: true }, new Date(T_ERLEDIGT.getTime() + MINUTE));
+    await perLink(
+      KONTO.id,
+      { isCompleted: false, comment: "Konto doch noch gesperrt." },
+      new Date(T_ERLEDIGT.getTime() + 2 * MINUTE),
+    );
+    expect(payloadsVon("onboarding-task-completed").map((m) => m.meldung_kurz)).toEqual(["erledigt", "kommentiert"]);
+  });
+
+  it("Kommentar zu einer entfallenen Aufgabe erreicht HR ebenfalls", async () => {
+    const gestrichen = new Date("2026-09-25T09:00:00.000Z");
+    Object.assign(db.onboardingAufgaben.find((a) => a.id === WLAN.id)!, {
+      herkunft: "AUSSTATTUNG",
+      isCompleted: true,
+      completedAt: gestrichen,
+      completedById: "u-1",
+      entfaelltAm: gestrichen,
+    });
+    const r = await perLink(WLAN.id, { comment: "WLAN-Zugang war schon eingerichtet." });
+    expect(r.status).toBe(200);
+    expect(payloadVon("onboarding-task-completed")).toMatchObject({ meldung_kurz: "kommentiert", nur_kommentar: "ja" });
+  });
+
+  it("ohne HR-Postfach steht `hr_postfach` leer im Payload (ohne An-Feld der Vorlage: SKIPPED)", async () => {
+    db.replyToEmail = null;
+    await perLink(NOTEBOOK.id, { comment: "Kommt später." });
+    const payload = payloadVon("onboarding-task-completed");
+    expect(payload).toMatchObject({ hr_postfach: "" });
+    const { rendered, skipReason } = renderEventEmail(
+      { ...standardVorlage("onboarding-task-completed"), ...LEERE_EMPFAENGER },
+      "onboarding-task-completed",
+      payload,
+    );
+    expect(rendered).toBeNull();
+    expect(skipReason).toBeTruthy();
   });
 
   it("zweimal „erledigt“ über den Link ergibt genau eine Mail", async () => {
@@ -735,11 +1175,22 @@ describe("onboarding-task-completed", () => {
     expect(mail.text).toContain("Erledigt über: Link der Führungskraft");
   });
 
-  it("Abhaken im Portal meldet HR nichts (Entscheidung Paket 5)", async () => {
+  it("Arbeitsort (F15) auch auf dem Link-Weg: Erledigt-Meldung und Abschluss tragen ihn", async () => {
+    db.onboardingVorgaenge = [vorgang({ arbeitsortId: "org-gs", arbeitsort: { name: "Grundschule Minden" } })];
+    db.onboardingAufgaben = beispielAufgaben([NOTEBOOK.id, WLAN.id]);
+
+    const r = await perLink(KONTO.id, { isCompleted: true });
+    expect(r.status).toBe(200);
+
+    expect(payloadVon("onboarding-task-completed")).toMatchObject({ arbeitsort: "Grundschule Minden" });
+    expect(payloadVon("onboarding-department-completed")).toMatchObject({ arbeitsort: "Grundschule Minden" });
+  });
+
+  it("Abhaken im Portal meldet HR nichts (Entscheidung Paket 5) — auch nicht mit Notiz", async () => {
     const r = await onboardingAufgabeImPortalAendern({
       onboardingId: VORGANG_ID,
       itemId: KONTO.id,
-      rohBody: { isCompleted: true },
+      rohBody: { isCompleted: true, notes: "HR-intern" },
       session: SESSION,
       jetzt: T_ERLEDIGT,
     });
@@ -799,6 +1250,172 @@ describe("onboarding-department-completed", () => {
 });
 
 // =============================================
+// onboarding-department-abgesagt (Paket A3, S19; E-A20)
+// =============================================
+
+describe("onboarding-department-abgesagt (Absage nach EXPIRED)", () => {
+  const EVENT = "onboarding-department-abgesagt";
+  const T_ABSAGE = new Date("2026-09-29T08:00:00.000Z");
+
+  beforeEach(() => {
+    // Abgesagt, nachdem die IT Konto und Notebook schon erledigt hatte.
+    db.onboardingVorgaenge = [vorgang({ status: "EXPIRED" })];
+    db.konfigs = [konfig()];
+    db.onboardingAufgaben = beispielAufgaben([KONTO.id, NOTEBOOK.id]);
+    db.links = [itLink()];
+  });
+
+  it("echte Payload = Beispiel aus dem Katalog; Liste maskiert im HTML, roh im Text — ohne Link", async () => {
+    const r = await aktion({ aktion: "absage" }, T_ABSAGE);
+    expect(r.status).toBe(201);
+
+    const payload = payloadVon(EVENT);
+    expect(payload).toEqual(beispiel(EVENT));
+
+    const mail = pruefeVollstaendig(EVENT, payload);
+    expect(mail.subject).toBe("Absage: Onboarding für Anna Beispiel entfällt (ONB-2026-031)");
+    expect(mail.text).toContain(
+      "das Onboarding für Anna Beispiel in FES Minden findet nicht statt. Die Ihnen dafür zugewiesenen Aufgaben (zuständig: IT-Abteilung) entfallen, und der Link zu Ihren Aufgaben ist nicht mehr aktiv.",
+    );
+    expect(mail.text).toContain(
+      "Folgendes hatten Sie bereits erledigt. Bitte machen Sie es rückgängig – etwa Zugänge löschen oder sperren und Ausgegebenes zurücknehmen:\n\n- Benutzerkonto und E-Mail-Adresse anlegen\n- Notebook & Zubehör bereitstellen",
+    );
+    expect(mail.text).toContain("Geplanter Dienstbeginn: 01.10.2026");
+    expect(mail.html).toContain('<li style="margin:0 0 4px;">Notebook &amp; Zubehör bereitstellen</li>');
+    expect(mail.html).not.toContain("&amp;amp;");
+    // Kein Link, kein Token — in keinem Teil.
+    for (const teil of [mail.subject, mail.html, mail.text ?? ""]) {
+      expect(teil).not.toContain("tok-it");
+      expect(teil).not.toContain("onboarding-tasks");
+      expect(teil).not.toContain("href=");
+    }
+    // Die offene WLAN-Aufgabe steht nicht in der Liste.
+    expect(mail.text).not.toContain("WLAN");
+  });
+
+  it("ohne erledigte Aufgaben: kein Rückbau-Absatz, keine leere Liste, keine verwaisten Marker", async () => {
+    db.onboardingAufgaben = beispielAufgaben();
+    await aktion({ aktion: "absage" }, T_ABSAGE);
+
+    const payload = payloadVon(EVENT);
+    expect(payload).toMatchObject({ hat_erledigte: "", erledigte_liste: "", erledigte_liste_html: "", anzahl_erledigt: 0 });
+    const mail = pruefeVollstaendig(EVENT, payload);
+    expect(mail.text).not.toContain("Folgendes hatten Sie bereits erledigt");
+    expect(mail.html).not.toContain("<ul");
+    expect(mail.text).toContain("Für noch offene Aufgaben ist nichts mehr zu tun.");
+  });
+
+  it("Arbeitsort (F15): weicht er ab, nennt ihn der Satz", async () => {
+    db.onboardingVorgaenge = [vorgang({ status: "EXPIRED", arbeitsortId: "org-gs", arbeitsort: { name: "FES Grundschule Minden" } })];
+    await aktion({ aktion: "absage" }, T_ABSAGE);
+    const mail = pruefeVollstaendig(EVENT, payloadVon(EVENT));
+    expect(mail.text).toContain("in FES Minden (Arbeitsort: FES Grundschule Minden) findet nicht statt.");
+  });
+
+  it("an die Führungskraft: derselbe Text, `{{abteilung}}` nur in Klammern", async () => {
+    db.onboardingAufgaben = [
+      aufgabe({ id: "i-fk", title: "Arbeitsplatz vorbereiten", assignee: "VORGESETZTER", isCompleted: true, completedAt: T_ERINNERT }),
+    ];
+    db.links = [
+      neuerLink({
+        onboardingId: VORGANG_ID,
+        departmentKey: "VORGESETZTER",
+        departmentName: "Führungskraft",
+        email: "a.leitung@example.org",
+        token: "tok-fk",
+        expiresAt: new Date("2026-12-21T08:00:00.000Z"),
+        sentAt: T_INFORMIERT,
+        lastSentAt: T_INFORMIERT,
+        lastSendStatus: "SENT",
+      }),
+    ];
+    await aktion({ aktion: "absage" }, T_ABSAGE);
+    const payload = payloadVon(EVENT);
+    expect(payload).toMatchObject({ email: "a.leitung@example.org", ist_fuehrungskraft: "ja", abteilung: "Führungskraft" });
+    const mail = pruefeVollstaendig(EVENT, payload);
+    expect(mail.text).toContain("(zuständig: Führungskraft)");
+    expect(mail.text).toContain("- Arbeitsplatz vorbereiten");
+  });
+});
+
+describe("Mailer — erledigte_liste (Paket A3, S19) im HTML maskiert, erledigte_liste_html nicht doppelt", () => {
+  it("ein Admin setzt {{erledigte_liste}} ins HTML: daraus wird kein Markup; Textteil roh", () => {
+    const { rendered } = renderEventEmail(
+      {
+        subject: "Betreff",
+        bodyHtml: "<div>{{erledigte_liste}}</div>{{erledigte_liste_html}}",
+        bodyText: "{{erledigte_liste}}",
+        ...LEERE_EMPFAENGER,
+      },
+      "onboarding-department-abgesagt",
+      erledigteListeMailFelder([{ title: "Schlüssel & <b>Chip</b> ausgeben" }]),
+      { overrideTo: "hr@example.org" },
+    );
+    expect(rendered!.html).toContain("<div>- Schlüssel &amp; &lt;b&gt;Chip&lt;/b&gt; ausgeben</div>");
+    expect(rendered!.html).toContain('<li style="margin:0 0 4px;">Schlüssel &amp; &lt;b&gt;Chip&lt;/b&gt; ausgeben</li>');
+    expect(rendered!.html).not.toContain("&amp;amp;");
+    expect(rendered!.text).toBe("- Schlüssel & <b>Chip</b> ausgeben");
+  });
+});
+
+describe("Beispiel-Payload (Testversand) der Absage", () => {
+  const EVENT = "onboarding-department-abgesagt";
+
+  it("rendert ohne leere Platzhalter; Katalog-Eintrag und Standardvorlage mit gleichem Namen", () => {
+    pruefeVollstaendig(EVENT, beispiel(EVENT));
+    const def = EVENT_CATALOG.find((d) => d.event === EVENT)!;
+    expect({ group: def.group, wired: def.wired, an: def.defaultRecipients }).toEqual({
+      group: "Onboarding",
+      wired: true,
+      an: { to: "{{email}}" },
+    });
+    expect(standardVorlage(EVENT).name).toBe(def.name);
+  });
+
+  it("gemeinsamer Teil = onboardingAbteilungsMailFelder, Liste = erledigteListeMailFelder(Beispiel)", () => {
+    const echt = onboardingAbteilungsMailFelder({
+      id: VORGANG_ID,
+      displayId: "ONB-2026-031",
+      firstName: "Anna",
+      lastName: "Beispiel",
+      personalData: { firstName: "Anna", lastName: "Beispiel" },
+      organization: ORG,
+      supervisorData: { vertragsbeginn: new Date("2026-10-01T00:00:00.000Z") },
+    });
+    expect(beispiel(EVENT)).toMatchObject(echt);
+    expect(beispiel(EVENT)).toMatchObject(erledigteListeMailFelder(ONBOARDING_ABSAGE_BEISPIEL_ERLEDIGT));
+    expect(ONBOARDING_ABSAGE_BEISPIEL_ERLEDIGT.map((a) => a.title)).toEqual([KONTO.title, NOTEBOOK.title]);
+  });
+
+  it("ohne Link-Felder und ohne fremde Adressen; Liste und Link nie im Betreff", () => {
+    const p = beispiel(EVENT);
+    for (const feld of ["link", "magicLink", "token", "expiresAt", "aufgabenliste", "angaben"]) {
+      expect({ feld, drin: feld in p }).toEqual({ feld, drin: false });
+    }
+    for (const [feld, wert] of Object.entries(p)) {
+      if (typeof wert === "string" && wert.includes("@")) {
+        expect({ feld, wert }).toEqual({ feld, wert: expect.stringMatching(/@example\.org$/) });
+      }
+    }
+    const def = EVENT_CATALOG.find((d) => d.event === EVENT)!;
+    expect([...(def.betreffOhne ?? [])].sort()).toEqual(
+      [
+        "aufgabenliste",
+        "aufgabenliste_html",
+        "angaben",
+        "angaben_html",
+        "nachtrag_liste",
+        "nachtrag_liste_html",
+        "link",
+        "magicLink",
+        "erledigte_liste",
+        "erledigte_liste_html",
+      ].sort(),
+    );
+  });
+});
+
+// =============================================
 // Mailer: Rohtexte im HTML-Teil (Paket 5 ergaenzt drei Namen)
 // =============================================
 
@@ -835,6 +1452,50 @@ describe("Mailer — aufgabe, stellenbezeichnung und betriebsstaette im HTML mas
   });
 });
 
+describe("Mailer — angaben (Paket A3) im HTML maskiert, angaben_html nicht doppelt", () => {
+  const payload = {
+    angaben: "Unterrichtsfächer: Chemie & <b>Sport</b>",
+    angaben_html: '<tr><td><p>Unterrichtsfächer</p><p>Chemie &amp; &lt;b&gt;Sport&lt;/b&gt;</p></td></tr>',
+  };
+
+  it("ein Admin setzt {{angaben}} ins HTML: daraus wird kein Markup; Textteil roh", () => {
+    const { rendered } = renderEventEmail(
+      { subject: "Betreff", bodyHtml: "<div>{{angaben}}</div><table>{{angaben_html}}</table>", bodyText: "{{angaben}}", ...LEERE_EMPFAENGER },
+      "onboarding-department-assigned",
+      payload,
+      { overrideTo: "hr@example.org" },
+    );
+    expect(rendered!.html).toContain("<div>Unterrichtsfächer: Chemie &amp; &lt;b&gt;Sport&lt;/b&gt;</div>");
+    // Das fertige HTML-Feld bleibt, wie es ist (kein &amp;amp;).
+    expect(rendered!.html).toContain("Chemie &amp; &lt;b&gt;Sport&lt;/b&gt;</p></td></tr></table>");
+    expect(rendered!.html).not.toContain("&amp;amp;");
+    expect(rendered!.text).toBe("Unterrichtsfächer: Chemie & <b>Sport</b>");
+  });
+});
+
+describe("Mailer — nachtrag_liste (Paket A3, S17) im HTML maskiert, nachtrag_liste_html nicht doppelt", () => {
+  it("ein Admin setzt {{nachtrag_liste}} ins HTML: daraus wird kein Markup; Textteil roh", () => {
+    const { rendered } = renderEventEmail(
+      {
+        subject: "Betreff",
+        bodyHtml: "<div>{{nachtrag_liste}}</div>{{nachtrag_liste_html}}",
+        bodyText: "{{nachtrag_liste}}",
+        ...LEERE_EMPFAENGER,
+      },
+      "onboarding-department-assigned",
+      {
+        nachtrag_liste: "Neu: Schlüssel & <b>Chip</b>",
+        nachtrag_liste_html: "<ul><li><strong>Neu:</strong> Schlüssel &amp; &lt;b&gt;Chip&lt;/b&gt;</li></ul>",
+      },
+      { overrideTo: "hr@example.org" },
+    );
+    expect(rendered!.html).toContain("<div>Neu: Schlüssel &amp; &lt;b&gt;Chip&lt;/b&gt;</div>");
+    expect(rendered!.html).toContain("<li><strong>Neu:</strong> Schlüssel &amp; &lt;b&gt;Chip&lt;/b&gt;</li>");
+    expect(rendered!.html).not.toContain("&amp;amp;");
+    expect(rendered!.text).toBe("Neu: Schlüssel & <b>Chip</b>");
+  });
+});
+
 // =============================================
 // Katalog: Beispiel-Payloads fuer den Testversand
 // =============================================
@@ -860,12 +1521,57 @@ describe("Beispiel-Payloads (Testversand) der vier Onboarding-Abteilungsmails", 
     }
   });
 
-  it("nur onboarding-task-completed hat kein An-Feld (HR-Postfach in der Vorlage)", () => {
-    const ohneEmpfaenger = ereignisse.filter(
-      (e) => EVENT_CATALOG.find((d) => d.event === e)!.defaultRecipients.to === "",
+  it("onboarding-task-completed geht an das HR-Postfach ({{hr_postfach}}), die drei anderen an {{email}}", () => {
+    // S18 (E-A17): frueher ohne An-Feld (to: "") — die Mail ging nur hinaus,
+    // wenn HR eine Adresse in die Vorlage schrieb, und Kommentare blieben stumm.
+    const ziele = Object.fromEntries(
+      ereignisse.map((e) => [e, EVENT_CATALOG.find((d) => d.event === e)!.defaultRecipients.to]),
     );
-    expect(ohneEmpfaenger).toEqual(["onboarding-task-completed"]);
+    expect(ziele).toEqual({
+      "onboarding-department-assigned": "{{email}}",
+      "onboarding-department-reminder": "{{email}}",
+      "onboarding-task-completed": "{{hr_postfach}}",
+      "onboarding-department-completed": "{{email}}",
+    });
     expect(beispiel("onboarding-task-completed")).not.toHaveProperty("email");
+    expect(beispiel("onboarding-task-completed")).toMatchObject({ hr_postfach: "personal@example.org" });
+  });
+
+  it("die Erledigt-Meldung sperrt zusaetzlich den Kommentar im Betreff (F19)", () => {
+    const def = EVENT_CATALOG.find((d) => d.event === "onboarding-task-completed")!;
+    expect([...(def.betreffOhne ?? [])].sort()).toEqual(
+      [
+        "aufgabenliste",
+        "aufgabenliste_html",
+        "angaben",
+        "angaben_html",
+        "nachtrag_liste",
+        "nachtrag_liste_html",
+        "link",
+        "magicLink",
+        "kommentar",
+        "kommentar_text",
+      ].sort(),
+    );
+    // Der Standard-Betreff haelt sich daran.
+    expect(standardVorlage("onboarding-task-completed").subject).toBe(
+      "Onboarding-Aufgabe {{meldung_kurz}}: {{aufgabe}} ({{abteilung}})",
+    );
+  });
+
+  it("Merker und Kurzform der Erledigt-Meldung (erledigtMeldungFelder)", () => {
+    expect(erledigtMeldungFelder("ERLEDIGT", null)).toEqual({ ist_erledigt: "ja", nur_kommentar: "", meldung_kurz: "erledigt" });
+    expect(erledigtMeldungFelder("ERLEDIGT", "   ")).toEqual({ ist_erledigt: "ja", nur_kommentar: "", meldung_kurz: "erledigt" });
+    expect(erledigtMeldungFelder("ERLEDIGT", "Konto steht")).toEqual({
+      ist_erledigt: "ja",
+      nur_kommentar: "",
+      meldung_kurz: "erledigt, mit Kommentar",
+    });
+    expect(erledigtMeldungFelder("KOMMENTAR", "Kommt später")).toEqual({
+      ist_erledigt: "",
+      nur_kommentar: "ja",
+      meldung_kurz: "kommentiert",
+    });
   });
 
   it("der gemeinsame Teil entspricht dem, was onboardingAbteilungsMailFelder liefert", () => {
@@ -902,6 +1608,43 @@ describe("Beispiel-Payloads (Testversand) der vier Onboarding-Abteilungsmails", 
       for (const feld of Object.keys(echt)) {
         expect({ event, feld, drin: feld in beispiel(event) }).toEqual({ event, feld, drin: false });
       }
+    }
+  });
+
+  it("Angaben = angabenMailFelder(angabenFuer(\"IT\", Beispielangaben)) und stehen nur in der Zuweisungsmail", () => {
+    const echt = angabenMailFelder(angabenFuer("IT", ONBOARDING_ABTEILUNG_BEISPIEL_ANGABEN, []));
+    expect(echt.angaben).toContain("Unterrichtsfächer: Chemie & Sport");
+    expect(echt.angaben_html).toContain("Chemie &amp; Sport");
+    expect(beispiel("onboarding-department-assigned")).toMatchObject(echt);
+    for (const event of ereignisse.filter((e) => e !== "onboarding-department-assigned")) {
+      for (const feld of Object.keys(echt)) {
+        expect({ event, feld, drin: feld in beispiel(event) }).toEqual({ event, feld, drin: false });
+      }
+    }
+  });
+
+  it("alle vier Beispiele tragen `arbeitsort` (F15) — im Beispiel leer, weil Einrichtung = Arbeitsort", () => {
+    for (const event of ereignisse) {
+      expect({ event, arbeitsort: beispiel(event).arbeitsort }).toEqual({ event, arbeitsort: "" });
+    }
+  });
+
+  it("Zuweisung und Erinnerung sperren Liste, Angaben, Nachtrag und Link im Betreff (Regel 17)", () => {
+    for (const event of ["onboarding-department-assigned", "onboarding-department-reminder"]) {
+      const def = EVENT_CATALOG.find((d) => d.event === event)!;
+      expect({ event, betreffOhne: def.betreffOhne }).toEqual({
+        event,
+        betreffOhne: [
+          "aufgabenliste",
+          "aufgabenliste_html",
+          "angaben",
+          "angaben_html",
+          "nachtrag_liste",
+          "nachtrag_liste_html",
+          "link",
+          "magicLink",
+        ],
+      });
     }
   });
 

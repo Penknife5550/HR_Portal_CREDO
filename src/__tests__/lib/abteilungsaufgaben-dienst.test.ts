@@ -10,6 +10,9 @@
  * "lastReminderAt nicht gesetzt") statt Aufrufparameter. Das Sperrverhalten
  * von Postgres bildet der Fake nicht nach — geprueft wird die Reihenfolge
  * (erst sperren, dann aendern) und die Bedingung der Updates.
+ *
+ * Der letzte Block faehrt denselben Versandkern einmal mit dem Onboarding:
+ * Die WEBHOOK-Regel gilt nur noch im Offboarding (E-A16, Feinplan F1).
  */
 
 type MailErgebnis = { status: "SENT" | "FAILED" | "SKIPPED"; detail?: string; recipient?: string } | null;
@@ -39,6 +42,10 @@ import {
   oeffentlicheAufgabeAendern,
   oeffentlicheAufgabenLaden,
 } from "@/lib/abteilungsaufgaben-uebergaenge";
+import {
+  onboardingAbteilungsAktionAusfuehren,
+  onboardingErinnerungenSenden,
+} from "@/lib/abteilungsaufgaben-onboarding";
 import { MELDUNGEN, VORLAGE_DEAKTIVIERT_DETAIL } from "@/lib/abteilungsaufgaben";
 import type { SessionPayload } from "@/lib/permissions";
 import type { Prisma } from "@prisma/client";
@@ -1224,5 +1231,148 @@ describe("Führungskraft", () => {
     expect(await fuehrungskraftAdresseFreigegeben("wer@freemail.example")).toBe(false);
     expect(await fuehrungskraftAdresseFreigegeben("leitung@fes-minden.de")).toBe(true);
     expect(await fuehrungskraftAdresseFreigegeben("Wer@Freemail.example", ["wer@freemail.example"])).toBe(true);
+  });
+});
+
+// =============================================
+// WEBHOOK-Regel nur im Offboarding (E-A16, Feinplan F1)
+// =============================================
+
+/**
+ * Die Onboarding-Abteilungsereignisse stehen in EVENTS_OHNE_WEBHOOK:
+ * triggerWebhooks ruft fuer sie keinen Webhook auf. Ein dort eingetragener
+ * Webhook uebernimmt also nichts — eine deaktivierte Portal-Vorlage darf den
+ * Link deshalb nicht als zugestellt markieren (sonst stuende die Stelle auf
+ * „informiert", obwohl sie nie etwas bekommen hat, und der Lauf erinnerte an
+ * einen Link, den niemand kennt). Gleicher Versandkern wie im Offboarding,
+ * dort bleibt die Regel (Tests oben unter „informieren").
+ */
+describe("WEBHOOK-Regel nur im Offboarding (E-A16)", () => {
+  const BEGINN = new Date("2027-08-01T00:00:00.000Z");
+
+  function onboardingVorgang(teil: Zeile = {}): Zeile {
+    return {
+      id: "onb-1",
+      displayId: "ONB-2027-031",
+      organizationId: "org-1",
+      status: "SUPERVISOR_SUBMITTED",
+      firstName: "Anna",
+      lastName: "Beispiel",
+      email: "anna.privat@example.org",
+      supervisorEmail: "a.leitung@example.org",
+      supervisorSubmittedAt: tage(-2),
+      personalData: { firstName: "Anna", lastName: "Beispiel" },
+      supervisorData: { isComplete: true, vertragsbeginn: BEGINN },
+      organization: { name: "FES Minden", mandantNumber: "01" },
+      ...teil,
+    };
+  }
+
+  function onboardingAufgabe(teil: Zeile): Zeile {
+    return {
+      id: `i-${naechsteId()}`,
+      onboardingId: "onb-1",
+      templateItemId: null,
+      title: "Konto anlegen",
+      category: "Vor Arbeitsbeginn",
+      orderIndex: naechsteId(),
+      description: null,
+      assignee: "IT",
+      relativeDueDays: null,
+      isCompleted: false,
+      completedAt: null,
+      completedById: null,
+      dueDate: null,
+      notes: null,
+      abteilungKommentar: null,
+      abteilungKommentarAm: null,
+      ...teil,
+    };
+  }
+
+  const vorlageAus = (): MailErgebnis => ({ status: "SKIPPED", detail: VORLAGE_DEAKTIVIERT_DETAIL });
+  const webhookZaehlung = () => (fakePrisma.webhookConfig as { count: jest.Mock }).count;
+
+  beforeEach(() => {
+    db.onboardingVorgaenge = [onboardingVorgang()];
+  });
+
+  it("Onboarding, Vorlage aus, aktiver Webhook: SKIPPED, sentAt bleibt null", async () => {
+    db.onboardingAufgaben = [onboardingAufgabe({ relativeDueDays: -7 })];
+    db.webhooks = [
+      { event: "onboarding-department-assigned", isActive: true },
+      { event: "onboarding-department-reminder", isActive: true },
+    ];
+    mailErgebnis = vorlageAus;
+
+    const r = await onboardingAbteilungsAktionAusfuehren({
+      onboardingId: "onb-1",
+      rohBody: undefined,
+      session: HR,
+      jetzt: JETZT,
+    });
+
+    expect(r.status).toBe(409);
+    expect(mails("onboarding-department-assigned")).toHaveLength(1);
+    expect(linkVon("IT")).toMatchObject({ onboardingId: "onb-1", sentAt: null, lastSentAt: null, lastSendStatus: "SKIPPED" });
+    expect(String(linkVon("IT").lastSendDetail)).toMatch(/Vorlage deaktiviert/);
+    expect(JSON.stringify(r.body)).not.toContain("Webhook");
+    // Die Sperre greift vor der Abfrage: Der Webhook-Bestand wird gar nicht gelesen.
+    expect(webhookZaehlung()).not.toHaveBeenCalled();
+
+    // Nichts gilt als zugestellt — der naechste Klick versucht es erneut,
+    // statt die Stelle als „schon informiert" zu ueberspringen.
+    mockTrigger.mockClear();
+    mailErgebnis = (_e, p) => ({ status: "SENT", recipient: String(p.email) });
+    const r2 = await onboardingAbteilungsAktionAusfuehren({
+      onboardingId: "onb-1",
+      rohBody: undefined,
+      session: HR,
+      jetzt: JETZT,
+    });
+    expect(r2.status).toBe(201);
+    expect(mails("onboarding-department-assigned")).toHaveLength(1);
+    expect(linkVon("IT")).toMatchObject({ sentAt: JETZT, lastSendStatus: "SENT" });
+  });
+
+  it("Onboarding-Erinnerung, Vorlage aus, aktiver Webhook: SKIPPED statt WEBHOOK", async () => {
+    db.onboardingAufgaben = [onboardingAufgabe({ dueDate: tage(-2) })];
+    db.links = [
+      neuerLink({
+        onboardingId: "onb-1",
+        departmentKey: "IT",
+        departmentName: "IT-Abteilung",
+        email: "it@example.org",
+        token: "tok-it",
+        expiresAt: tage(60),
+        sentAt: tage(-6),
+        lastSentAt: tage(-6),
+        lastSendStatus: "SENT",
+      }),
+    ];
+    db.webhooks = [{ event: "onboarding-department-reminder", isActive: true }];
+    mailErgebnis = vorlageAus;
+
+    await onboardingErinnerungenSenden(JETZT);
+
+    expect(mails("onboarding-department-reminder")).toHaveLength(1);
+    // Merker wie bei jedem SKIPPED (sonst taeglich neu), aber nie „an Webhook uebergeben".
+    expect(linkVon("IT")).toMatchObject({ lastSendStatus: "SKIPPED", lastReminderAt: JETZT, token: "tok-it" });
+    expect(webhookZaehlung()).not.toHaveBeenCalled();
+  });
+
+  it("Offboarding unveraendert: dieselbe Lage beim Lauf ergibt WEBHOOK", async () => {
+    db.aufgaben = [aufgabe({ assigneeDepartment: "IT", dueDate: tage(-2) })];
+    db.links = [link({ sentAt: tage(-6), lastSentAt: tage(-6) })];
+    db.webhooks = [{ event: "offboarding-reminder", isActive: true }];
+    mailErgebnis = vorlageAus;
+
+    await erinnerungenSenden(JETZT);
+
+    expect(mails("offboarding-reminder")).toHaveLength(1);
+    expect(linkVon("IT")).toMatchObject({ lastSendStatus: "WEBHOOK", lastReminderAt: JETZT });
+    expect(webhookZaehlung()).toHaveBeenCalledWith({
+      where: { event: "offboarding-reminder", isActive: true },
+    });
   });
 });

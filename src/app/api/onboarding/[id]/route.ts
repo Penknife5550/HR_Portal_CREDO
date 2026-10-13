@@ -8,7 +8,11 @@
  *         Unterlagen (`unterlagen`, Paket 4) aus unterlagenUebersichtLaden,
  *         dazu Ausstattung & Zugaenge (`ausstattung`, Paket A2) aus
  *         ausstattungUebersichtLaden — nur fuer HR_EDIT_ROLES, sonst `null`
- * PATCH – Status aendern
+ * PATCH – Status aendern. Seit Paket A3 (Ausstattung & Zugaenge):
+ *         COMPLETED mit offenen Ausstattungs- oder Hinweis-Aufgaben nur mit
+ *         `bestaetigt: true`, sonst 409 `{ error, grund: "AUSSTATTUNG_OFFEN",
+ *         offen: [{ titel, stelle }] }` (E-A19); EXPIRED setzt `expiredAt`
+ *         (F12, Grundlage der Loeschfrist E-A22)
  *
  * Mandant: Ein Vorgang eines fremden Mandanten bekommt in BEIDEN Methoden
  * dieselbe 404 mit demselben Text wie ein unbekannter.
@@ -22,8 +26,14 @@ import { decrypt } from "@/lib/encryption";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
 import { LINK_STATUS, pruefungNichtMoeglichGrund } from "@/lib/onboarding-spuren";
 import { statusAenderungSchema } from "@/lib/validations/onboarding";
-import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { MELDUNGEN, onboardingEmpfaengerEinrichtung } from "@/lib/abteilungsaufgaben";
 import { onboardingAbteilungsUebersichtLaden } from "@/lib/abteilungsaufgaben-onboarding";
+import { konfigsLaden } from "@/lib/abteilungsaufgaben-dienst";
+import {
+  ABSCHLUSS_AUSSTATTUNG_OFFEN,
+  abschlussOffeneAufgaben,
+  abschlussOffenMeldung,
+} from "@/lib/ausstattung";
 import { pflichtDokumenteAusVorlage } from "@/lib/required-documents";
 import { unterlagenUebersichtLaden } from "@/lib/unterlagen-dienst";
 import { ausstattungUebersichtLaden } from "@/lib/ausstattung-dienst";
@@ -191,6 +201,17 @@ export async function GET(
  */
 class VorgangGeaendert extends Error {}
 
+/**
+ * Abschluss ohne Bestaetigung, obwohl Ausstattungs- oder Hinweis-Aufgaben
+ * offen sind (E-A19). Eigene Klasse: Die Ausnahme rollt den schon
+ * geschriebenen Statuswechsel zurueck und traegt die gelesene Liste hinaus.
+ */
+class AusstattungOffen extends Error {
+  constructor(readonly offen: { title: string; assignee: string | null }[]) {
+    super(ABSCHLUSS_AUSSTATTUNG_OFFEN);
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -217,7 +238,7 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    const { status } = parsed.data;
+    const { status, bestaetigt } = parsed.data;
 
     // Die Link-Status (INVITED bis SUPERVISOR_SUBMITTED) ergeben sich aus den
     // beiden Spuren und werden per `statusAbgleichen` abgeleitet. Von Hand
@@ -259,8 +280,12 @@ export async function PATCH(
     //             die Modalitaeten. Frueher liess der Server jeden Uebergang
     //             zu; nur die Oberflaeche schraenkte den Knopf ein, und im
     //             festhaengenden Fall zeigte sie ihn trotz fehlendem Fragebogen.
-    //   COMPLETED nur aus REVIEWED.
-    //   EXPIRED   jederzeit (HR zieht einen Vorgang zurueck).
+    //   COMPLETED nur aus REVIEWED — und bei offenen Ausstattungs- oder
+    //             Hinweis-Aufgaben nur mit `bestaetigt` (E-A19, unten in der
+    //             Transaktion).
+    //   EXPIRED   jederzeit (HR zieht einen Vorgang zurueck); setzt
+    //             `expiredAt` (F12: die Loeschfrist der Freitexte zaehlt ab
+    //             dort — `updatedAt` bewegt sich, das AuditLog wird aufgeraeumt).
     const jetzt = new Date();
     let data: Prisma.OnboardingProcessUncheckedUpdateManyInput;
     if (status === "REVIEWED") {
@@ -287,7 +312,7 @@ export async function PATCH(
           { status: 409 }
         );
       }
-      data = { status };
+      data = { status, expiredAt: jetzt };
     }
 
     // Bedingt schreiben statt `update`: Zwischen dem Lesen oben und hier kann
@@ -310,6 +335,26 @@ export async function PATCH(
         });
         if (geschrieben.count === 0) throw new VorgangGeaendert();
 
+        // E-A19: Offene Ausstattungs- und Hinweis-Aufgaben frieren mit dem
+        // Abschluss ein (der Link ist danach nur lesbar). Gezaehlt wird NACH
+        // dem bedingten Update: Es sperrt den Vorgang, und jeder Anleger von
+        // Ausstattungsaufgaben (F4) wie der Link-PATCH der Stelle (Abhaken,
+        // Wiederoeffnen; `oeffentlichAendern`) sperrt ihn zuerst, bedingt auf
+        // „laufend“ — zwischen Zaehlen und Commit kommt also keine neue und
+        // keine wieder geoeffnete hinzu, und danach scheitern beide am
+        // Endstatus. Entfallene sind `isCompleted` (F2) und zaehlen nicht.
+        // Ohne Bestaetigung rollt die Ausnahme den Statuswechsel zurueck.
+        let offeneAusstattung = 0;
+        if (status === "COMPLETED") {
+          const offen = await tx.checklistItem.findMany({
+            where: { onboardingId: id, herkunft: { not: null }, isCompleted: false },
+            select: { title: true, assignee: true },
+            orderBy: [{ orderIndex: "asc" }, { category: "asc" }],
+          });
+          if (offen.length > 0 && bestaetigt !== true) throw new AusstattungOffen(offen);
+          offeneAusstattung = offen.length;
+        }
+
         await tx.auditLog.create({
           data: {
             onboardingId: id,
@@ -318,11 +363,26 @@ export async function PATCH(
             details: {
               from: existing.status,
               to: status,
+              // Mit Bestaetigung abgeschlossen: wie viele Ausstattungsaufgaben offen blieben.
+              ...(offeneAusstattung > 0 ? { offeneAusstattung } : {}),
             },
           },
         });
       });
     } catch (error) {
+      if (error instanceof AusstattungOffen) {
+        // Titel und Stelle wie in der Karte (Stelle am Arbeitsort) — nie
+        // Bemerkung, Angabe oder Hinweistext.
+        const offen = abschlussOffeneAufgaben({
+          aufgaben: error.offen,
+          arbeitsortId: onboardingEmpfaengerEinrichtung(existing),
+          konfigs: await konfigsLaden(),
+        });
+        return NextResponse.json(
+          { error: abschlussOffenMeldung(offen.length), grund: ABSCHLUSS_AUSSTATTUNG_OFFEN, offen },
+          { status: 409 },
+        );
+      }
       if (!(error instanceof VorgangGeaendert)) throw error;
       return NextResponse.json(
         {

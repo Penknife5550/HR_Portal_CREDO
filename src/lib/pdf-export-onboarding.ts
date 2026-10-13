@@ -29,6 +29,7 @@ import {
 import {
   AUSSTATTUNG_KATEGORIE,
   ausstattungsGruppen,
+  checklistFortschritt,
   namenAufzaehlen,
   type AusstattungsZeile,
   type UebersichtHinweisDaten,
@@ -223,7 +224,16 @@ interface ChecklistExport {
   assignee: string | null;
   notes: string | null;
   dueDate: string | null;
+  /**
+   * Von HR gestrichen (Ausstattung & Zugaenge, F2; ISO). Druckt „entfällt“
+   * statt ✓ und ohne Erledigt-Datum, zaehlt nicht im Fortschritt. Optional:
+   * aeltere Aufrufer liefern das Feld nicht.
+   */
+  entfaelltAm?: string | null;
 }
+
+/** Wie eine entfallene Aufgabe im PDF heisst (rechte Spalte, statt des Erledigt-Datums). */
+export const PDF_ENTFAELLT = "entfällt";
 
 // =============================================
 // Farben + Helpers
@@ -885,8 +895,9 @@ async function addChecklistePages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
   doc.addPage();
   pageHeader(doc, ctx, "Checkliste");
 
-  const completed = ctx.checklistItems.filter((i) => i.isCompleted).length;
-  let y = section(doc, `Checkliste (${completed}/${ctx.checklistItems.length})`, 55);
+  // Ohne entfallene Aufgaben (F2) — dieselbe Rechnung wie Portal und Link-Seite.
+  const stand = checklistFortschritt(ctx.checklistItems);
+  let y = section(doc, `Checkliste (${stand.erledigt}/${stand.gesamt})`, 55);
 
   // Nach Kategorie gruppieren
   const byCategory: Record<string, ChecklistExport[]> = {};
@@ -900,20 +911,23 @@ async function addChecklistePages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
     checkBreak(doc, 30, ctx, "Checkliste");
     y = doc.y;
 
-    const catDone = items.filter((i) => i.isCompleted).length;
+    const kat = checklistFortschritt(items);
     doc.rect(50, y, 515, 20).fill("#F0F0F0");
     doc.font("Helvetica-Bold").fontSize(9).fillColor(C.primary).text(category, 58, y + 4, { width: 380 });
     doc.font("Helvetica-Bold").fontSize(9)
-      .fillColor(catDone === items.length ? C.gruen : C.gray)
-      .text(`${catDone}/${items.length}`, 460, y + 4, { width: 100, align: "right" });
+      .fillColor(kat.alleErledigt ? C.gruen : C.gray)
+      .text(`${kat.erledigt}/${kat.gesamt}`, 460, y + 4, { width: 100, align: "right" });
     doc.y = y + 26;
 
     for (const item of items) {
       checkBreak(doc, item.notes ? 35 : 20, ctx, "Checkliste");
       const iy = doc.y;
 
-      const icon = item.isCompleted ? "\u2713" : "\u2610";
-      const iconColor = item.isCompleted ? C.gruen : C.gray;
+      // Entfallen (F2): zugleich `isCompleted`, aber nie mit \u2713 \u2014 ein Strich
+      // links, rechts \u201eentf\u00e4llt\u201c statt des Erledigt-Datums.
+      const entfaellt = item.entfaelltAm != null;
+      const icon = entfaellt ? "\u2013" : item.isCompleted ? "\u2713" : "\u2610";
+      const iconColor = item.isCompleted && !entfaellt ? C.gruen : C.gray;
       doc.font("Helvetica-Bold").fontSize(9).fillColor(iconColor).text(icon, 55, iy);
 
       const titleColor = item.isCompleted ? C.gray : C.black;
@@ -929,7 +943,9 @@ async function addChecklistePages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
       if (zustaendig) {
         doc.font("Helvetica").fontSize(7).fillColor(C.blau).text(zustaendig, 410, iy, { width: 70 });
       }
-      if (item.isCompleted && item.completedAt) {
+      if (entfaellt) {
+        doc.font("Helvetica").fontSize(7).fillColor(C.gray).text(PDF_ENTFAELLT, 485, iy, { width: 80, align: "right" });
+      } else if (item.isCompleted && item.completedAt) {
         doc.font("Helvetica").fontSize(7).fillColor(C.gray).text(fmt(item.completedAt), 485, iy, { width: 80, align: "right" });
       }
 

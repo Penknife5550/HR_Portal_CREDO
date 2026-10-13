@@ -16,6 +16,11 @@
  *
  * Die übrigen Felder der Detailroute (Abteilungen, Unterlagen, Fortschritt)
  * haben eigene Suites und sind hier stillgelegt.
+ *
+ * Seit S15 (Karte im Reiter Checkliste) auch die eigene Route
+ * GET /api/onboarding/[id]/ausstattung: nur HR_EDIT_ROLES — Einrichtungsleitung,
+ * Vorgesetzte und der n8n-Schlüssel (SERVICE) bekommen 403, ohne dass der
+ * Vorgang oder die neuen Tabellen gelesen werden.
  */
 
 const mockGetSession = jest.fn();
@@ -26,6 +31,9 @@ const mockPrisma = {
   // die neuen Tabellen und der Katalog (src/lib/ausstattung-dienst.ts)
   onboardingAusstattung: { findMany: jest.fn() },
   onboardingStellenHinweis: { findMany: jest.fn() },
+  // seit S15: Aufgabenstand der Karte
+  onboardingAusstattungAufgabe: { findMany: jest.fn() },
+  checklistItem: { findMany: jest.fn() },
   ausstattungsPosition: { findMany: jest.fn() },
   ausstattungsAusblendung: { findMany: jest.fn() },
   organization: { findUnique: jest.fn() },
@@ -54,6 +62,7 @@ jest.mock("@/lib/unterlagen-dienst", () => ({
 
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/onboarding/[id]/route";
+import { GET as karteLaden } from "@/app/api/onboarding/[id]/ausstattung/route";
 import { HR_EDIT_ROLES, PORTAL_ROLES, type SessionPayload } from "@/lib/permissions";
 import type { AusstattungsUebersicht } from "@/lib/ausstattung";
 
@@ -158,6 +167,8 @@ beforeEach(() => {
     { departmentKey: "IT", departmentName: "IT-Abteilung", email: "it@example.org", organizationId: null, isActive: true },
   ]);
   mockPrisma.user.findMany.mockResolvedValue([]);
+  mockPrisma.onboardingAusstattungAufgabe.findMany.mockResolvedValue([]);
+  mockPrisma.checklistItem.findMany.mockResolvedValue([]);
 });
 
 async function laden(role: string): Promise<{ status: number; body: Record<string, unknown>; text: string }> {
@@ -259,5 +270,64 @@ describe("GET /api/onboarding/[id] — ausstattung (Regel 16)", () => {
     expect(status).toBe(403);
     expect(mockPrisma.onboardingProcess.findUnique).not.toHaveBeenCalled();
     expect(mockPrisma.onboardingAusstattung.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/onboarding/[id]/ausstattung — nur HR (Regel 16, S15)", () => {
+  async function karte(role: string) {
+    mockGetSession.mockResolvedValue(sitzung(role));
+    const res = await karteLaden(new NextRequest(`https://hr.example.org/api/onboarding/${ID}/ausstattung`), {
+      params: Promise.resolve({ id: ID }),
+    });
+    return { status: res.status, body: await res.json() };
+  }
+
+  it.each([...NICHT_HR, "SERVICE"])("%s bekommt 403 — weder Vorgang noch neue Tabellen werden gelesen", async (role) => {
+    const { status, body } = await karte(role);
+
+    expect(status).toBe(403);
+    expect(body).toEqual({ error: "Keine Berechtigung" });
+    expect(mockPrisma.onboardingProcess.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.onboardingAusstattung.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.onboardingStellenHinweis.findMany).not.toHaveBeenCalled();
+  });
+
+  it("HR bekommt die Karte samt Aufgabenstand", async () => {
+    mockPrisma.onboardingAusstattungAufgabe.findMany.mockResolvedValue([
+      { ausstattungId: "z-1", option: "", checklistItemId: "i-ipad" },
+    ]);
+    mockPrisma.checklistItem.findMany.mockResolvedValue([
+      {
+        id: "i-ipad",
+        title: "Dienst-iPad (Lernmittel) bereitstellen",
+        isCompleted: false,
+        completedAt: null,
+        dueDate: new Date("2027-01-27T00:00:00.000Z"),
+        eilt: false,
+        entfaelltAm: null,
+      },
+    ]);
+
+    const { status, body } = await karte("HR_SACHBEARBEITER");
+
+    expect(status).toBe(200);
+    const u = body.data as AusstattungsUebersicht;
+    expect(u.zustand).toBe("BEARBEITBAR");
+    expect(u.gruppen[0].zeilen[0].aufgaben).toEqual([
+      {
+        option: "",
+        checklistItemId: "i-ipad",
+        titel: "Dienst-iPad (Lernmittel) bereitstellen",
+        status: "offen",
+        faelligAm: "2027-01-27T00:00:00.000Z",
+        eilt: false,
+        erledigtAm: null,
+      },
+    ]);
+    expect(u.gruppen[0].zeilen[0].aktionen).toEqual({ aendern: true, streichen: true, sperrGrund: null });
+    // Der Vorgang wird mit eigenem select geladen — nie mit den Fragebogen-Angaben.
+    const args = mockPrisma.onboardingProcess.findUnique.mock.calls[0][0] as { select?: Record<string, unknown> };
+    expect(args.select).toBeDefined();
+    expect(args.select).not.toHaveProperty("personalData");
   });
 });

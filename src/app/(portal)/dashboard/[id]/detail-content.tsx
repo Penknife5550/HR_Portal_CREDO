@@ -97,7 +97,21 @@ import {
 } from "@/lib/kostenstellen-anzeige";
 import { ArbeitsortFeld, ArbeitsortKopf } from "@/components/ausstattung/arbeitsort-feld";
 import { ModalitaetenAusstattungKarte } from "@/components/ausstattung/modalitaeten-ausstattung-karte";
-import { arbeitsortSperrGrund, type AusstattungsUebersicht } from "@/lib/ausstattung";
+import {
+  AusstattungKarte,
+  ausstattungAktionSenden,
+  type AusstattungAktionsAusgang,
+} from "@/components/ausstattung/ausstattung-karte";
+import type { AusstattungAktionBody } from "@/components/ausstattung/ausstattung-dialoge";
+import { AufgabeZusatz, EntfaelltHaken, istEntfallen } from "@/components/ausstattung/aufgabe-zusatz";
+import { AbschlussDialog, abschlussSenden } from "@/components/ausstattung/abschluss-dialog";
+import {
+  arbeitsortSperrGrund,
+  bemerkungJeAufgabe,
+  checklistFortschritt,
+  type AbschlussOffeneAufgabe,
+  type AusstattungsUebersicht,
+} from "@/lib/ausstattung";
 
 // =============================================
 // Types
@@ -214,6 +228,19 @@ export interface ChecklistItemData {
    * `relativeDueDays` berechnete Vorschau. Kommt fertig vom Server.
    */
   faelligAm?: string | null;
+  /**
+   * Ausstattung & Zugaenge (Paket A3): `null` = aus der Checklisten-Vorlage,
+   * sonst "AUSSTATTUNG" bzw. "HINWEIS". Die Detailroute laedt die Punkte per
+   * `include`, die Spalten kommen ohne Routenaenderung mit.
+   */
+  herkunft?: string | null;
+  /** Frist auf den Tag des Versands angehoben (Regel 14). */
+  eilt?: boolean;
+  /**
+   * Von HR gestrichen (F2): Die Aufgabe ist zugleich `isCompleted`, zaehlt
+   * aber NIRGENDS (`checklistFortschritt`) und laesst sich nicht abhaken.
+   */
+  entfaelltAm?: string | null;
 }
 
 interface NoteData {
@@ -662,6 +689,11 @@ export function DetailContent({
   const [checklistNoteText, setChecklistNoteText] = useState("");
   const [savingChecklistNote, setSavingChecklistNote] = useState(false);
   const [completingProcess, setCompletingProcess] = useState(false);
+  // Rueckfrage „Vorgang abschließen?“ (E-A19): `offen` = Liste aus der 409.
+  const [abschluss, setAbschluss] = useState<{
+    offen: AbschlussOffeneAufgabe[] | null;
+    fehler: string | null;
+  } | null>(null);
   const [reviewingProcess, setReviewingProcess] = useState(false);
   // Ablehnung von „Als geprüft markieren" / „Vorgang abschließen". Der Server
   // prueft die Uebergaenge selbst (409 mit deutschem Grund) — ohne Anzeige
@@ -749,25 +781,31 @@ export function DetailContent({
     }
   };
 
-  const handleCompleteProcess = async () => {
+  // „Vorgang abschließen“ (Paket A3, E-A19): eigener Dialog statt
+  // `window.confirm`. Der erste Klick im Dialog schickt den Abschluss ohne
+  // Bestaetigung; sind noch Ausstattungs- oder Hinweis-Aufgaben offen,
+  // antwortet der Server 409 mit der Liste (nichts geaendert), der Dialog
+  // zeigt sie, und erst „Trotzdem abschließen“ schickt `bestaetigt: true`.
+  // Fehler bleiben im Dialog, nicht unter dem Kopf.
+  const handleCompleteProcess = () => {
     if (!data || !canComplete) return;
-    if (!window.confirm("Möchten Sie diesen Vorgang wirklich als abgeschlossen markieren? Diese Aktion kann nicht rückgängig gemacht werden.")) return;
-    setCompletingProcess(true);
     setStatusFehler(null);
+    setAbschluss({ offen: null, fehler: null });
+  };
+
+  const abschliessen = async (bestaetigt: boolean) => {
+    if (!data || completingProcess) return;
+    setCompletingProcess(true);
     try {
-      const res = await fetch(`/api/onboarding/${data.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "COMPLETED" }),
-      });
-      if (res.ok) {
+      const ausgang = await abschlussSenden(data.id, bestaetigt);
+      if (ausgang.art === "ok") {
+        setAbschluss(null);
         await loadData();
+      } else if (ausgang.art === "offen") {
+        setAbschluss({ offen: ausgang.offen, fehler: ausgang.meldung });
       } else {
-        const err = await res.json().catch(() => ({}));
-        setStatusFehler(err.error || "Der Vorgang konnte nicht abgeschlossen werden.");
+        setAbschluss((bisher) => ({ offen: bisher?.offen ?? null, fehler: ausgang.meldung }));
       }
-    } catch {
-      setStatusFehler("Verbindungsfehler. Bitte versuchen Sie es erneut.");
     } finally {
       setCompletingProcess(false);
     }
@@ -967,8 +1005,9 @@ export function DetailContent({
 
   // ---- Abteilungs-Aktionen (Karte „Aufgaben für Abteilungen") ----
   //
-  // Eine Route fuer alle vier Aktionen: Informieren (`{}`), Erinnern, Erneut
-  // senden und Link erneuern (`{ aktion, departmentKey }`). Die Antwort traegt
+  // Eine Route fuer alle Aktionen: Informieren (`{}`), Erinnern, Erneut
+  // senden, Link erneuern und (Paket A3) Nachtrag senden
+  // (`{ aktion, departmentKey }`). Die Antwort traegt
   // den Versandbericht als fertige Meldung (201 gruen, 409/502 rot) samt
   // Hinweis (gelb). Danach IMMER neu laden — auch ein 409/502 kann den Stand
   // aendern (etwa „Versand fehlgeschlagen" an der Zeile).
@@ -981,6 +1020,19 @@ export function DetailContent({
     );
     setAbteilungsMeldung(meldung);
     await loadData(true);
+  };
+
+  // ---- Ausstattung & Zugaenge (Karte im Reiter Checkliste, Paket A3) ----
+  //
+  // Eine Route fuer alle sechs Aktionen der Karte. Danach neu laden, sobald
+  // der Server geantwortet hat — auch nach einer Ablehnung (409): Die
+  // Checkliste aendert sich mit (neue, entfallene, wieder geoeffnete
+  // Aufgaben), und ein 409 heisst oft „inzwischen anders“. Leise, damit der
+  // offene Dialog nicht verschwindet. Die Meldung zeigt die Karte selbst.
+  const ausstattungAktion = async (body: AusstattungAktionBody): Promise<AusstattungAktionsAusgang> => {
+    const ausgang = await ausstattungAktionSenden(onboardingId, body);
+    if (ausgang.status !== null) await loadData(true);
+    return ausgang;
   };
 
   // ---- Unterlagen nachfordern (Paket 4) ----
@@ -1014,6 +1066,7 @@ export function DetailContent({
 
   // ---- Computed values ----
   const statusInfo = data ? STATUS_LABELS[data.status] || STATUS_LABELS.INVITED : STATUS_LABELS.INVITED;
+  const checklisteStand = checklistFortschritt(checklistItems);
   // mitarbeiterName: erst der Name aus dem Fragebogen, dann der beim Anlegen
   // eingetragene — und ohne „Anna null", wenn nur ein Teil bekannt ist.
   const displayName = (data ? mitarbeiterName(data) : null) ?? data?.email ?? "";
@@ -1133,6 +1186,19 @@ export function DetailContent({
             </p>
           )}
 
+          {/* Rückfrage „Vorgang abschließen?“ (E-A19) — Fehler und die Liste
+              offener Ausstattungsaufgaben stehen im Dialog. */}
+          {abschluss && (
+            <AbschlussDialog
+              offen={abschluss.offen}
+              fehler={abschluss.fehler}
+              sendet={completingProcess}
+              untertitel={[data.displayId, displayName].filter(Boolean).join(" · ") || null}
+              onAbbrechen={() => setAbschluss(null)}
+              onAbschliessen={(bestaetigt) => void abschliessen(bestaetigt)}
+            />
+          )}
+
           {/* Row 2: Person info */}
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{displayName}</span>
@@ -1208,9 +1274,14 @@ export function DetailContent({
                       {data.unterlagen.pille.text}
                     </span>
                   )}
-                  {tab.id === "checklist" && checklistItems.length > 0 && (
-                    <span className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
-                      {checklistItems.filter((i) => i.isCompleted).length}/{checklistItems.length}
+                  {/* Ohne entfallene Aufgaben (F2) — dieselbe Rechnung wie
+                      Kopfzeile, Balken, Stepper und Link-Seite. */}
+                  {tab.id === "checklist" && checklisteStand.gesamt > 0 && (
+                    <span
+                      data-pille="checkliste"
+                      className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground"
+                    >
+                      {checklisteStand.erledigt}/{checklisteStand.gesamt}
                     </span>
                   )}
                 </button>
@@ -1326,6 +1397,9 @@ export function DetailContent({
             onAbteilungsMeldungSchliessen={() => setAbteilungsMeldung(null)}
             abteilungenDialogOffen={abteilungenDialogOffen}
             setAbteilungenDialogOffen={setAbteilungenDialogOffen}
+            ausstattung={data.ausstattung}
+            darfAusstattungBearbeiten={darfBearbeiten}
+            onAusstattungAktion={ausstattungAktion}
           />
         )}
         {activeTab === "supervisor" && (
@@ -1439,6 +1513,8 @@ export function TabOverview({
   // Speist die Karte „Status-Übersicht" — dieselbe Quelle wie die Chips im
   // Kopf der Seite (E10).
   const chips = spurenChips(data);
+  // Ohne entfallene Aufgaben (F2) — dieselbe Rechnung wie Reiter und Checkliste.
+  const checklisteStand = checklistFortschritt(data.checklistItems);
 
   return (
     <div className="space-y-6">
@@ -1670,13 +1746,10 @@ export function TabOverview({
                 label="Checkliste"
                 value={
                   data.checklistItems.length > 0
-                    ? `${data.checklistItems.filter((i) => i.isCompleted).length}/${data.checklistItems.length}`
+                    ? `${checklisteStand.erledigt}/${checklisteStand.gesamt}`
                     : "Keine"
                 }
-                done={
-                  data.checklistItems.length > 0 &&
-                  data.checklistItems.every((i) => i.isCompleted)
-                }
+                done={checklisteStand.alleErledigt}
               />
             </div>
           </Card>
@@ -3392,7 +3465,17 @@ export function TabDocuments({
 // Tab 3: Checkliste
 // =============================================
 
-/** Exportiert fuer den Komponententest (Aufgabenkarte, Karte, Dialog). */
+/**
+ * Exportiert fuer den Komponententest (Aufgabenkarte, Karte, Dialog).
+ *
+ * Reihenfolge (Mockup 6.3): Fortschritt, Karte „Ausstattung & Zugänge“, Karte
+ * „Aufgaben für Abteilungen“, dann die Aufgaben je Kategorie. Ohne
+ * Checklistenpunkte stehen beide Karten VOR dem Leerzustand (Regel 20) — ein
+ * Vorgang ohne Checklisten-Vorlage hat trotzdem Ausstattung und Abteilungen;
+ * der Leerzustand ersetzt nur Fortschritt und Liste. Jede Zaehlung laeuft
+ * ueber `checklistFortschritt`: Entfallene Aufgaben (F2) zaehlen weder im
+ * Zaehler noch im Nenner.
+ */
 export function TabChecklist({
   checklistItems,
   togglingItems,
@@ -3413,6 +3496,9 @@ export function TabChecklist({
   onAbteilungsMeldungSchliessen,
   abteilungenDialogOffen,
   setAbteilungenDialogOffen,
+  ausstattung,
+  darfAusstattungBearbeiten = false,
+  onAusstattungAktion,
 }: {
   checklistItems: ChecklistItemData[];
   togglingItems: Set<string>;
@@ -3436,62 +3522,26 @@ export function TabChecklist({
   onAbteilungsMeldungSchliessen?: () => void;
   abteilungenDialogOffen: boolean;
   setAbteilungenDialogOffen: (offen: boolean) => void;
+  /**
+   * Karte „Ausstattung & Zugänge“ (Paket A3) — nur fuer HR_EDIT_ROLES, sonst
+   * `null`/fehlend: dann keine Karte und keine Bemerkung an den Aufgaben.
+   */
+  ausstattung?: AusstattungsUebersicht | null;
+  /** Rolle in HR_EDIT_ROLES (Aktionen und Freitexte der Karte). */
+  darfAusstattungBearbeiten?: boolean;
+  /** Fuehrt eine Aktion der Karte aus (senden, neu laden). */
+  onAusstattungAktion?: (body: AusstattungAktionBody) => Promise<AusstattungAktionsAusgang>;
 }) {
-  if (checklistItems.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-16">
-        <CheckIcon className="mb-4 h-16 w-16 text-border" />
-        <p className="mb-1 text-base font-medium text-foreground">Keine Checkliste</p>
-        <p className="text-sm text-muted-foreground">
-          Diesem Vorgang wurde noch keine Checkliste zugeordnet.
-        </p>
-      </div>
-    );
-  }
-
-  const completed = checklistItems.filter((i) => i.isCompleted).length;
-  const total = checklistItems.length;
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-  // Anzeigename je Zustaendigkeit: der Name aus der Karte (bei eigenen
-  // Schluesseln z. B. „Empfang FES Minden" statt „EMPFANG"), sonst das Label.
-  // Nie der rohe Schluessel — „VORGESETZTER" ist keine Beschriftung.
-  const abteilungsName = (key: string) =>
-    abteilungen?.zeilen.find((z) => z.departmentKey === key)?.departmentName ?? abteilungLabel(key);
-
-  // Group by category
-  const grouped: Record<string, ChecklistItemData[]> = {};
-  checklistItems.forEach((item) => {
-    if (!grouped[item.category]) grouped[item.category] = [];
-    grouped[item.category].push(item);
-  });
-
-  return (
-    <div className="space-y-6">
-      {/* Progress Bar */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Fortschritt</p>
-            <p className="text-xs text-muted-foreground">
-              {completed} von {total} Aufgaben erledigt
-            </p>
-          </div>
-          <span
-            className={`text-2xl font-bold ${
-              pct === 100 ? "text-credo-gruen" : pct > 50 ? "text-foreground" : "text-muted-foreground"
-            }`}
-          >
-            {pct}%
-          </span>
-        </div>
-        <div className="h-3 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-credo-gruen transition-all duration-500 ease-out"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
+  const karten = (
+    <>
+      {/* Ausstattung & Zugaenge (Paket A3) */}
+      {ausstattung && (
+        <AusstattungKarte
+          uebersicht={ausstattung}
+          darfBearbeiten={darfAusstattungBearbeiten}
+          onAktion={onAusstattungAktion}
+        />
+      )}
 
       {/* Aufgaben für Abteilungen (Paket 5) */}
       {abteilungen && (
@@ -3509,6 +3559,62 @@ export function TabChecklist({
           setDialogOffen={setAbteilungenDialogOffen}
         />
       )}
+    </>
+  );
+
+  // Ohne Checklistenpunkte ersetzt der Leerzustand nur Fortschritt und Liste
+  // (Regel 20). Bewusst EIN Baum mit festen Plaetzen statt eines eigenen
+  // `return`: Legt eine Aktion der Karte die erste Aufgabe an, wechselt die
+  // Seite sonst den Zweig — die Karte wuerde neu eingehaengt und verloere
+  // mitten in der Aktion ihre Meldung.
+  const leer = checklistItems.length === 0;
+  const { erledigt: completed, gesamt: total, prozent: pct } = checklistFortschritt(checklistItems);
+  // Bemerkung zur Position je Aufgabe — nur aus der Uebersicht, die nur HR bekommt (Regel 16).
+  const bemerkungen = bemerkungJeAufgabe(ausstattung);
+
+  // Anzeigename je Zustaendigkeit: der Name aus der Karte (bei eigenen
+  // Schluesseln z. B. „Empfang FES Minden" statt „EMPFANG"), sonst das Label.
+  // Nie der rohe Schluessel — „VORGESETZTER" ist keine Beschriftung.
+  const abteilungsName = (key: string) =>
+    abteilungen?.zeilen.find((z) => z.departmentKey === key)?.departmentName ?? abteilungLabel(key);
+
+  // Group by category
+  const grouped: Record<string, ChecklistItemData[]> = {};
+  checklistItems.forEach((item) => {
+    if (!grouped[item.category]) grouped[item.category] = [];
+    grouped[item.category].push(item);
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Progress Bar */}
+      {!leer && (
+        <div className="rounded-xl border border-border bg-card p-5" data-fortschritt="checkliste">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Fortschritt</p>
+              <p className="text-xs text-muted-foreground">
+                {completed} von {total} Aufgaben erledigt
+              </p>
+            </div>
+            <span
+              className={`text-2xl font-bold ${
+                pct === 100 ? "text-credo-gruen" : pct > 50 ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {pct}%
+            </span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-credo-gruen transition-all duration-500 ease-out"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {karten}
 
       {checklistFehler && (
         <p
@@ -3517,6 +3623,19 @@ export function TabChecklist({
         >
           {checklistFehler}
         </p>
+      )}
+
+      {leer && (
+        <div
+          className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card py-16"
+          data-leer="checkliste"
+        >
+          <CheckIcon className="mb-4 h-16 w-16 text-border" />
+          <p className="mb-1 text-base font-medium text-foreground">Keine Checkliste</p>
+          <p className="text-sm text-muted-foreground">
+            Diesem Vorgang wurde noch keine Checkliste zugeordnet.
+          </p>
+        </div>
       )}
 
       {/* Grouped Items */}
@@ -3532,11 +3651,16 @@ export function TabChecklist({
               .sort((a, b) => a.orderIndex - b.orderIndex)
               .map((item) => {
                 const name = item.assignee ? abteilungsName(item.assignee) : null;
-                const erledigt = item.isCompleted ? erledigtText(item) : "";
+                // Eine entfallene Aufgabe (F2) ist zugleich `isCompleted` — sie
+                // zeigt „Entfällt“ (AufgabeZusatz) statt „erledigt von …“, keine
+                // Faelligkeit, und ihr Haken ist gesperrt (sonst liefe der Klick
+                // in die 409 des Portal-PATCH).
+                const entfaellt = istEntfallen(item);
+                const erledigt = item.isCompleted && !entfaellt ? erledigtText(item) : "";
                 // `faelligAm` ist die gespeicherte Faelligkeit ODER die aus
                 // Vertragsbeginn und Tagen berechnete Vorschau — deshalb hat
                 // sie Vorrang vor `dueDate`.
-                const faellig = item.faelligAm ?? item.dueDate;
+                const faellig = entfaellt ? null : (item.faelligAm ?? item.dueDate);
                 return (
                   <div
                     key={item.id}
@@ -3545,20 +3669,24 @@ export function TabChecklist({
                   >
                     <div className="flex items-start gap-3 p-4">
                       {/* Checkbox */}
-                      <button
-                        type="button"
-                        onClick={() => toggleChecklistItem(item.id, item.isCompleted)}
-                        disabled={togglingItems.has(item.id)}
-                        aria-label={item.isCompleted ? "Als offen markieren" : "Als erledigt markieren"}
-                        aria-pressed={item.isCompleted}
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
-                          item.isCompleted
-                            ? "border-credo-gruen bg-credo-gruen"
-                            : "border-border hover:border-credo-gruen/50"
-                        } ${togglingItems.has(item.id) ? "opacity-50" : ""}`}
-                      >
-                        {item.isCompleted && <CheckIcon className="h-3.5 w-3.5 text-white" />}
-                      </button>
+                      {entfaellt ? (
+                        <EntfaelltHaken />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => toggleChecklistItem(item.id, item.isCompleted)}
+                          disabled={togglingItems.has(item.id)}
+                          aria-label={item.isCompleted ? "Als offen markieren" : "Als erledigt markieren"}
+                          aria-pressed={item.isCompleted}
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
+                            item.isCompleted
+                              ? "border-credo-gruen bg-credo-gruen"
+                              : "border-border hover:border-credo-gruen/50"
+                          } ${togglingItems.has(item.id) ? "opacity-50" : ""}`}
+                        >
+                          {item.isCompleted && <CheckIcon className="h-3.5 w-3.5 text-white" />}
+                        </button>
+                      )}
 
                       {/* Content */}
                       <div className="min-w-0 flex-1">
@@ -3625,6 +3753,9 @@ export function TabChecklist({
                             </span>
                           )}
                         </div>
+
+                        {/* Ausstattung & Zugaenge: „Entfällt“, „Eilt“, Bemerkung (nur HR) */}
+                        <AufgabeZusatz item={item} bemerkung={bemerkungen[item.id] ?? null} />
 
                         {/* Kommentar der Abteilung (ueber ihren Link) — React maskiert */}
                         {item.abteilungKommentar && (
