@@ -903,9 +903,13 @@ describe("Vorschläge übernehmen", () => {
       "Räume einer Einrichtung bitte als eigene Position dieser Einrichtung anlegen.",
     );
     expect(d.querySelectorAll("[data-vorschlag-hinweis]")).toHaveLength(1);
+    // Die drei Schlüssel-Positionen unterscheiden sich nur in den Einrichtungsarten — die Vorschau nennt sie.
+    expect(d.querySelector('li[data-vorschlag="FACILITY_SCHLUESSEL_KITA"] [data-vorschlag-gilt]')?.textContent).toBe(" – nur Kita");
+    expect(d.querySelector('li[data-vorschlag="IT_LAPTOP"] [data-vorschlag-gilt]')).toBeNull();
+    expect(d.textContent).toContain("mit Standardwerten für Vorauswahl, Fälligkeit und Hinweise");
 
-    const meldung = "14 Vorschläge übernommen – ausgeschaltet. Bitte prüfen, Fälligkeiten eintragen und einschalten, was passt. 1 stand schon im Katalog.";
-    schreibAntwort = { ok: true, koerper: { angelegt: 14, vorhanden: 1, meldung } };
+    const meldung = `${VORSCHLAEGE.length - 1} Vorschläge übernommen – ausgeschaltet, mit Standardwerten. Bitte Vorauswahl und Fälligkeiten prüfen und einschalten, was passt. 1 stand schon im Katalog.`;
+    schreibAntwort = { ok: true, koerper: { angelegt: VORSCHLAEGE.length - 1, vorhanden: 1, meldung } };
     const vorher = ladeAufrufe();
     await klicke(within(d).getByRole("button", { name: `${VORSCHLAEGE.length - 1} Vorschläge übernehmen` }));
     expect(schreibend()).toEqual([{ url: "/api/settings/ausstattung/vorschlaege", method: "POST", body: null }]);

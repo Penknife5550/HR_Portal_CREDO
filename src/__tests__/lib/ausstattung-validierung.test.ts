@@ -328,11 +328,12 @@ describe("katalogPositionSchema", () => {
     expect(fehler(katalogPositionSchema.safeParse({ ...MINIMAL, hinweisStelle: 7 }))).toBe("Ungültige Eingabe");
   });
 
-  it("die Vorschlaege bestehen das Schema und bleiben dabei unveraendert (ausser Schluessel und Pflegehinweis)", () => {
+  it("die Vorschlaege bestehen das Schema und bleiben dabei unveraendert (ausser Schluessel, Pflegehinweis und Standard)", () => {
     for (const v of VORSCHLAEGE) {
       const geparst = katalogPositionSchema.parse(v);
-      // Der Pflegehinweis ist kein Katalogfeld (nur Vorschau „Vorschläge übernehmen“) und faellt weg.
-      const { vorschlagSchluessel, pflegeHinweis: _pflege, ...ohneSchluessel } = v;
+      // Pflegehinweis (nur Vorschau „Vorschläge übernehmen“) und standardAktiv (nur die Migration
+      // AUSSTATTUNG_STANDARDKATALOG_V1) sind keine Katalogfelder und fallen weg.
+      const { vorschlagSchluessel, pflegeHinweis: _pflege, standardAktiv: _standard, ...ohneSchluessel } = v;
       // Die Vorschlaege tragen keine A4-Werte (G27) — geparst stehen sie leer da.
       const ohneA4 = { beiAustritt: null, rueckgabeKategorie: null, ausgabeKennung: null };
       expect({ vorschlagSchluessel, ...geparst }).toEqual({ vorschlagSchluessel, ...ohneA4, ...ohneSchluessel });

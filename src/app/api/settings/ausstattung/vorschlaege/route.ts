@@ -1,9 +1,10 @@
 /**
  * API: POST /api/settings/ausstattung/vorschlaege  („Vorschläge übernehmen …“)
  *
- * Legt die Vorschläge für den Anfangsbestand an, die noch fehlen — zentral,
- * ausgeschaltet, ohne Fälligkeit. Wiederholbar: Ein zweiter Aufruf legt nichts
- * an. Antwort `{ angelegt, vorhanden, meldung }`. Kein Body.
+ * Legt die Vorschläge des Standardkatalogs an, die noch fehlen — zentral, mit
+ * ihren Standardwerten (Vorauswahl, Fälligkeit, Hinweise), aber immer
+ * ausgeschaltet. Wiederholbar: Ein zweiter Aufruf legt nichts an. Antwort
+ * `{ angelegt, vorhanden, meldung }`. Kein Body.
  *
  * Berechtigung: SUPER_ADMIN, HR_LEITUNG (adminHandler)
  *

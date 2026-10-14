@@ -30,6 +30,10 @@
 -- Nach dem Push (nicht Teil dieses Skripts): Die einmalige Datenmigration
 -- SUPERVISOR_MIT_AUSSTATTUNG_V1 in prisma/seed-check.js setzt
 -- supervisor_data."mitAusstattung" im Bestand auf false (Arbeitsschritt S7).
+-- Danach fuellt AUSSTATTUNG_STANDARDKATALOG_V1 die (dann leere) Tabelle
+-- ausstattungs_positionen mit dem Standardkatalog (20 Positionen, 13
+-- eingeschaltet, ohne A4-Werte; Feinplan Abschnitt 8). Das Schema selbst
+-- aendert sich dadurch nicht.
 -- =============================================================================
 
 -- AlterTable

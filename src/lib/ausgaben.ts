@@ -256,15 +256,32 @@ export interface RueckgabeVorgabe {
  * leerem `beiAustritt` (G27). Transponder/Chip ist ein Rueckgabe-Stueck
  * (Kategorie SCHLUESSEL), keine Sperraufgabe (G14, Abweichung vom Mockup 6.8).
  * Angaben (Art ANGABE) fehlen: Bei ihnen bleiben alle drei Felder leer (G8).
+ * Auch die Migration AUSSTATTUNG_STANDARDKATALOG_V1 (prisma/seed-check.js)
+ * setzt diese Werte NICHT — vorher muessen aktive Offboarding-Webhooks auf dem
+ * Server geprueft sein (Regel 29). Seit dem Standardkatalog (14.10.2026) mit
+ * den Zeilen fuer schulische Zugaenge, Diensthandy und die Schluessel von Kita
+ * und Bueros.
  */
 export const RUECKGABE_VORGABEN: Readonly<Record<string, Readonly<RueckgabeVorgabe>>> = {
   IT_LAPTOP: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE", ausgabeKennung: "Inventarnummer" },
   IT_IPAD: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE", ausgabeKennung: "Inventarnummer" },
   IT_TELEFON: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE", ausgabeKennung: "Inventarnummer" },
+  IT_MOBIL: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "IT_HARDWARE", ausgabeKennung: "Inventarnummer" },
   IT_BYOD: { beiAustritt: "SPERREN", rueckgabeKategorie: null, ausgabeKennung: null },
   IT_ZUGAENGE: { beiAustritt: "SPERREN", rueckgabeKategorie: null, ausgabeKennung: null },
+  IT_ZUGAENGE_SCHULE: { beiAustritt: "SPERREN", rueckgabeKategorie: null, ausgabeKennung: null },
   FACILITY_TRANSPONDER: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "SCHLUESSEL", ausgabeKennung: "Chipnummer" },
   FACILITY_SCHLUESSEL: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "SCHLUESSEL", ausgabeKennung: "Schlüsselnummer" },
+  FACILITY_SCHLUESSEL_KITA: {
+    beiAustritt: "RUECKGABE",
+    rueckgabeKategorie: "SCHLUESSEL",
+    ausgabeKennung: "Schlüsselnummer",
+  },
+  FACILITY_SCHLUESSEL_BUERO: {
+    beiAustritt: "RUECKGABE",
+    rueckgabeKategorie: "SCHLUESSEL",
+    ausgabeKennung: "Schlüsselnummer",
+  },
   FACILITY_SPIND: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "SCHLUESSEL", ausgabeKennung: "Schlüsselnummer" },
   VERWALTUNG_KOPIERKARTE: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "SONSTIGES", ausgabeKennung: "Kartennummer" },
   VERWALTUNG_DIENSTAUSWEIS: { beiAustritt: "RUECKGABE", rueckgabeKategorie: "DOKUMENTE", ausgabeKennung: "Ausweisnummer" },

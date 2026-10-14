@@ -2207,6 +2207,418 @@ async function migriereOffboardingSperrpunkte(prisma) {
   }
 }
 
+// =============================================
+// Einmalige Datenmigration: Standardkatalog „Ausstattung & Zugaenge"
+// (nach der Zustimmung von DSB und MAV am 14.10.2026; Feinplan, Abschnitt
+// „Standardkatalog (14.10.2026)")
+// =============================================
+const AUSSTATTUNG_STANDARDKATALOG_MARKER = "AUSSTATTUNG_STANDARDKATALOG_V1";
+
+/** Wie AUSSTATTUNG_AUDIT.STANDARDKATALOG_ANGELEGT in src/lib/ausstattung.ts. */
+const AUSSTATTUNG_STANDARDKATALOG_AUDIT_JS = "AUSSTATTUNG_STANDARDKATALOG_ANGELEGT";
+
+/*
+ * JS-Kopie von VORSCHLAEGE (src/lib/ausstattung.ts) — im Container gibt es kein
+ * tsx. Der Test src/__tests__/lib/ausstattung-standardkatalog.test.ts haelt
+ * beide Fassungen Feld fuer Feld gleich (Reihenfolge, orderIndex, Standardwerte,
+ * `standardAktiv`) und schickt jede Zeile dieser Kopie durch dieselbe Pruefung
+ * wie POST /api/settings/ausstattung (katalogPositionSchema + positionPruefen).
+ * Wer dort einen Vorschlag aendert, aendert ihn hier mit (der Test sagt es).
+ *
+ * Bewusst NICHT hier: `pflegeHinweis` (kein Katalogfeld, nur Vorschau) und die
+ * A4-Felder `beiAustritt`, `rueckgabeKategorie`, `ausgabeKennung` (G27 — die
+ * kommen nur ueber „Rückgabe-Vorgaben übernehmen …", nachdem auf dem Server
+ * aktive Offboarding-Webhooks geprueft sind).
+ */
+const SCHULEN_JS = Object.freeze(["GYMNASIUM", "GESAMTSCHULE", "GRUNDSCHULE", "BERUFSKOLLEG"]);
+const BUEROS_JS = Object.freeze(["VERWALTUNG", "GMBH", "VEREIN"]);
+// Rechner und Telefon nicht fuer Minijob und Ehrenamt (Entscheidung 14.10.2026).
+const MIT_ARBEITSPLATZ_JS = Object.freeze(["STANDARD", "BEAMTE", "ERZIEHER"]);
+const SCHLUESSEL_HINWEIS_STELLE_JS = "Schlüssel gegen Unterschrift ausgeben und die Schlüsselnummer notieren.";
+const SCHLUESSEL_WEITERE_RAEUME_JS = "Weitere Räume bitte in der Bemerkung nennen.";
+const ZUGANG_HINWEIS_STELLE_JS = "Erst nach Verpflichtung auf Vertraulichkeit freischalten.";
+
+/** Wie die Labels in ANGABEN_KATALOG (src/lib/ausstattung.ts) — die Bezeichnung einer Angabe. */
+const ANGABEN_LABELS_JS = Object.freeze({
+  UNTERRICHTSFAECHER: "Unterrichtsfächer",
+  DURCHWAHL: "Gewünschte Durchwahl",
+  ARBEITSPLATZ_RAUM: "Raum des Arbeitsplatzes",
+});
+
+/** Wie `vorschlag()` in src/lib/ausstattung.ts: alle Felder mit Leerwert, jede Liste neu. */
+function standardVorschlagJs(teil) {
+  return {
+    organizationId: null,
+    einrichtungsarten: [],
+    angabeSchluessel: null,
+    hinweisFuehrungskraft: null,
+    hinweisStelle: null,
+    optionen: [],
+    vorausgewaehlt: false,
+    vorausgewaehlteOptionen: [],
+    bemerkungAnbieten: teil.art !== "ANGABE",
+    bemerkungPlatzhalter: null,
+    aufgabeTitel: null,
+    defaultDueDays: null,
+    personengruppen: [],
+    sichtbarFuer: [],
+    entgeltrelevant: false,
+    ...teil,
+  };
+}
+
+/** Wie `angabeVorschlag()` in src/lib/ausstattung.ts. */
+function standardAngabeJs(teil) {
+  return standardVorschlagJs({
+    ...teil,
+    art: "ANGABE",
+    bezeichnung: ANGABEN_LABELS_JS[teil.angabeSchluessel],
+    sichtbarFuer: [...(teil.sichtbarFuer || [])],
+    einrichtungsarten: [...(teil.einrichtungsarten || [])],
+  });
+}
+
+const STANDARDKATALOG_JS = Object.freeze(
+  [
+    // ---- IT ----
+    standardVorschlagJs({
+      vorschlagSchluessel: "IT_ZUGAENGE",
+      departmentKey: "IT",
+      art: "AUSWAHL",
+      bezeichnung: "Zugänge",
+      optionen: ["Benutzerkonto und Dienst-E-Mail", "Drucker-PIN", "WLAN"],
+      vorausgewaehlteOptionen: ["Benutzerkonto und Dienst-E-Mail"],
+      aufgabeTitel: "Zugang einrichten",
+      defaultDueDays: -7,
+      hinweisStelle: ZUGANG_HINWEIS_STELLE_JS,
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "IT_ZUGAENGE_SCHULE",
+      departmentKey: "IT",
+      art: "AUSWAHL",
+      bezeichnung: "Schulische Zugänge",
+      einrichtungsarten: [...SCHULEN_JS],
+      optionen: ["Schulverwaltung", "WebUntis", "Schulportal"],
+      aufgabeTitel: "Zugang einrichten",
+      defaultDueDays: -7,
+      hinweisStelle: ZUGANG_HINWEIS_STELLE_JS,
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "IT_LAPTOP",
+      departmentKey: "IT",
+      art: "JA_NEIN",
+      bezeichnung: "Dienstrechner/Endgerät (Laptop/PC)",
+      vorausgewaehlt: true,
+      personengruppen: [...MIT_ARBEITSPLATZ_JS],
+      defaultDueDays: -5,
+      bemerkungPlatzhalter: "z. B. Laptop statt PC, zweiter Bildschirm",
+      hinweisStelle: "Gerät mit Standardsoftware einrichten und am ersten Arbeitstag übergeben.",
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "IT_TELEFON",
+      departmentKey: "IT",
+      art: "JA_NEIN",
+      bezeichnung: "Telefon mit Durchwahl",
+      vorausgewaehlt: true,
+      personengruppen: [...MIT_ARBEITSPLATZ_JS],
+      defaultDueDays: -5,
+      bemerkungPlatzhalter: "z. B. gewünschte Durchwahl",
+      hinweisStelle: "Durchwahl einrichten und dem Sekretariat für die Telefonliste mitteilen.",
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "IT_IPAD",
+      departmentKey: "IT",
+      art: "JA_NEIN",
+      bezeichnung: "Dienst-iPad (Lernmittel)",
+      einrichtungsarten: [...SCHULEN_JS],
+      defaultDueDays: -5,
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "IT_MOBIL",
+      departmentKey: "IT",
+      art: "JA_NEIN",
+      bezeichnung: "Diensthandy",
+      defaultDueDays: -5,
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "IT_BYOD",
+      departmentKey: "IT",
+      art: "JA_NEIN",
+      bezeichnung: "Private Endgeräte (BYOD) freischalten",
+      aufgabeTitel: "Private Endgeräte (BYOD) freischalten",
+      standardAktiv: false,
+    }),
+    standardAngabeJs({
+      vorschlagSchluessel: "IT_DURCHWAHL",
+      departmentKey: "IT",
+      angabeSchluessel: "DURCHWAHL",
+      standardAktiv: false,
+    }),
+    // ---- Gebaeudewirtschaft ----
+    standardVorschlagJs({
+      vorschlagSchluessel: "FACILITY_SCHLUESSEL",
+      departmentKey: "FACILITY",
+      art: "AUSWAHL",
+      bezeichnung: "Schlüssel",
+      einrichtungsarten: [...SCHULEN_JS],
+      optionen: ["Haupteingang", "Lehrerzimmer", "Klassenraum", "Fachraum", "Sporthalle"],
+      vorausgewaehlteOptionen: ["Haupteingang", "Lehrerzimmer"],
+      aufgabeTitel: "Schlüssel ausgeben",
+      defaultDueDays: -3,
+      hinweisFuehrungskraft: "Welche Klassen- und Fachräume? Bitte in der Bemerkung nennen.",
+      bemerkungPlatzhalter: "z. B. Raum 2.14, Chemieraum",
+      hinweisStelle: SCHLUESSEL_HINWEIS_STELLE_JS,
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "FACILITY_SCHLUESSEL_KITA",
+      departmentKey: "FACILITY",
+      art: "AUSWAHL",
+      bezeichnung: "Schlüssel",
+      einrichtungsarten: ["KITA"],
+      optionen: ["Haupteingang", "Gruppenraum", "Personalraum"],
+      vorausgewaehlteOptionen: ["Haupteingang", "Gruppenraum"],
+      aufgabeTitel: "Schlüssel ausgeben",
+      defaultDueDays: -3,
+      hinweisFuehrungskraft: SCHLUESSEL_WEITERE_RAEUME_JS,
+      hinweisStelle: SCHLUESSEL_HINWEIS_STELLE_JS,
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "FACILITY_SCHLUESSEL_BUERO",
+      departmentKey: "FACILITY",
+      art: "AUSWAHL",
+      bezeichnung: "Schlüssel",
+      einrichtungsarten: [...BUEROS_JS],
+      optionen: ["Haupteingang", "Büro"],
+      vorausgewaehlteOptionen: ["Haupteingang", "Büro"],
+      aufgabeTitel: "Schlüssel ausgeben",
+      defaultDueDays: -3,
+      hinweisFuehrungskraft: SCHLUESSEL_WEITERE_RAEUME_JS,
+      bemerkungPlatzhalter: "z. B. Archiv, Lager",
+      hinweisStelle: SCHLUESSEL_HINWEIS_STELLE_JS,
+      standardAktiv: true,
+    }),
+    standardAngabeJs({
+      vorschlagSchluessel: "FACILITY_UNTERRICHTSFAECHER",
+      departmentKey: "FACILITY",
+      angabeSchluessel: "UNTERRICHTSFAECHER",
+      sichtbarFuer: ["IT"],
+      einrichtungsarten: [...SCHULEN_JS],
+      standardAktiv: true,
+    }),
+    standardAngabeJs({
+      vorschlagSchluessel: "FACILITY_ARBEITSPLATZ",
+      departmentKey: "FACILITY",
+      angabeSchluessel: "ARBEITSPLATZ_RAUM",
+      sichtbarFuer: ["IT", "VERWALTUNG"],
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "FACILITY_TRANSPONDER",
+      departmentKey: "FACILITY",
+      art: "JA_NEIN",
+      bezeichnung: "Transponder/Chip",
+      standardAktiv: false,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "FACILITY_PARKPLATZ",
+      departmentKey: "FACILITY",
+      art: "JA_NEIN",
+      bezeichnung: "Parkplatz",
+      standardAktiv: false,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "FACILITY_SPIND",
+      departmentKey: "FACILITY",
+      art: "JA_NEIN",
+      bezeichnung: "Spind",
+      standardAktiv: false,
+    }),
+    // ---- Verwaltung / Sekretariat ----
+    standardVorschlagJs({
+      vorschlagSchluessel: "VERWALTUNG_FACH",
+      departmentKey: "VERWALTUNG",
+      art: "JA_NEIN",
+      bezeichnung: "Fach im Lehrerzimmer",
+      einrichtungsarten: [...SCHULEN_JS],
+      vorausgewaehlt: true,
+      defaultDueDays: -3,
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "VERWALTUNG_TUERSCHILD",
+      departmentKey: "VERWALTUNG",
+      art: "JA_NEIN",
+      bezeichnung: "Türschild",
+      defaultDueDays: -3,
+      standardAktiv: true,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "VERWALTUNG_KOPIERKARTE",
+      departmentKey: "VERWALTUNG",
+      art: "JA_NEIN",
+      bezeichnung: "Kopierkarte",
+      standardAktiv: false,
+    }),
+    standardVorschlagJs({
+      vorschlagSchluessel: "VERWALTUNG_DIENSTAUSWEIS",
+      departmentKey: "VERWALTUNG",
+      art: "JA_NEIN",
+      bezeichnung: "Dienstausweis",
+      standardAktiv: false,
+    }),
+  ].map((v, i) =>
+    // Tief eingefroren: Auch die Listen einer Zeile lassen sich zur Laufzeit
+    // nicht verbiegen (sonst schriebe die Migration still andere Werte, und der
+    // Gleichheitstest laese dieselben veraenderten Listen).
+    Object.freeze({
+      ...v,
+      orderIndex: i * 10,
+      einrichtungsarten: Object.freeze([...v.einrichtungsarten]),
+      optionen: Object.freeze([...v.optionen]),
+      vorausgewaehlteOptionen: Object.freeze([...v.vorausgewaehlteOptionen]),
+      personengruppen: Object.freeze([...v.personengruppen]),
+      sichtbarFuer: Object.freeze([...v.sichtbarFuer]),
+    }),
+  ),
+);
+
+/**
+ * Plant die Migration — rein und ohne Datenbank, damit ein Test sie halten kann.
+ *
+ * `anzahlVorhanden` ist die Zahl der Katalogpositionen (alle, auch
+ * ausgeschaltete und solche einer Einrichtung). Nur ein LEERER Katalog wird
+ * gefuellt: Steht dort schon etwas, hat jemand gepflegt (oder „Vorschläge
+ * übernehmen" geklickt) — die Migration ueberschreibt und ergaenzt dann nichts,
+ * HR holt Fehlendes ueber „Vorschläge übernehmen" (dann ausgeschaltet).
+ *
+ * `anlegen`: je Vorschlag die Schreibdaten — zentral, mit
+ * `vorschlagSchluessel`, `isActive` = `standardAktiv`, OHNE die A4-Felder (sie
+ * bleiben null) und ohne `standardAktiv` selbst (kein Datenbankfeld). Jede
+ * Liste ist eine eigene Kopie. Die IDs vergibt der Aufrufer.
+ * `details`: der Nachweis im Merker — nur Anzahlen.
+ */
+function planeStandardkatalog(anzahlVorhanden) {
+  const vorhanden = Number.isInteger(anzahlVorhanden) && anzahlVorhanden > 0 ? anzahlVorhanden : 0;
+  if (vorhanden > 0) {
+    return { anlegen: [], details: { vorhanden, angelegt: 0, eingeschaltet: 0 } };
+  }
+  const anlegen = STANDARDKATALOG_JS.map((v) => {
+    const { standardAktiv, ...felder } = v;
+    return {
+      ...felder,
+      einrichtungsarten: [...felder.einrichtungsarten],
+      optionen: [...felder.optionen],
+      vorausgewaehlteOptionen: [...felder.vorausgewaehlteOptionen],
+      personengruppen: [...felder.personengruppen],
+      sichtbarFuer: [...felder.sichtbarFuer],
+      isActive: standardAktiv === true,
+    };
+  });
+  return {
+    anlegen,
+    details: { vorhanden: 0, angelegt: anlegen.length, eingeschaltet: anlegen.filter((z) => z.isActive).length },
+  };
+}
+
+/**
+ * Fuellt einen LEEREN Katalog „Ausstattung & Zugänge" mit dem Standardkatalog
+ * (Plan: `planeStandardkatalog`).
+ *
+ * WARUM: Nach der Zustimmung von DSB und MAV (14.10.2026, A0) soll der Katalog
+ * mit dem Deploy bereitstehen — Zugaenge, Rechner, Telefon, Schluessel braucht
+ * jede Einstellung; HR ergaenzt danach im Betrieb. Eingeschaltet sind nur die
+ * Positionen mit `standardAktiv`; die uebrigen stehen ausgeschaltet bereit.
+ * Die Migration setzt KEINE A4-Werte („Beim Austritt"): Die kommen nur ueber
+ * „Rückgabe-Vorgaben übernehmen …", nachdem auf dem Server aktive
+ * Offboarding-Webhooks geprueft sind (Regel 29, G27).
+ *
+ * Ein nicht leerer Katalog bleibt unberuehrt — nur der Merker wird gesetzt
+ * (mit der gezaehlten Anzahl), damit ein spaeter geleerter Katalog nicht beim
+ * naechsten Start ungefragt wieder gefuellt wird.
+ *
+ * Alles in EINER (interaktiven) Transaktion: zaehlen, anlegen, ein
+ * AuditLog-Eintrag (`processType: "SYSTEM"`, ohne `userId`; nur IDs,
+ * Schluessel, Stelle, `isActive` und Anzahlen) und der Merker in
+ * `system_migrations` — entweder alles oder nichts. Gezaehlt wird in der
+ * Transaktion, damit Plan und Schreiben denselben Stand sehen. Fehler werden
+ * geloggt und brechen den Start nicht ab; ohne Merker laeuft die Migration
+ * beim naechsten Start erneut (`vorschlagSchluessel @unique` verhindert eine
+ * doppelte Anlage).
+ */
+async function migriereAusstattungStandardkatalog(prisma) {
+  try {
+    if (await migrationErledigt(prisma, AUSSTATTUNG_STANDARDKATALOG_MARKER)) {
+      // Merker gesetzt, Katalog leer: entweder bewusst geleert — oder die
+      // Tabelle ist nach einem Rueckfall auf ein Image ohne Ausstattung
+      // (`db push --accept-data-loss` verwirft sie, `system_migrations` bleibt)
+      // leer neu entstanden. Neu angelegt wird bewusst NICHT (ein geleerter
+      // Katalog bleibt leer); die Zeile sagt dem Betrieb, dass hier nichts kam
+      // (Abhilfe: CLAUDE.md, „Einmalige Datenmigrationen“).
+      if ((await prisma.ausstattungsPosition.count()) === 0) {
+        console.log(
+          "Ausstattung & Zugaenge (" + AUSSTATTUNG_STANDARDKATALOG_MARKER +
+            "): bereits gelaufen, Katalog leer - nichts angelegt.",
+        );
+      }
+      return;
+    }
+
+    const plan = await prisma.$transaction(async (tx) => {
+      const anzahl = await tx.ausstattungsPosition.count();
+      const geplant = planeStandardkatalog(anzahl);
+      const zeilen = geplant.anlegen.map((z) => ({ id: crypto.randomUUID(), ...z }));
+      if (zeilen.length > 0) {
+        await tx.ausstattungsPosition.createMany({ data: zeilen });
+        await tx.auditLog.create({
+          data: {
+            userId: null,
+            processType: "SYSTEM",
+            action: AUSSTATTUNG_STANDARDKATALOG_AUDIT_JS,
+            details: {
+              migration: AUSSTATTUNG_STANDARDKATALOG_MARKER,
+              angelegt: geplant.details.angelegt,
+              eingeschaltet: geplant.details.eingeschaltet,
+              positionen: zeilen.map((z) => ({
+                positionId: z.id,
+                vorschlagSchluessel: z.vorschlagSchluessel,
+                departmentKey: z.departmentKey,
+                isActive: z.isActive,
+              })),
+            },
+          },
+        });
+      }
+      await markiereMigration(tx, AUSSTATTUNG_STANDARDKATALOG_MARKER, geplant.details);
+      return geplant;
+    });
+
+    if (plan.details.angelegt > 0) {
+      console.log(
+        "Ausstattung & Zugaenge (" + AUSSTATTUNG_STANDARDKATALOG_MARKER + "): " +
+          plan.details.angelegt + " Katalogpositionen angelegt, " +
+          plan.details.eingeschaltet + " eingeschaltet.",
+      );
+    } else {
+      console.log(
+        "Ausstattung & Zugaenge (" + AUSSTATTUNG_STANDARDKATALOG_MARKER + "): Katalog nicht leer (" +
+          plan.details.vorhanden + " Positionen) - nichts angelegt.",
+      );
+    }
+  } catch (error) {
+    // Nicht kritisch fuer den Start: Ohne Katalog bleibt alles wie vor A1
+    // (kein Ausstattungsschritt). Ohne Merker laeuft sie beim naechsten Start erneut.
+    console.error("Migration " + AUSSTATTUNG_STANDARDKATALOG_MARKER + " fehlgeschlagen:", error.message);
+  }
+}
+
 async function main() {
   const prisma = new PrismaClient();
   try {
@@ -2233,6 +2645,12 @@ async function main() {
     // der Offboarding-Vorlagen — vor dem Seed; auf einer frischen Datenbank nur
     // der Merker (prisma/seed.ts legt die Vorlagen schon mit Hinweis an).
     await migriereOffboardingSperrpunkte(prisma);
+    // Ausstattung & Zugaenge (Standardkatalog, 14.10.2026): einen LEEREN
+    // Katalog mit den Vorschlaegen fuellen, die Standardpositionen
+    // eingeschaltet, ohne A4-Werte — nach dem Schema-Abgleich (Tabelle muss
+    // stehen) und nach den uebrigen Ausstattungs-Migrationen. Auch auf einer
+    // frischen Datenbank (der Seed legt keinen Katalog an).
+    await migriereAusstattungStandardkatalog(prisma);
 
     const userCount = await prisma.user.count();
     if (userCount === 0) {
@@ -2312,4 +2730,9 @@ module.exports = {
   sperrpunktHinweisJs,
   planeOffboardingSperrpunkte,
   migriereOffboardingSperrpunkte,
+  AUSSTATTUNG_STANDARDKATALOG_MARKER,
+  AUSSTATTUNG_STANDARDKATALOG_AUDIT_JS,
+  STANDARDKATALOG_JS,
+  planeStandardkatalog,
+  migriereAusstattungStandardkatalog,
 };

@@ -70,7 +70,11 @@ const POS_IPAD = "Dienst-iPad (Lernmittel)";
 const POS_SCHLUESSEL = "Schlüssel";
 const POS_ZUGAENGE = "Zugänge";
 const OPT_HAUPTEINGANG = "Haupteingang";
-const OPT_DIENSTMAIL = "Dienst-E-Mail";
+// Die Option heisst je nach Katalogstand „Dienst-E-Mail“ (Vorschläge bis
+// 13.10.2026) oder „Benutzerkonto und Dienst-E-Mail“ (Standardkatalog,
+// 14.10.2026) – sie wird deshalb aus dem Formular gelesen (optMail), nicht
+// fest verdrahtet; so läuft die Probe auf altem und neuem Katalogstand.
+const OPT_DIENSTMAIL_TEIL = "Dienst-E-Mail";
 
 // =============================================
 // Ausgabe und Prüfpunkte
@@ -476,9 +480,12 @@ async function ablauf(prisma, { start, heute, stempel, gym }) {
   const formPos = findeAlle(mod.json.ausstattung, (o) => typeof o.id === "string" && typeof o.bezeichnung === "string" && typeof o.art === "string");
   const fIpad = formPos.find((p) => p.bezeichnung === POS_IPAD && p.art === "JA_NEIN");
   const fSchl = formPos.find((p) => p.bezeichnung === POS_SCHLUESSEL && p.art === "AUSWAHL" && p.optionen?.includes(OPT_HAUPTEINGANG));
-  const fZug = formPos.find((p) => p.bezeichnung === POS_ZUGAENGE && p.art === "AUSWAHL" && p.optionen?.includes(OPT_DIENSTMAIL));
+  const fZug = formPos.find(
+    (p) => p.bezeichnung === POS_ZUGAENGE && p.art === "AUSWAHL" && p.optionen?.some((o) => o.includes(OPT_DIENSTMAIL_TEIL)),
+  );
+  const optMail = fZug?.optionen.find((o) => o.includes(OPT_DIENSTMAIL_TEIL));
   muss(
-    `Formular bietet „${POS_IPAD}“, „${POS_SCHLUESSEL}“ (${OPT_HAUPTEINGANG}) und „${POS_ZUGAENGE}“ (${OPT_DIENSTMAIL}) an`,
+    `Formular bietet „${POS_IPAD}“, „${POS_SCHLUESSEL}“ (${OPT_HAUPTEINGANG}) und „${POS_ZUGAENGE}“ (${optMail ?? OPT_DIENSTMAIL_TEIL}) an`,
     !!fIpad && !!fSchl && !!fZug,
     `gefunden: ${formPos.map((p) => p.bezeichnung).join(", ")}`,
   );
@@ -493,7 +500,7 @@ async function ablauf(prisma, { start, heute, stempel, gym }) {
       ausstattung: [
         { positionId: fIpad.id, gewaehlt: true },
         { positionId: fSchl.id, auswahl: [OPT_HAUPTEINGANG] },
-        { positionId: fZug.id, auswahl: [OPT_DIENSTMAIL] },
+        { positionId: fZug.id, auswahl: [optMail] },
       ],
       hinweise: [],
       currentStep: 5,
@@ -532,12 +539,12 @@ async function ablauf(prisma, { start, heute, stempel, gym }) {
   );
   const aIpad = zIpad?.aufgaben.find((a) => a.option === "")?.checklistItem;
   const aSchl = zSchl?.aufgaben.find((a) => a.option === OPT_HAUPTEINGANG)?.checklistItem;
-  const aZug = zZug?.aufgaben.find((a) => a.option === OPT_DIENSTMAIL)?.checklistItem;
+  const aZug = zZug?.aufgaben.find((a) => a.option === optMail)?.checklistItem;
   muss(
-    "Ausstattungsaufgaben angelegt (iPad → IT, Haupteingang → FACILITY, Dienst-E-Mail → IT)",
+    `Ausstattungsaufgaben angelegt (iPad → IT, Haupteingang → FACILITY, ${optMail} → IT)`,
     aIpad?.assignee === "IT" && aSchl?.assignee === "FACILITY" && aZug?.assignee === "IT" &&
       [aIpad, aSchl, aZug].every((a) => a.herkunft === "AUSSTATTUNG"),
-    `iPad=${aIpad?.assignee}/${aIpad?.herkunft}, Haupteingang=${aSchl?.assignee}, Dienst-E-Mail=${aZug?.assignee}`,
+    `iPad=${aIpad?.assignee}/${aIpad?.herkunft}, Haupteingang=${aSchl?.assignee}, ${optMail}=${aZug?.assignee}`,
   );
   info(`Aufgaben: „${aIpad.title}“, „${aSchl.title}“, „${aZug.title}“`);
 

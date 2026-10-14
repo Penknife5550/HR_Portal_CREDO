@@ -291,6 +291,21 @@ describe("RUECKGABE_VORGABEN", () => {
     for (const s of ["FACILITY_PARKPLATZ", "VERWALTUNG_FACH", "VERWALTUNG_TUERSCHILD"]) {
       expect(RUECKGABE_VORGABEN[s].beiAustritt).toBe("NICHTS");
     }
+    // Standardkatalog (14.10.2026): die neuen Vorschlaege.
+    expect(RUECKGABE_VORGABEN.IT_ZUGAENGE_SCHULE).toEqual({ beiAustritt: "SPERREN", rueckgabeKategorie: null, ausgabeKennung: null });
+    expect(RUECKGABE_VORGABEN.IT_MOBIL).toEqual({
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "IT_HARDWARE",
+      ausgabeKennung: "Inventarnummer",
+    });
+    for (const s of ["FACILITY_SCHLUESSEL_KITA", "FACILITY_SCHLUESSEL_BUERO"]) {
+      expect(RUECKGABE_VORGABEN[s]).toEqual(RUECKGABE_VORGABEN.FACILITY_SCHLUESSEL);
+    }
+    expect(RUECKGABE_VORGABEN.FACILITY_SCHLUESSEL).toEqual({
+      beiAustritt: "RUECKGABE",
+      rueckgabeKategorie: "SCHLUESSEL",
+      ausgabeKennung: "Schlüsselnummer",
+    });
   });
 
   it("S23: jede Vorgabe besteht positionPruefen an ihrem Vorschlag (so, wie die Aktion sie schreibt)", () => {

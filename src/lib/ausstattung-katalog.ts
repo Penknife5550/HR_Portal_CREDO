@@ -30,7 +30,10 @@
  *      den A4-Feldern „Beim Austritt“ (G8). `vorschlagSchluessel` verwirft
  *      schon Zod; ihn setzt allein `vorschlaegeUebernehmen` (F11,
  *      `createMany` mit `skipDuplicates` — Doppelklick und zwei Tabs bleiben
- *      folgenlos), und zwar IMMER ohne A4-Werte (G27).
+ *      folgenlos), und zwar IMMER ohne A4-Werte (G27). Einmal ausserhalb
+ *      dieser Datei: Die Migration AUSSTATTUNG_STANDARDKATALOG_V1
+ *      (prisma/seed-check.js) fuellt einen LEEREN Katalog mit denselben
+ *      Vorschlaegen, ebenfalls ohne A4-Werte.
  *   8. A4 schaltet nur eine bewusste Handlung ein (G27): von Hand im
  *      Positionsdialog oder `rueckgabeVorgabenUebernehmen` — diese setzt die
  *      Vorgaben (RUECKGABE_VORGABEN in ausgaben.ts) NUR an Positionen mit
@@ -508,9 +511,13 @@ export async function ausblendungSetzen(
 // =============================================
 
 /**
- * Legt die Vorschlaege (VORSCHLAEGE in ausstattung.ts) an, die noch fehlen —
- * ausgeschaltet, zentral, ohne Faelligkeit und ohne A4-Werte (G27: „Beim
- * Austritt“ bleibt leer, bis `rueckgabeVorgabenUebernehmen` laeuft). `vorschlagSchluessel @unique` +
+ * Legt die Vorschlaege (VORSCHLAEGE in ausstattung.ts, der Standardkatalog)
+ * an, die noch fehlen — zentral, mit ihren Standardwerten (Vorauswahl,
+ * Faelligkeit, Hinweise, Einrichtungsarten), aber IMMER ausgeschaltet
+ * (Regel 1; `standardAktiv` gilt nur fuer die einmalige Migration
+ * AUSSTATTUNG_STANDARDKATALOG_V1 und faellt in `katalogWerte` weg) und ohne
+ * A4-Werte (G27: „Beim Austritt“ bleibt leer, bis
+ * `rueckgabeVorgabenUebernehmen` laeuft). `vorschlagSchluessel @unique` +
  * `skipDuplicates` machen den Aufruf wiederholbar (F11): Der zweite legt
  * nichts an. Protokolliert wird nur, wenn etwas angelegt wurde — mit ID,
  * Schluessel, Stelle und Titel JEDER angelegten Position (Regel 18): Nach
@@ -676,7 +683,7 @@ export interface KatalogAusschnitt {
  * (`db`) oder mit dem globalen Client; die Abfragen laufen nacheinander.
  *
  * Ohne aktive Position und ausserhalb von EINSTELLUNG fragt sie nur einmal
- * bzw. gar nicht — der Regelfall nach dem Deploy (leerer Katalog) kostet eine
+ * bzw. gar nicht — ein Katalog ohne eingeschaltete Position kostet eine
  * Abfrage.
  */
 export async function katalogAusschnittLaden(db: Db, vorgang: AusschnittVorgang): Promise<KatalogAusschnitt> {

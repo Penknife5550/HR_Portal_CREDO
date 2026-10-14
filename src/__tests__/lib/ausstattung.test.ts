@@ -1005,10 +1005,24 @@ describe("aehnlicheVorlagenpunkte", () => {
       return { ...v, id: schluessel, isActive: true };
     };
     expect(aehnlicheVorlagenpunkte([vorschlag("IT_LAPTOP"), vorschlag("IT_IPAD")], [seed])).toEqual([]);
-    // „Dienst-E-Mail“ (Option der Zugänge) und „E-Mail-Adresse“ meinen dasselbe.
+    // „Benutzerkonto und Dienst-E-Mail“ (Option der Zugänge) meint dasselbe wie der Vorlagenpunkt —
+    // die Katalogseite warnt, HR räumt den Vorlagenpunkt auf.
     expect(aehnlicheVorlagenpunkte([vorschlag("IT_ZUGAENGE")], [seed]).map((t) => [t.positionId, t.wort])).toEqual([
-      ["IT_ZUGAENGE", "mail"],
+      ["IT_ZUGAENGE", "benutzerkonto"],
     ]);
+  });
+
+  it("gilt die Position nur fuer einige Einrichtungsarten, nennt der Text sie und raet zum Umformulieren statt zum Streichen", () => {
+    const fach = position({
+      id: "fach",
+      departmentKey: "VERWALTUNG",
+      bezeichnung: "Fach im Lehrerzimmer",
+      einrichtungsarten: ["GYMNASIUM", "KITA"],
+    });
+    const [treffer] = aehnlicheVorlagenpunkte([fach], [punkt("Postfach, Namensschild und Telefonliste vorbereiten", "VERWALTUNG")]);
+    expect(treffer.text).toBe(
+      "Vorlage „Onboarding Standard“: „Postfach, Namensschild und Telefonliste vorbereiten“ klingt nach „Fach im Lehrerzimmer“ (gilt nur für Gymnasium, Kita). Dort bekommt die Stelle zwei Aufgaben – den Vorlagenpunkt bitte umformulieren statt streichen, sonst fehlt er den übrigen Einrichtungen.",
+    );
   });
 
   it("nur dieselbe Stelle; Freitext oder keine Zustaendigkeit zaehlt nicht", () => {
@@ -1096,67 +1110,117 @@ describe("VORSCHLAEGE", () => {
     }
   });
 
-  it("sind zentral, ohne Entgeltbezug, ohne Faelligkeit und ohne Einschraenkung", () => {
+  it("sind zentral, ohne Entgeltbezug; nur Rechner und Telefon schraenken die Personengruppe ein", () => {
     for (const v of VORSCHLAEGE) {
+      // Entscheidung 14.10.2026: Rechner und Telefon nicht fuer Minijob und Ehrenamt.
+      const gruppen = ["IT_LAPTOP", "IT_TELEFON"].includes(v.vorschlagSchluessel)
+        ? ["STANDARD", "BEAMTE", "ERZIEHER"]
+        : [];
       expect(v).toMatchObject({
         organizationId: null,
-        einrichtungsarten: [],
-        personengruppen: [],
+        personengruppen: gruppen,
         entgeltrelevant: false,
-        defaultDueDays: null,
       });
     }
   });
 
-  it("enthalten den Anfangsbestand aus dem Plan samt BYOD (E-A39)", () => {
+  it("Standardwerte (14.10.2026): Faelligkeit nur an Aufgaben des Standards, nie an Angaben, immer vor Dienstbeginn", () => {
+    for (const v of VORSCHLAEGE) {
+      if (v.art === "ANGABE" || !v.standardAktiv) {
+        // Angaben werden keine Aufgabe; was ausgeschaltet bereitsteht, bleibt wie bisher ohne Frist.
+        expect(`${v.vorschlagSchluessel}: ${v.defaultDueDays}`).toBe(`${v.vorschlagSchluessel}: null`);
+      } else {
+        expect(v.defaultDueDays).not.toBeNull();
+        expect(v.defaultDueDays!).toBeLessThan(0);
+      }
+    }
+  });
+
+  it("enthalten den Standardkatalog (Feinplan, Abschnitt „Standardkatalog (14.10.2026)“) samt BYOD (E-A39)", () => {
     const je = (stelle: string) =>
       VORSCHLAEGE.filter((v) => v.departmentKey === stelle).map((v) => [v.art, v.bezeichnung]);
     expect(je("IT")).toEqual([
-      ["JA_NEIN", "Dienst-Laptop/PC"],
-      ["JA_NEIN", "Dienst-iPad (Lernmittel)"],
-      ["JA_NEIN", "Telefon mit Durchwahl"],
-      ["JA_NEIN", "Private Endgeräte (BYOD) freischalten"],
       ["AUSWAHL", "Zugänge"],
+      ["AUSWAHL", "Schulische Zugänge"],
+      ["JA_NEIN", "Dienstrechner/Endgerät (Laptop/PC)"],
+      ["JA_NEIN", "Telefon mit Durchwahl"],
+      ["JA_NEIN", "Dienst-iPad (Lernmittel)"],
+      ["JA_NEIN", "Diensthandy"],
+      ["JA_NEIN", "Private Endgeräte (BYOD) freischalten"],
       ["ANGABE", "Gewünschte Durchwahl"],
     ]);
     expect(je("FACILITY")).toEqual([
+      ["AUSWAHL", "Schlüssel"],
+      ["AUSWAHL", "Schlüssel"],
+      ["AUSWAHL", "Schlüssel"],
+      ["ANGABE", "Unterrichtsfächer"],
+      ["ANGABE", "Raum des Arbeitsplatzes"],
       ["JA_NEIN", "Transponder/Chip"],
       ["JA_NEIN", "Parkplatz"],
       ["JA_NEIN", "Spind"],
-      ["AUSWAHL", "Schlüssel"],
-      ["ANGABE", "Unterrichtsfächer"],
     ]);
     expect(je("VERWALTUNG")).toEqual([
       ["JA_NEIN", "Fach im Lehrerzimmer"],
-      ["JA_NEIN", "Kopierkarte"],
       ["JA_NEIN", "Türschild"],
+      ["JA_NEIN", "Kopierkarte"],
       ["JA_NEIN", "Dienstausweis"],
     ]);
-    expect(VORSCHLAEGE).toHaveLength(15);
+    expect(VORSCHLAEGE).toHaveLength(20);
   });
 
   it("Zugänge, Schlüssel und Unterrichtsfächer wie im Feinplan", () => {
     const zugaenge = VORSCHLAEGE.find((v) => v.vorschlagSchluessel === "IT_ZUGAENGE");
     expect(zugaenge).toMatchObject({
-      optionen: ["Dienst-E-Mail", "Schulportal", "WebUntis", "Schulverwaltung", "Drucker-PIN"],
-      vorausgewaehlteOptionen: ["Dienst-E-Mail"],
+      optionen: ["Benutzerkonto und Dienst-E-Mail", "Drucker-PIN", "WLAN"],
+      vorausgewaehlteOptionen: ["Benutzerkonto und Dienst-E-Mail"],
       aufgabeTitel: "Zugang einrichten",
+      defaultDueDays: -7,
+      hinweisStelle: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+      einrichtungsarten: [],
+    });
+    expect(VORSCHLAEGE.find((v) => v.vorschlagSchluessel === "IT_ZUGAENGE_SCHULE")).toMatchObject({
+      optionen: ["Schulverwaltung", "WebUntis", "Schulportal"],
+      vorausgewaehlteOptionen: [],
+      einrichtungsarten: ["GYMNASIUM", "GESAMTSCHULE", "GRUNDSCHULE", "BERUFSKOLLEG"],
       hinweisStelle: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
     });
     const schluessel = VORSCHLAEGE.find((v) => v.vorschlagSchluessel === "FACILITY_SCHLUESSEL");
     expect(schluessel).toMatchObject({
-      optionen: ["Haupteingang", "Lehrerzimmer"],
+      optionen: ["Haupteingang", "Lehrerzimmer", "Klassenraum", "Fachraum", "Sporthalle"],
+      vorausgewaehlteOptionen: ["Haupteingang", "Lehrerzimmer"],
       aufgabeTitel: "Schlüssel ausgeben",
+      defaultDueDays: -3,
       // Steht im Formular unter der Position — an die Führungskraft gerichtet, mit Bemerkungsfeld dazu.
-      hinweisFuehrungskraft: "Weitere Räume bitte in der Bemerkung nennen.",
+      hinweisFuehrungskraft: "Welche Klassen- und Fachräume? Bitte in der Bemerkung nennen.",
       bemerkungAnbieten: true,
+      bemerkungPlatzhalter: "z. B. Raum 2.14, Chemieraum",
       // Die Pflegeanweisung an die Verwaltung steht nur in der Vorschau von „Vorschläge übernehmen“.
       pflegeHinweis: "Räume einer Einrichtung bitte als eigene Position dieser Einrichtung anlegen.",
     });
+    expect(VORSCHLAEGE.find((v) => v.vorschlagSchluessel === "FACILITY_SCHLUESSEL_KITA")).toMatchObject({
+      einrichtungsarten: ["KITA"],
+      optionen: ["Haupteingang", "Gruppenraum", "Personalraum"],
+      vorausgewaehlteOptionen: ["Haupteingang", "Gruppenraum"],
+      // Der Raum selbst steht in der Angabe „Raum des Arbeitsplatzes“ — die Bemerkung fragt nicht noch einmal.
+      hinweisFuehrungskraft: "Weitere Räume bitte in der Bemerkung nennen.",
+      bemerkungPlatzhalter: null,
+    });
+    expect(VORSCHLAEGE.find((v) => v.vorschlagSchluessel === "FACILITY_SCHLUESSEL_BUERO")).toMatchObject({
+      einrichtungsarten: ["VERWALTUNG", "GMBH", "VEREIN"],
+      optionen: ["Haupteingang", "Büro"],
+      vorausgewaehlteOptionen: ["Haupteingang", "Büro"],
+      hinweisFuehrungskraft: "Weitere Räume bitte in der Bemerkung nennen.",
+      bemerkungPlatzhalter: "z. B. Archiv, Lager",
+    });
+    // Kein Platzhalter einer Schlüssel-Position wiederholt das Beispiel der Angabe „Raum des Arbeitsplatzes“.
+    for (const v of VORSCHLAEGE.filter((x) => x.departmentKey === "FACILITY" && x.art === "AUSWAHL")) {
+      expect(v.bemerkungPlatzhalter ?? "").not.toContain("Büro 2.14");
+    }
     const faecher = VORSCHLAEGE.find((v) => v.vorschlagSchluessel === "FACILITY_UNTERRICHTSFAECHER");
     expect(faecher).toMatchObject({ angabeSchluessel: "UNTERRICHTSFAECHER", sichtbarFuer: ["IT"], bemerkungAnbieten: false });
     expect(VORSCHLAEGE.find((v) => v.vorschlagSchluessel === "IT_DURCHWAHL")).toMatchObject({
       angabeSchluessel: "DURCHWAHL",
+      standardAktiv: false,
     });
   });
 
@@ -1178,7 +1242,8 @@ describe("VORSCHLAEGE", () => {
     const schluessel = VORSCHLAEGE.find((v) => v.vorschlagSchluessel === "FACILITY_SCHLUESSEL")!;
     const [gruppe] = formularGruppen([{ ...schluessel, id: "s", isActive: true }], {});
     expect(gruppe.positionen[0]).not.toHaveProperty("pflegeHinweis");
-    expect(gruppe.positionen[0].hinweisFuehrungskraft).toBe("Weitere Räume bitte in der Bemerkung nennen.");
+    expect(gruppe.positionen[0].hinweisFuehrungskraft).toBe("Welche Klassen- und Fachräume? Bitte in der Bemerkung nennen.");
+    expect(gruppe.positionen[0]).not.toHaveProperty("standardAktiv");
     expect(katalogWerte({ ...schluessel, isActive: false })).not.toHaveProperty("pflegeHinweis");
   });
 });
@@ -1432,14 +1497,14 @@ describe("freigabeWarnungen", () => {
 
 describe("vorschlaegeMeldung", () => {
   it("nennt Anzahl, Zustand und was schon da war", () => {
-    expect(vorschlaegeMeldung(15, 0)).toBe(
-      "15 Vorschläge übernommen – ausgeschaltet. Bitte prüfen, Fälligkeiten eintragen und einschalten, was passt.",
+    expect(vorschlaegeMeldung(20, 0)).toBe(
+      "20 Vorschläge übernommen – ausgeschaltet, mit Standardwerten. Bitte Vorauswahl und Fälligkeiten prüfen und einschalten, was passt.",
     );
-    expect(vorschlaegeMeldung(1, 14)).toBe(
-      "1 Vorschlag übernommen – ausgeschaltet. Bitte prüfen, Fälligkeiten eintragen und einschalten, was passt. 14 standen schon im Katalog.",
+    expect(vorschlaegeMeldung(1, 19)).toBe(
+      "1 Vorschlag übernommen – ausgeschaltet, mit Standardwerten. Bitte Vorauswahl und Fälligkeiten prüfen und einschalten, was passt. 19 standen schon im Katalog.",
     );
     expect(vorschlaegeMeldung(2, 1)).toMatch(/ 1 stand schon im Katalog\.$/);
-    expect(vorschlaegeMeldung(0, 15)).toBe(MELDUNGEN.VORSCHLAEGE_ALLE_VORHANDEN);
+    expect(vorschlaegeMeldung(0, 20)).toBe(MELDUNGEN.VORSCHLAEGE_ALLE_VORHANDEN);
   });
 });
 
@@ -1763,7 +1828,17 @@ describe("Katalogseite (S4)", () => {
         artName: "Auswahl",
         vorhanden: false,
         hinweis: null,
+        gilt: null,
       });
+    });
+
+    it("nennt die Einrichtungsarten — die drei Schlüssel-Positionen stehen sonst gleichlautend da", () => {
+      const eintraege = vorschlaegeVorschau([], []).gruppen.flatMap((g) => g.eintraege);
+      const gilt = (s: string) => eintraege.find((e) => e.vorschlagSchluessel === s)?.gilt;
+      expect(gilt("FACILITY_SCHLUESSEL")).toBe("nur Gymnasium, Gesamtschule, Grundschule, Berufskolleg");
+      expect(gilt("FACILITY_SCHLUESSEL_KITA")).toBe("nur Kita");
+      expect(gilt("FACILITY_SCHLUESSEL_BUERO")).toBe("nur Verwaltung, GmbH, Verein");
+      expect(gilt("IT_LAPTOP")).toBeNull();
     });
 
     it("trägt den Pflegehinweis eines Vorschlags (Schlüssel: Räume je Einrichtung) in die Vorschau", () => {
@@ -1773,6 +1848,22 @@ describe("Katalogseite (S4)", () => {
         "Räume einer Einrichtung bitte als eigene Position dieser Einrichtung anlegen.",
       );
       expect(eintraege.filter((e) => e.hinweis !== null).map((e) => e.vorschlagSchluessel)).toEqual(["FACILITY_SCHLUESSEL"]);
+    });
+
+    it("bei einem Eintrag, der schon im Katalog steht, gelten die GESPEICHERTEN Einrichtungsarten", () => {
+      const gilt = (positionen: Parameters<typeof vorschlaegeVorschau>[0], s: string) =>
+        vorschlaegeVorschau(positionen, [])
+          .gruppen.flatMap((g) => g.eintraege)
+          .find((e) => e.vorschlagSchluessel === s)?.gilt;
+      // Altbestand (Vorschläge vor dem 14.10.2026): Schlüssel ohne Einschränkung gilt überall —
+      // die Vorschau darf nicht „nur Schulen“ behaupten, sonst schaltete HR Kita und Büro dazu.
+      expect(gilt([{ vorschlagSchluessel: "FACILITY_SCHLUESSEL", einrichtungsarten: [] }], "FACILITY_SCHLUESSEL")).toBeNull();
+      expect(gilt([{ vorschlagSchluessel: "FACILITY_SCHLUESSEL" }], "FACILITY_SCHLUESSEL")).toBeNull();
+      expect(gilt([{ vorschlagSchluessel: "IT_LAPTOP", einrichtungsarten: ["KITA"] }], "IT_LAPTOP")).toBe("nur Kita");
+      // Was fehlt, zeigt die Vorlage.
+      expect(gilt([{ vorschlagSchluessel: "FACILITY_SCHLUESSEL", einrichtungsarten: [] }], "FACILITY_SCHLUESSEL_KITA")).toBe(
+        "nur Kita",
+      );
     });
 
     it("markiert, was schon im Katalog steht (auch geändert), und zählt den Rest", () => {

@@ -809,7 +809,7 @@ describe("POST /api/settings/ausstattung/vorschlaege", () => {
     expect(body).toEqual({
       angelegt: VORSCHLAEGE.length,
       vorhanden: 0,
-      meldung: `${VORSCHLAEGE.length} Vorschläge übernommen – ausgeschaltet. Bitte prüfen, Fälligkeiten eintragen und einschalten, was passt.`,
+      meldung: `${VORSCHLAEGE.length} Vorschläge übernommen – ausgeschaltet, mit Standardwerten. Bitte Vorauswahl und Fälligkeiten prüfen und einschalten, was passt.`,
     });
     const { data, skipDuplicates, select } = mockPrisma.ausstattungsPosition.createManyAndReturn.mock.calls[0][0];
     expect(skipDuplicates).toBe(true);
@@ -890,6 +890,21 @@ describe("POST /api/settings/ausstattung/vorschlaege", () => {
         },
       ],
     });
+  });
+
+  it("Standardkatalog: übernimmt die Standardwerte, schaltet aber nie ein — auch nicht, was im Standard an ist", async () => {
+    await VORSCHLAEGE_POST(anfrage("POST"), OHNE_PARAMS);
+    const { data } = mockPrisma.ausstattungsPosition.createManyAndReturn.mock.calls[0][0];
+    expect(VORSCHLAEGE.some((v) => v.standardAktiv)).toBe(true);
+    for (const v of VORSCHLAEGE) {
+      const d = data.find((x: { vorschlagSchluessel: string }) => x.vorschlagSchluessel === v.vorschlagSchluessel);
+      expect([v.vorschlagSchluessel, d.isActive]).toEqual([v.vorschlagSchluessel, false]);
+      expect(d).not.toHaveProperty("standardAktiv");
+      expect(d.defaultDueDays).toBe(v.defaultDueDays);
+      expect(d.vorausgewaehlt).toBe(v.vorausgewaehlt);
+      expect(d.vorausgewaehlteOptionen).toEqual(v.vorausgewaehlteOptionen);
+      expect(d.einrichtungsarten).toEqual(v.einrichtungsarten);
+    }
   });
 
   it("gibt die Vorschlags-Listen nicht heraus (jede Zeile hat eigene Arrays)", async () => {

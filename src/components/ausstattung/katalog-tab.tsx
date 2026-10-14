@@ -722,8 +722,9 @@ export function AusstattungKatalogTab() {
           }}
         >
           <p className="text-foreground">
-            Die Vorschläge kommen zentral, ausgeschaltet und ohne Fälligkeit in den Katalog. Was schon dort steht
-            (auch geändert), bleibt, wie es ist. Danach prüfen, Fälligkeiten eintragen und einschalten, was passt.
+            Die Vorschläge kommen zentral und ausgeschaltet in den Katalog, mit Standardwerten für Vorauswahl,
+            Fälligkeit und Hinweise. Was schon dort steht (auch geändert), bleibt, wie es ist. Danach prüfen und
+            einschalten, was passt.
           </p>
           <div className="space-y-3">
             {vorschau.gruppen.map((g) => (
@@ -737,6 +738,12 @@ export function AusstattungKatalogTab() {
                       className={e.vorhanden ? "text-muted-foreground" : "text-foreground"}
                     >
                       {e.bezeichnung} <span className="text-xs text-muted-foreground">({e.artName})</span>
+                      {e.gilt && (
+                        <span className="text-xs text-muted-foreground" data-vorschlag-gilt>
+                          {" "}
+                          – {e.gilt}
+                        </span>
+                      )}
                       {e.vorhanden && <span className="text-xs"> – schon im Katalog</span>}
                       {e.hinweis && (
                         <span className="block text-xs text-muted-foreground" data-vorschlag-hinweis>

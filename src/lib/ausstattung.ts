@@ -18,7 +18,9 @@
  * Stand S9: Konstanten und Typen, dazu die Katalogregeln (positionPruefen,
  * positionGiltAm, positionenFuer, formularGruppen, adressLuecken,
  * aehnlicheVorlagenpunkte, aufgabenTitel), die Vorschlaege fuer den
- * Anfangsbestand, die Meldungen des Katalogs, die Rechnungen der
+ * Anfangsbestand (seit 14.10.2026 der Standardkatalog mit Standardwerten;
+ * einen leeren Katalog fuellt die Migration AUSSTATTUNG_STANDARDKATALOG_V1
+ * in prisma/seed-check.js), die Meldungen des Katalogs, die Rechnungen der
  * Katalogseite (Feldliste und Aenderungen fuer PATCH und Protokoll, Stellen,
  * Warnung „außerhalb der Freigabeliste“, Antworttypen der Einstellungsrouten)
  * und ihre Anzeige (katalogZeilen, katalogHinweise, vorschlaegeVorschau —
@@ -367,6 +369,12 @@ export const AUSSTATTUNG_AUDIT = {
   VORSCHLAEGE_UEBERNOMMEN: "AUSSTATTUNG_VORSCHLAEGE_UEBERNOMMEN",
   /** A4 (G27): IDs, Vorschlagsschluessel, Anzahl — nie Werte von Hand. */
   RUECKGABE_VORGABEN_UEBERNOMMEN: "AUSSTATTUNG_RUECKGABE_VORGABEN_UEBERNOMMEN",
+  /**
+   * Einmalige Migration AUSSTATTUNG_STANDARDKATALOG_V1 (prisma/seed-check.js,
+   * ohne `userId`): IDs, Vorschlagsschluessel, Stelle, `isActive`, Anzahlen.
+   * Der Wert steht dort als JS-Kopie (ausstattung-standardkatalog.test.ts).
+   */
+  STANDARDKATALOG_ANGELEGT: "AUSSTATTUNG_STANDARDKATALOG_ANGELEGT",
   // Vorgang
   ARBEITSORT_GEAENDERT: "ONBOARDING_ARBEITSORT_GEAENDERT",
   AUFGABEN_ANGELEGT: "AUSSTATTUNG_AUFGABEN_ANGELEGT",
@@ -390,6 +398,7 @@ export const AUSSTATTUNG_AUDIT_LABELS: Readonly<Record<AusstattungAuditCode, str
   [AUSSTATTUNG_AUDIT.AUSBLENDUNG_GEAENDERT]: "Ausstattungsposition für Einrichtung ein-/ausgeblendet",
   [AUSSTATTUNG_AUDIT.VORSCHLAEGE_UEBERNOMMEN]: "Ausstattungs-Vorschläge übernommen",
   [AUSSTATTUNG_AUDIT.RUECKGABE_VORGABEN_UEBERNOMMEN]: "Rückgabe-Vorgaben in den Katalog übernommen",
+  [AUSSTATTUNG_AUDIT.STANDARDKATALOG_ANGELEGT]: "Standardkatalog Ausstattung & Zugänge angelegt",
   [AUSSTATTUNG_AUDIT.ARBEITSORT_GEAENDERT]: "Arbeitsort geändert",
   [AUSSTATTUNG_AUDIT.AUFGABEN_ANGELEGT]: "Ausstattungsaufgaben angelegt",
   [AUSSTATTUNG_AUDIT.FAELLIGKEIT_ANGEHOBEN]: "Fälligkeit von Ausstattungsaufgaben angehoben",
@@ -1227,7 +1236,12 @@ function wortPasst(titelWort: string, wort: string): boolean {
  * (ohne Gross/Klein, Wort fuer Wort nach `wortPasst`; „Schlüssel
  * bereitlegen“ ↔ Position „Schlüssel“). Je Position und Vorlagenpunkt ein
  * Treffer. Angaben werden keine Aufgabe und bleiben deshalb aussen vor. Welche
- * Vorlagen zaehlen (aktive des Onboardings), waehlt der Aufrufer.
+ * Vorlagen zaehlen (aktive des Onboardings), waehlt der Aufrufer. Gilt die
+ * Position nur fuer einige Einrichtungsarten, nennt der Text sie und raet zum
+ * Umformulieren statt zum Streichen (Standardkatalog, 14.10.2026). Nur gleiche
+ * Stelle: Paare ueber zwei Stellen (Schluessel-Punkte der Verwaltung in den
+ * Seed-Vorlagen ↔ Schluessel-Positionen der Gebaeudewirtschaft) meldet die
+ * Seite nicht — die stehen als Handgriff im Feinplan, Abschnitt 8.
  */
 export function aehnlicheVorlagenpunkte(
   positionen: ReadonlyArray<KatalogPosition>,
@@ -1238,6 +1252,10 @@ export function aehnlicheVorlagenpunkte(
     if (p.art === "ANGABE") continue;
     const woerter = [...new Set([p.bezeichnung, ...p.optionen].flatMap(vergleichsWoerter))];
     if (woerter.length === 0) continue;
+    // Vorlagen gelten fuer alle Einrichtungen. Deckt die Position nur einige ab
+    // („Fach im Lehrerzimmer“ nur Schulen), fehlte ein gestrichener Punkt den
+    // uebrigen — dann raet der Text zum Umformulieren statt zum Streichen.
+    const nur = p.einrichtungsarten.map((a) => wertName(EINRICHTUNGSARTEN, a)).join(", ");
     for (const v of vorlagenpunkte) {
       if ((v.defaultAssignee ?? "").trim() !== p.departmentKey) continue;
       const titelWoerter = vergleichsWoerter(v.title);
@@ -1252,7 +1270,9 @@ export function aehnlicheVorlagenpunkte(
         punktId: v.id ?? null,
         punktTitel: v.title,
         wort,
-        text: `Vorlage „${v.templateName}“: „${v.title}“ klingt nach „${p.bezeichnung}“. Bitte den Vorlagenpunkt streichen oder umformulieren, sonst bekommt die Stelle zwei Aufgaben.`,
+        text: nur
+          ? `Vorlage „${v.templateName}“: „${v.title}“ klingt nach „${p.bezeichnung}“ (gilt nur für ${nur}). Dort bekommt die Stelle zwei Aufgaben – den Vorlagenpunkt bitte umformulieren statt streichen, sonst fehlt er den übrigen Einrichtungen.`
+          : `Vorlage „${v.templateName}“: „${v.title}“ klingt nach „${p.bezeichnung}“. Bitte den Vorlagenpunkt streichen oder umformulieren, sonst bekommt die Stelle zwei Aufgaben.`,
       });
     }
   }
@@ -3832,7 +3852,8 @@ export function ausstattungVorschauSatz(
 }
 
 // =============================================
-// Vorschlaege fuer den Anfangsbestand (Plan, Abschnitt 5; E-A39)
+// Standardkatalog: Vorschlaege fuer den Anfangsbestand (Plan, Abschnitt 5;
+// E-A39; Feinplan „Standardkatalog (14.10.2026)“)
 // =============================================
 
 /** Ein Vorschlag: eine vollstaendige Position mit festem Schluessel (F11). */
@@ -3851,9 +3872,17 @@ export interface Vorschlag extends PositionEntwurf {
    * Fuehrungskraft liest nur `hinweisFuehrungskraft`).
    */
   pflegeHinweis?: string;
+  /**
+   * Eingeschaltet im Standardkatalog? Liest NUR die einmalige Migration
+   * `AUSSTATTUNG_STANDARDKATALOG_V1` (prisma/seed-check.js, als JS-Kopie), die
+   * einen LEEREN Katalog mit allen Vorschlaegen fuellt. Kein Katalog- und kein
+   * Datenbankfeld: „Vorschläge übernehmen“ legt trotzdem alles aus (Regel 1),
+   * und `katalogWerte` laesst das Feld fallen.
+   */
+  standardAktiv: boolean;
 }
 
-type VorschlagTeil = Pick<Vorschlag, "vorschlagSchluessel" | "departmentKey" | "art" | "bezeichnung"> &
+type VorschlagTeil = Pick<Vorschlag, "vorschlagSchluessel" | "departmentKey" | "art" | "bezeichnung" | "standardAktiv"> &
   Partial<Omit<Vorschlag, "orderIndex">>;
 
 /** Alle Felder mit ihrem Leerwert; jede Liste neu, damit kein Vorschlag eine fremde teilt. */
@@ -3878,46 +3907,143 @@ function vorschlag(teil: VorschlagTeil): Omit<Vorschlag, "orderIndex"> {
   };
 }
 
-function angabeVorschlag(
-  vorschlagSchluessel: string,
-  departmentKey: string,
-  angabeSchluessel: AngabeSchluessel,
-  sichtbarFuer: string[] = [],
-): Omit<Vorschlag, "orderIndex"> {
+function angabeVorschlag(teil: {
+  vorschlagSchluessel: string;
+  departmentKey: string;
+  angabeSchluessel: AngabeSchluessel;
+  standardAktiv: boolean;
+  sichtbarFuer?: string[];
+  einrichtungsarten?: string[];
+}): Omit<Vorschlag, "orderIndex"> {
   return vorschlag({
-    vorschlagSchluessel,
-    departmentKey,
+    ...teil,
     art: "ANGABE",
-    angabeSchluessel,
-    bezeichnung: ANGABEN_KATALOG[angabeSchluessel].label,
-    sichtbarFuer,
+    bezeichnung: ANGABEN_KATALOG[teil.angabeSchluessel].label,
+    sichtbarFuer: [...(teil.sichtbarFuer ?? [])],
+    einrichtungsarten: [...(teil.einrichtungsarten ?? [])],
   });
 }
 
+/** Einrichtungsarten der Schulen (Schluessel, Lehrerzimmer, Schulverwaltung, iPad). */
+const SCHULEN: ReadonlyArray<Einrichtungsart> = ["GYMNASIUM", "GESAMTSCHULE", "GRUNDSCHULE", "BERUFSKOLLEG"];
+/** Einrichtungsarten mit Bueros statt Klassenraeumen (Verwaltung, Gesellschaften, Vereine). */
+const BUEROS: ReadonlyArray<Einrichtungsart> = ["VERWALTUNG", "GMBH", "VEREIN"];
 /**
- * „Vorschläge übernehmen“ (Einstellungen → Ausstattung & Zugänge): alle zentral,
- * ohne Faelligkeit und – wie jede neue Position – ausgeschaltet (Regel 1). Die
- * Verwaltung schaltet ein, was passt, und traegt Fristen und die Raeume ihrer
- * Einrichtung selbst ein. Der Seed legt keinen Katalog an. Bewusst OHNE
- * A4-Werte (G27): Die Vorgaben fuer „Beim Austritt“ stehen getrennt als
- * RUECKGABE_VORGABEN in ausgaben.ts und kommen nur ueber „Rückgabe-Vorgaben
- * übernehmen …“ an die Positionen — sonst schaltete der Pilot von A1 bis A3
- * die Erfassung der Uebergaben schon ein.
+ * Personengruppen mit eigenem Arbeitsplatz (Rechner, Telefon). Minijob und
+ * Ehrenamt sehen diese Positionen nicht (Entscheidung 14.10.2026).
+ */
+const MIT_ARBEITSPLATZ: ReadonlyArray<Personengruppe> = ["STANDARD", "BEAMTE", "ERZIEHER"];
+
+/** Hinweis an die Gebaeudewirtschaft an jeder Schluessel-Position. */
+const SCHLUESSEL_HINWEIS_STELLE = "Schlüssel gegen Unterschrift ausgeben und die Schlüsselnummer notieren.";
+/** Hinweis an die Fuehrungskraft unter den Schluesseln von Kita und Buero (der Raum steht in der Angabe). */
+const SCHLUESSEL_WEITERE_RAEUME = "Weitere Räume bitte in der Bemerkung nennen.";
+/** E-A28: Zugaenge erst nach der Verpflichtung auf Vertraulichkeit. */
+const ZUGANG_HINWEIS_STELLE = "Erst nach Verpflichtung auf Vertraulichkeit freischalten.";
+
+/**
+ * Der Standardkatalog — die EINZIGE Quelle fuer zwei Wege:
+ *
+ *   - „Vorschläge übernehmen“ (Einstellungen → Ausstattung & Zugänge) legt
+ *     fehlende Vorschlaege mit diesen Standardwerten an (Vorauswahl,
+ *     Faelligkeit, Hinweise, Einrichtungsarten), aber wie jede neue Position
+ *     AUSGESCHALTET (Regel 1). Die Verwaltung prueft und schaltet ein.
+ *   - Die einmalige Migration `AUSSTATTUNG_STANDARDKATALOG_V1`
+ *     (prisma/seed-check.js) fuellt einen LEEREN Katalog nach dem Deploy mit
+ *     allen Vorschlaegen und schaltet die mit `standardAktiv` ein (Wunsch des
+ *     Projektverantwortlichen nach der Zustimmung von DSB und MAV am
+ *     14.10.2026: Schluessel, Telefon, E-Mail, Rechner gehoeren zu jeder
+ *     Einstellung). Im Container gibt es kein tsx — dort steht eine JS-Kopie,
+ *     die ausstattung-standardkatalog.test.ts Feld fuer Feld gegen diese
+ *     Liste haelt. Wer hier etwas aendert, aendert die Kopie mit.
+ *
+ * Alle zentral. Faelligkeiten in Tagen relativ zum Vertragsbeginn (Zugaenge
+ * eine Woche vorher, Geraete fuenf Tage, Schluessel, Fach und Tuerschild drei).
+ * Zugang, Schluessel und die uebrigen Positionen gelten fuer alle
+ * Personengruppen (Wunsch: „jeder“); nur Rechner und Telefon sind auf
+ * Angestellte, Beamte und Kita-Personal beschraenkt (`MIT_ARBEITSPLATZ`,
+ * Entscheidung 14.10.2026) — Minijob und Ehrenamt sehen sie gar nicht. Die
+ * Fuehrungskraft waehlt ab, HR kann die Gruppen im Betrieb aendern.
+ * Bewusst OHNE A4-Werte (G27): Die Vorgaben fuer „Beim Austritt“ stehen
+ * getrennt als RUECKGABE_VORGABEN in ausgaben.ts und kommen nur ueber
+ * „Rückgabe-Vorgaben übernehmen …“ an die Positionen — vorher muessen aktive
+ * Offboarding-Webhooks auf dem Server geprueft sein (Regel 29).
+ *
+ * Drei Schluessel-Positionen fuer FACILITY (Schulen, Kita, Bueros) statt einer:
+ * Die Raeume unterscheiden sich, und je Arbeitsort gilt genau eine (disjunkte
+ * Einrichtungsarten). Was nicht zum Standard gehoert (BYOD, Transponder,
+ * Parkplatz, Spind, Kopierkarte, Dienstausweis, Durchwahl als Angabe), steht
+ * ausgeschaltet bereit.
  */
 export const VORSCHLAEGE: ReadonlyArray<Readonly<Vorschlag>> = [
   // ---- IT ----
-  vorschlag({ vorschlagSchluessel: "IT_LAPTOP", departmentKey: "IT", art: "JA_NEIN", bezeichnung: "Dienst-Laptop/PC" }),
   vorschlag({
-    vorschlagSchluessel: "IT_IPAD",
+    vorschlagSchluessel: "IT_ZUGAENGE",
+    departmentKey: "IT",
+    art: "AUSWAHL",
+    bezeichnung: "Zugänge",
+    optionen: ["Benutzerkonto und Dienst-E-Mail", "Drucker-PIN", "WLAN"],
+    vorausgewaehlteOptionen: ["Benutzerkonto und Dienst-E-Mail"],
+    aufgabeTitel: "Zugang einrichten",
+    defaultDueDays: -7,
+    hinweisStelle: ZUGANG_HINWEIS_STELLE,
+    standardAktiv: true,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "IT_ZUGAENGE_SCHULE",
+    departmentKey: "IT",
+    art: "AUSWAHL",
+    bezeichnung: "Schulische Zugänge",
+    einrichtungsarten: [...SCHULEN],
+    optionen: ["Schulverwaltung", "WebUntis", "Schulportal"],
+    aufgabeTitel: "Zugang einrichten",
+    defaultDueDays: -7,
+    hinweisStelle: ZUGANG_HINWEIS_STELLE,
+    standardAktiv: true,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "IT_LAPTOP",
     departmentKey: "IT",
     art: "JA_NEIN",
-    bezeichnung: "Dienst-iPad (Lernmittel)",
+    // „Endgerät“ steht mit Absicht im Namen: Nur so erkennt `aehnlicheVorlagenpunkte`
+    // (Wort fuer Wort) den Vorlagenpunkt „Arbeitsplatz/Endgerät einrichten,
+    // Zugangsdaten übergeben“ der IT und warnt vor der doppelten Aufgabe.
+    bezeichnung: "Dienstrechner/Endgerät (Laptop/PC)",
+    vorausgewaehlt: true,
+    personengruppen: [...MIT_ARBEITSPLATZ],
+    defaultDueDays: -5,
+    bemerkungPlatzhalter: "z. B. Laptop statt PC, zweiter Bildschirm",
+    hinweisStelle: "Gerät mit Standardsoftware einrichten und am ersten Arbeitstag übergeben.",
+    standardAktiv: true,
   }),
   vorschlag({
     vorschlagSchluessel: "IT_TELEFON",
     departmentKey: "IT",
     art: "JA_NEIN",
     bezeichnung: "Telefon mit Durchwahl",
+    vorausgewaehlt: true,
+    personengruppen: [...MIT_ARBEITSPLATZ],
+    defaultDueDays: -5,
+    bemerkungPlatzhalter: "z. B. gewünschte Durchwahl",
+    hinweisStelle: "Durchwahl einrichten und dem Sekretariat für die Telefonliste mitteilen.",
+    standardAktiv: true,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "IT_IPAD",
+    departmentKey: "IT",
+    art: "JA_NEIN",
+    bezeichnung: "Dienst-iPad (Lernmittel)",
+    einrichtungsarten: [...SCHULEN],
+    defaultDueDays: -5,
+    standardAktiv: true,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "IT_MOBIL",
+    departmentKey: "IT",
+    art: "JA_NEIN",
+    bezeichnung: "Diensthandy",
+    defaultDueDays: -5,
+    standardAktiv: true,
   }),
   vorschlag({
     vorschlagSchluessel: "IT_BYOD",
@@ -3926,65 +4052,136 @@ export const VORSCHLAEGE: ReadonlyArray<Readonly<Vorschlag>> = [
     bezeichnung: "Private Endgeräte (BYOD) freischalten",
     // Sonst hiesse die Aufgabe „… freischalten bereitstellen“.
     aufgabeTitel: "Private Endgeräte (BYOD) freischalten",
+    standardAktiv: false,
   }),
-  vorschlag({
-    vorschlagSchluessel: "IT_ZUGAENGE",
+  // Die Durchwahl fragt der Standard ueber den Platzhalter der Telefon-Position
+  // ab; die Angabe bleibt fuer Einrichtungen, die sie getrennt sehen wollen.
+  angabeVorschlag({
+    vorschlagSchluessel: "IT_DURCHWAHL",
     departmentKey: "IT",
-    art: "AUSWAHL",
-    bezeichnung: "Zugänge",
-    optionen: ["Dienst-E-Mail", "Schulportal", "WebUntis", "Schulverwaltung", "Drucker-PIN"],
-    vorausgewaehlteOptionen: ["Dienst-E-Mail"],
-    aufgabeTitel: "Zugang einrichten",
-    // E-A28: Zugaenge erst nach der Verpflichtung auf Vertraulichkeit.
-    hinweisStelle: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+    angabeSchluessel: "DURCHWAHL",
+    standardAktiv: false,
   }),
-  angabeVorschlag("IT_DURCHWAHL", "IT", "DURCHWAHL"),
   // ---- Gebaeudewirtschaft ----
-  vorschlag({
-    vorschlagSchluessel: "FACILITY_TRANSPONDER",
-    departmentKey: "FACILITY",
-    art: "JA_NEIN",
-    bezeichnung: "Transponder/Chip",
-  }),
-  vorschlag({ vorschlagSchluessel: "FACILITY_PARKPLATZ", departmentKey: "FACILITY", art: "JA_NEIN", bezeichnung: "Parkplatz" }),
-  vorschlag({ vorschlagSchluessel: "FACILITY_SPIND", departmentKey: "FACILITY", art: "JA_NEIN", bezeichnung: "Spind" }),
   vorschlag({
     vorschlagSchluessel: "FACILITY_SCHLUESSEL",
     departmentKey: "FACILITY",
     art: "AUSWAHL",
     bezeichnung: "Schlüssel",
-    optionen: ["Haupteingang", "Lehrerzimmer"],
+    einrichtungsarten: [...SCHULEN],
+    optionen: ["Haupteingang", "Lehrerzimmer", "Klassenraum", "Fachraum", "Sporthalle"],
+    vorausgewaehlteOptionen: ["Haupteingang", "Lehrerzimmer"],
     aufgabeTitel: "Schlüssel ausgeben",
+    defaultDueDays: -3,
     // Steht im Formular unter der Position — richtet sich deshalb an die Fuehrungskraft.
-    hinweisFuehrungskraft: "Weitere Räume bitte in der Bemerkung nennen.",
+    hinweisFuehrungskraft: "Welche Klassen- und Fachräume? Bitte in der Bemerkung nennen.",
+    bemerkungPlatzhalter: "z. B. Raum 2.14, Chemieraum",
+    hinweisStelle: SCHLUESSEL_HINWEIS_STELLE,
     // Die Pflegeanweisung gehoert in die Vorschau, nicht ins Formular.
     pflegeHinweis: "Räume einer Einrichtung bitte als eigene Position dieser Einrichtung anlegen.",
+    standardAktiv: true,
   }),
-  angabeVorschlag("FACILITY_UNTERRICHTSFAECHER", "FACILITY", "UNTERRICHTSFAECHER", ["IT"]),
+  vorschlag({
+    vorschlagSchluessel: "FACILITY_SCHLUESSEL_KITA",
+    departmentKey: "FACILITY",
+    art: "AUSWAHL",
+    bezeichnung: "Schlüssel",
+    einrichtungsarten: ["KITA"],
+    optionen: ["Haupteingang", "Gruppenraum", "Personalraum"],
+    vorausgewaehlteOptionen: ["Haupteingang", "Gruppenraum"],
+    aufgabeTitel: "Schlüssel ausgeben",
+    defaultDueDays: -3,
+    // Den Raum selbst (Gruppenraum, Büro) fragt die Angabe „Raum des
+    // Arbeitsplatzes“ darunter ab, die auch IT und Sekretariat sehen — die
+    // Bemerkung bleibt fuer weitere Raeume, sonst fragte das Formular zweimal.
+    hinweisFuehrungskraft: SCHLUESSEL_WEITERE_RAEUME,
+    hinweisStelle: SCHLUESSEL_HINWEIS_STELLE,
+    standardAktiv: true,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "FACILITY_SCHLUESSEL_BUERO",
+    departmentKey: "FACILITY",
+    art: "AUSWAHL",
+    bezeichnung: "Schlüssel",
+    einrichtungsarten: [...BUEROS],
+    optionen: ["Haupteingang", "Büro"],
+    vorausgewaehlteOptionen: ["Haupteingang", "Büro"],
+    aufgabeTitel: "Schlüssel ausgeben",
+    defaultDueDays: -3,
+    hinweisFuehrungskraft: SCHLUESSEL_WEITERE_RAEUME,
+    bemerkungPlatzhalter: "z. B. Archiv, Lager",
+    hinweisStelle: SCHLUESSEL_HINWEIS_STELLE,
+    standardAktiv: true,
+  }),
+  angabeVorschlag({
+    vorschlagSchluessel: "FACILITY_UNTERRICHTSFAECHER",
+    departmentKey: "FACILITY",
+    angabeSchluessel: "UNTERRICHTSFAECHER",
+    sichtbarFuer: ["IT"],
+    einrichtungsarten: [...SCHULEN],
+    standardAktiv: true,
+  }),
+  angabeVorschlag({
+    vorschlagSchluessel: "FACILITY_ARBEITSPLATZ",
+    departmentKey: "FACILITY",
+    angabeSchluessel: "ARBEITSPLATZ_RAUM",
+    // IT richtet Rechner und Telefon am Platz ein, das Sekretariat fuehrt Telefonliste und Tuerschild.
+    sichtbarFuer: ["IT", "VERWALTUNG"],
+    standardAktiv: true,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "FACILITY_TRANSPONDER",
+    departmentKey: "FACILITY",
+    art: "JA_NEIN",
+    bezeichnung: "Transponder/Chip",
+    standardAktiv: false,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "FACILITY_PARKPLATZ",
+    departmentKey: "FACILITY",
+    art: "JA_NEIN",
+    bezeichnung: "Parkplatz",
+    standardAktiv: false,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "FACILITY_SPIND",
+    departmentKey: "FACILITY",
+    art: "JA_NEIN",
+    bezeichnung: "Spind",
+    standardAktiv: false,
+  }),
   // ---- Verwaltung / Sekretariat ----
   vorschlag({
     vorschlagSchluessel: "VERWALTUNG_FACH",
     departmentKey: "VERWALTUNG",
     art: "JA_NEIN",
     bezeichnung: "Fach im Lehrerzimmer",
-  }),
-  vorschlag({
-    vorschlagSchluessel: "VERWALTUNG_KOPIERKARTE",
-    departmentKey: "VERWALTUNG",
-    art: "JA_NEIN",
-    bezeichnung: "Kopierkarte",
+    einrichtungsarten: [...SCHULEN],
+    vorausgewaehlt: true,
+    defaultDueDays: -3,
+    standardAktiv: true,
   }),
   vorschlag({
     vorschlagSchluessel: "VERWALTUNG_TUERSCHILD",
     departmentKey: "VERWALTUNG",
     art: "JA_NEIN",
     bezeichnung: "Türschild",
+    defaultDueDays: -3,
+    standardAktiv: true,
+  }),
+  vorschlag({
+    vorschlagSchluessel: "VERWALTUNG_KOPIERKARTE",
+    departmentKey: "VERWALTUNG",
+    art: "JA_NEIN",
+    bezeichnung: "Kopierkarte",
+    standardAktiv: false,
   }),
   vorschlag({
     vorschlagSchluessel: "VERWALTUNG_DIENSTAUSWEIS",
     departmentKey: "VERWALTUNG",
     art: "JA_NEIN",
     bezeichnung: "Dienstausweis",
+    standardAktiv: false,
   }),
 ].map((v, i) => ({ ...v, orderIndex: i * 10 }));
 
@@ -4214,13 +4411,18 @@ export function freigabeWarnungen(
   );
 }
 
-/** Rueckmeldung von „Vorschläge übernehmen“ (fertiger Satz fuer die Katalogseite). */
+/**
+ * Rueckmeldung von „Vorschläge übernehmen“ (fertiger Satz fuer die
+ * Katalogseite). Die Vorschlaege tragen seit dem Standardkatalog (14.10.2026)
+ * Vorauswahl und Faelligkeit — zu pruefen bleibt, ob sie fuer die Einrichtungen
+ * passen; eingeschaltet wird von Hand (Regel 1).
+ */
 export function vorschlaegeMeldung(angelegt: number, vorhanden: number): string {
   if (angelegt <= 0) return MELDUNGEN.VORSCHLAEGE_ALLE_VORHANDEN;
   const wieviele = angelegt === 1 ? "1 Vorschlag übernommen" : `${angelegt} Vorschläge übernommen`;
   const schon =
     vorhanden <= 0 ? "" : vorhanden === 1 ? " 1 stand schon im Katalog." : ` ${vorhanden} standen schon im Katalog.`;
-  return `${wieviele} – ausgeschaltet. Bitte prüfen, Fälligkeiten eintragen und einschalten, was passt.${schon}`;
+  return `${wieviele} – ausgeschaltet, mit Standardwerten. Bitte Vorauswahl und Fälligkeiten prüfen und einschalten, was passt.${schon}`;
 }
 
 /** Eine Position, wie GET /api/settings/ausstattung sie liefert. */
@@ -4554,6 +4756,13 @@ export interface VorschlagGruppe {
     vorhanden: boolean;
     /** Hinweis fuer die Pflege des Katalogs (`Vorschlag.pflegeHinweis`), sonst null. */
     hinweis: string | null;
+    /**
+     * Einschraenkung auf Einrichtungsarten („nur Kita“), sonst null — sonst
+     * stuenden die drei Schluessel-Positionen gleichlautend untereinander. Bei
+     * einem Eintrag, der schon im Katalog steht, die GESPEICHERTEN Arten (der
+     * Aufruf aendert ihn nicht; ein Altbestand ohne Einschraenkung gilt ueberall).
+     */
+    gilt: string | null;
   }[];
 }
 
@@ -4564,10 +4773,15 @@ export interface VorschlagGruppe {
  * Aufruf wieder an). `fehlen` = so viele legt der Aufruf an; 0 = nichts zu tun.
  */
 export function vorschlaegeVorschau(
-  positionen: ReadonlyArray<{ vorschlagSchluessel?: string | null }>,
+  positionen: ReadonlyArray<{ vorschlagSchluessel?: string | null; einrichtungsarten?: ReadonlyArray<string> }>,
   stellen: ReadonlyArray<KatalogStelle>,
 ): { gruppen: VorschlagGruppe[]; fehlen: number } {
-  const vorhanden = new Set(positionen.map((p) => p.vorschlagSchluessel).filter((s): s is string => !!s));
+  // Gespeicherte Einrichtungsarten je Vorschlagsschluessel (vorschlagSchluessel ist @unique).
+  const gespeichert = new Map<string, ReadonlyArray<string>>();
+  for (const p of positionen) {
+    if (p.vorschlagSchluessel) gespeichert.set(p.vorschlagSchluessel, p.einrichtungsarten ?? []);
+  }
+  const vorhanden = new Set(gespeichert.keys());
   const namen = new Map(stellen.map((s) => [s.key, s.name]));
   const gruppen = new Map<string, VorschlagGruppe>();
   let fehlen = 0;
@@ -4583,12 +4797,14 @@ export function vorschlaegeVorschau(
     }
     const da = vorhanden.has(v.vorschlagSchluessel);
     if (!da) fehlen += 1;
+    const arten = da ? (gespeichert.get(v.vorschlagSchluessel) ?? []) : v.einrichtungsarten;
     gruppe.eintraege.push({
       vorschlagSchluessel: v.vorschlagSchluessel,
       bezeichnung: v.bezeichnung,
       artName: istAusstattungsArt(v.art) ? ART_NAMEN[v.art] : v.art,
       vorhanden: da,
       hinweis: v.pflegeHinweis ?? null,
+      gilt: arten.length > 0 ? `nur ${arten.map((a) => wertName(EINRICHTUNGSARTEN, a)).join(", ")}` : null,
     });
   }
   return { gruppen: [...gruppen.values()], fehlen };
