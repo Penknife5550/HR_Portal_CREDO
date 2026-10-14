@@ -1,53 +1,206 @@
-# Server-Update 10/2026 — `main` ab `f6d3daf` (Ablaufplan)
+# Server-Update 10/2026 — `main` ab `b6e1c8a` (Ablaufplan)
 
-> **Stand:** Ablaufplan vom 14.10.2026, **noch nicht ausgeführt**. Er ersetzt die Fassung vom
-> 09.10.2026 (nur bis `a2e2e64`) durch **einen** gemeinsamen Deploy. Das Protokoll kommt nach dem
-> Update direkt unter diesen Kopf (Vorlage in Abschnitt 9), wie beim
-> [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
+> **Stand:** Ablaufplan vom 14.10.2026, **am 14.10.2026 ausgeführt** — das Protokoll steht direkt
+> unter diesem Kopf. Er ersetzt die Fassung vom 09.10.2026 (nur bis `a2e2e64`) durch **einen**
+> gemeinsamen Deploy, wie beim [Deploy vom 24.09.](deploy-onboarding-pakete-2026-09.md).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
-> **Ausgangsstand:** `f6d3daf` (Deploy vom 30.09.2026: Paket 4 Stufe 1 und Zeitplaner). Dieser
-> Deploy ist im Repo **nicht protokolliert** — der Kopf von
-> [deploy-paket4-stufe1.md](deploy-paket4-stufe1.md) sagt noch „noch nicht ausgeführt“. Deshalb
-> bestätigt Schritt 1.1 den Stand zuerst auf dem Server (Lehre 1 vom 24.09.).
-> **Etappe A vom 09.10.** (Abschnitte 1 und 2 der alten Fassung) hat nur gelesen und das Etikett
-> `hr-portal-app:f6d3daf` gesetzt. Beides wird mit dieser Fassung einfach wiederholt. Steht der
-> Server in 1.1 **nicht** auf `f6d3daf` (etwa schon auf `a2e2e64` oder `8c1ef05`), gilt diese
-> Anleitung nicht: **STOPP**.
+> **Ausgangsstand:** `b6e1c8a` („fix(checklisten): Reihenfolge wirkt im Vorgang; …“), deployt am
+> **02.10.2026**: Container `hr-portal-app` angelegt um 07:47:30 UTC (09:47 Uhr deutscher Zeit),
+> Image `sha256:5b1a01dd32ef…`. Dieser Deploy ist im Repo **nirgends protokolliert**. Belegt ist er
+> vom Server (14.10.2026, nur gelesen): `sudo git reflog` zeigt die Pulls `f6d3daf` (30.09.,
+> 13:38 UTC), `da5c743` (01.10., 06:30 UTC) und `b6e1c8a` (02.10., 07:44 UTC), alle
+> `pull: Fast-forward`; `docker inspect` zeigt das Erstelldatum des Containers; die Tabellen
+> `individuelle_mails` und `individuelle_mail_anhaenge` existieren, und der Schema-Vergleich des
+> laufenden Containers gegen die Datenbank (wie 1.3) ergibt `0`. **Seit dem 02.10. live** sind
+> damit Paket 3 (individuelle E-Mail mit Anhang, `da5c743`), die Reihenfolge der Checklisten-Punkte
+> (`226338d`, `2fbc4e4`, `b6e1c8a`), der Prüfbefehl `npm run pruefen` samt Sperrklinke (`bfb0665`,
+> nur Tests) und das Handbuch-Kapitel `1c0967b` (nur Doku). Nach dem Pull vom 01.10. wurde auch
+> gebaut und gestartet (Entrypoint-Sicherung `vor-schema-abgleich-20261001-063314.sql`, 06:33 UTC —
+> dabei entstanden die Tabellen der individuellen E-Mail; Vorgeschichte im Protokoll). Davor lief `f6d3daf` (Deploy
+> vom 30.09.2026, Paket 4 Stufe 1 und Zeitplaner, ebenfalls nicht protokolliert — der Kopf von
+> [deploy-paket4-stufe1.md](deploy-paket4-stufe1.md) sagt noch „noch nicht ausgeführt“).
+> **Fund vom 14.10.2026:** Die vorige Fassung dieser Anleitung (Commit `ea2d41d`) nahm `f6d3daf`
+> als Ausgangsstand an. Schritt 1.1 hat auf dem Server deshalb zu Recht angehalten (Lehre 1 vom
+> 24.09.: den Stand zuerst auf dem Server bestätigen). Diese Fassung rechnet durchgehend ab
+> `b6e1c8a`. Steht der Server in 1.1 **nicht** auf `b6e1c8a` (etwa wieder auf `f6d3daf` oder schon
+> auf `a2e2e64`, `8c1ef05` oder `0974b7f`), gilt sie nicht: **STOPP**.
+> **Etappe A vom 09.10.** (Abschnitte 1 und 2 der Fassung vom 09.10.) wurde im Chat übergeben;
+> ob und wie weit sie lief, ist **nicht protokolliert** (Ausgaben kamen nie an). Nach der damaligen
+> Fassung (`8c1ef05`) hätten schon 1.1 (erwartet `f6d3daf`) und 1.2 (erwartet ein Erstelldatum
+> `2026-09-30T`) angehalten — das Etikettieren stand erst in 2.1. Ein Etikett
+> `hr-portal-app:f6d3daf` gibt es dann nicht. Wurde trotzdem etikettiert, zeigt es auf das Image vom
+> 02.10. mit `b6e1c8a`; ein Etikett mit einer **anderen** ID (etwa aus dem nicht protokollierten
+> Deploy vom 02.10.) ist ebenfalls denkbar. 2.1 prüft das über die Image-ID, setzt das richtige
+> Etikett `hr-portal-app:b6e1c8a` auf die in 1.2 bestätigte ID und entfernt ein falsches
+> `f6d3daf`-Etikett; der Rückweg (Abschnitt 7) nennt nur noch `b6e1c8a`. Was aus Etappe A schon
+> lief, wird einfach wiederholt (alle Schritte bis 2.2 lassen sich wiederholen).
 > **Ziel:** `main` mit dem Code bis `0974b7f` („Standardkatalog beim Deploy anlegen“) und
-> **einem** Doku-Commit darüber, der nur diese Anleitung enthält. Bis `0974b7f` sind es 37 Commits
-> nach `f6d3daf` (davon 4 Merges): die 18 bis `a2e2e64` aus der Fassung vom 09.10., zwei
-> Doku-Commits zu dieser Anleitung, das Modul „Ausstattung & Zugänge“ (A1–A4, 12 Commits samt
-> Plänen und Prüfskript), zwei Fehlerbehebungen im Offboarding (je ein Commit und ein Merge) und
-> der Standardkatalog `0974b7f`. DSB und MAV haben am 14.10.2026 zugestimmt (A0 erledigt) — für
-> Stufe 1 **und** Stufe 2. Stufe 1 geht mit dem Start in Betrieb, Stufe 2 schaltet 5.3 als letzten
-> Schritt vor der Freigabe an HR ein. Übersicht in Abschnitt 0, Prüfung in 3.2.
-> **Geprüft am 14.10.2026** mit **zwei Generalproben**, beide gleich aufgebaut: Docker-Image aus
-> dem Commit gebaut, echter Entrypoint gegen eine Kopie der Entwicklungsdatenbank, die vorher auf
-> das Schema von `f6d3daf` gebracht wurde (Mailserver aus, keine Webhooks,
-> `ZEITPLANER_AKTIV=false`). Die erste lief auf `80ccfc3`, die zweite auf `0974b7f` mit dem
-> Standardkatalog. Durchlaufen jeweils: Vorschau wie 3.4, erster Start (Sicherung, Schema-Push,
-> einmalige Datenmigrationen, drei System-Vorlagen; bis „Ready“ 8 bzw. 9 s), Prüfungen wie 5.2,
-> zweiter Start, Vorschau des Rückwegs wie 7.3 Schritt 5. **Vorschau und Rückweg-Vorschau waren in
-> beiden Proben byte-gleich** — der Standardkatalog ändert das Schema nicht. Schema-Zählung:
-> 19/1/9/25/23, kein `DROP`; ohne Datenbank aus den Schemas `f6d3daf` → `80ccfc3` gerechnet (die
-> Schema-Datei von `0974b7f` ist byte-gleich), enthält das Delta dieselben Zeilen (nur die
-> Reihenfolge der `ALTER TABLE`-Blöcke weicht ab).
-> Rückweg: 9 × `DROP TABLE`, 23 × `DROP CONSTRAINT`, 19 × `DROP COLUMN`, 7 × `DROP INDEX` und ein
-> Neubau des Enums `DocumentType`. Die zweite Probe zeigte außerdem: drei Migrationszeilen, darunter
+> Doku-Commits darüber, die nur diese Anleitung enthalten. Bis `0974b7f` sind es **31 Commits**
+> nach `b6e1c8a` (davon 4 Merges; ab `f6d3daf` wären es 37): die 12 noch nicht ausgerollten der
+> Fassung vom 09.10. (bis `a2e2e64`), zwei Doku-Commits zu dieser Anleitung, das Modul „Ausstattung &
+> Zugänge“ (A1–A4, 12 Commits samt Plänen und Prüfskript), zwei Fehlerbehebungen im Offboarding (je
+> ein Commit und ein Merge) und der Standardkatalog `0974b7f`. DSB und MAV haben am 14.10.2026
+> zugestimmt (A0 erledigt) — für Stufe 1 **und** Stufe 2. Stufe 1 geht mit dem Start in Betrieb,
+> Stufe 2 schaltet 5.3 als letzten Schritt vor der Freigabe an HR ein. Übersicht in Abschnitt 0,
+> Prüfung in 3.2.
+> **Geprüft am 14.10.2026** mit **drei Generalproben**, alle gleich aufgebaut: Docker-Image aus
+> dem Commit gebaut, echter Entrypoint gegen eine Kopie der Entwicklungsdatenbank (Mailserver aus,
+> keine Webhooks, `ZEITPLANER_AKTIV=false`). Die ersten beiden gingen noch vom Schema `f6d3daf`
+> aus (die erste auf `80ccfc3`, die zweite auf `0974b7f` mit dem Standardkatalog). Die **dritte**
+> ging vom echten Ausgangsstand `b6e1c8a` aus, auf `0974b7f`: Die Kopie stand schon auf diesem
+> Schema (leere Migration) und enthielt eine individuelle E-Mail mit einem Anhang. **Die Erwartungen
+> dieser Fassung stammen aus der dritten Probe.** Durchlaufen jeweils: Vorschau wie 3.4, erster
+> Start (Sicherung, Schema-Push, einmalige Datenmigrationen, drei System-Vorlagen; bis „Ready“ 8, 9
+> bzw. 10 s), Prüfungen wie 5.2, zweiter Start, Vorschau des Rückwegs wie 7.3 Schritt 5.
+> Schema-Zählung ab `b6e1c8a`: **19/1/7/21/20**, kein `DROP` — gegenüber `f6d3daf` (19/1/9/25/23)
+> fehlen genau die zwei Tabellen der individuellen E-Mail mit ihren 4 Indizes und 3
+> Fremdschlüsseln. Ohne Datenbank aus den Schemas `b6e1c8a` → `0974b7f` gerechnet, enthält das
+> Delta dieselben Zeilen (nur die Reihenfolge der `ALTER TABLE`-Blöcke weicht ab). Rückweg auf das
+> Image `b6e1c8a`: 7 × `DROP TABLE`, 20 × `DROP CONSTRAINT`, 19 × `DROP COLUMN`, 7 × `DROP INDEX` und
+> ein Neubau des Enums `DocumentType` — die Tabellen der individuellen E-Mail bleiben stehen. Die
+> dritte Probe zeigte außerdem: drei Migrationszeilen, darunter
 > `… 20 Katalogpositionen angelegt, 13 eingeschaltet.`; `system_migrations` 10 → 13; genau ein neuer
-> AuditLog-Eintrag (`AUSSTATTUNG_STANDARDKATALOG_ANGELEGT`, ohne Benutzer); keine Mail; beim zweiten
-> Start keine Migrationszeile. Betriebsdateien: `package.json` (eine Zeile), `prisma/seed-check.js`,
-> `prisma/seed.ts`, zwei neue Word-Dateien; keine neue Abhängigkeit, keine neue
-> Umgebungsvariable. Alle neuen SQL-Abfragen dieser Anleitung liefen lesend gegen die
+> AuditLog-Eintrag (`AUSSTATTUNG_STANDARDKATALOG_ANGELEGT`, ohne Benutzer); keine Mail; die
+> individuelle E-Mail samt Anhang nach beiden Starts unverändert (Prüfsumme über alle Zeilen); beim
+> zweiten Start keine Migrationszeile. Betriebsdateien ab `b6e1c8a`: `prisma/seed-check.js`,
+> `prisma/seed.ts`, zwei neue Word-Dateien — `package.json` und `package-lock.json` sind seit
+> `b6e1c8a` unverändert; keine neue Abhängigkeit, keine neue Umgebungsvariable. Alle SQL-Abfragen
+> dieser Anleitung, die nicht schon auf dem Server liefen, liefen lesend gegen die
 > Entwicklungsdatenbanken (alter und neuer Stand).
 > **Nicht in den Generalproben gemessen:** die Zeile `[Zeitplaner] Uhr gestartet` (dort war die Uhr
-> aus), gespeicherte Mailvorlagen und Webhooks (die Kopie hatte keine), echte Rückgaben (die Kopie
-> hatte 0), ein Build ganz ohne Zwischenspeicher, die Handschritte im Portal ab 5.3 — darunter
-> Stufe 2; ihre Erwartungen (Meldung, 17 Positionen, Prüfabfrage) sind aus dem Code nachgerechnet —
-> und die Rückfallwege selbst.
+> aus), gespeicherte Mailvorlagen und Webhooks (die Kopien hatten keine), echte Rückgaben (die
+> Kopien hatten 0), ein Build ganz ohne Zwischenspeicher (die dritte Probe baute ganz aus dem
+> Zwischenspeicher der zweiten) und ob auf dem Server der Zwischenspeicher vom 02.10. noch da ist
+> (3.3), die Handschritte im Portal ab 5.3 — darunter Stufe 2; ihre Erwartungen (Meldung, 17
+> Positionen, Prüfabfrage) sind aus dem Code nachgerechnet — und die Rückfallwege selbst.
 > **Muster:** Befehle aus [deploy-paket4-stufe1.md](deploy-paket4-stufe1.md) und
 > [deploy-onboarding-pakete-2026-09.md](deploy-onboarding-pakete-2026-09.md) übernommen, nur
 > Namen und Erwartungen angepasst.
+
+## Protokoll vom 14.10.2026
+
+**Ergebnis: Deploy erfolgreich.** Der Server läuft seit dem 14.10.2026, 11:16 UTC (13:16 Uhr
+deutscher Zeit), auf dem Code `0974b7f` (Repo-Stand `ea2d41d`), Image `hr_portal_credo-app:latest`
+= `64e1319792ff`. Das Portal war von etwa 11:13 bis 11:17 UTC nicht erreichbar. Stufe 1 **und**
+Stufe 2 von „Ausstattung & Zugänge“ sind eingeschaltet. Ausgeführt hat der Projektverantwortliche
+per SSH; die Befehle kamen Schritt für Schritt aus dem Chat mit Claude (auf dem Server lag bis zum
+Pull die Fassung vom 09.10., danach `ea2d41d` — die Fassung ab `b6e1c8a` entstand während des
+Deploys). Uhrzeiten unten in UTC (Server und Container laufen in UTC; deutsche Zeit = UTC + 2 h).
+
+### Vorgeschichte (am 14.10. auf dem Server festgestellt, vorher nirgends protokolliert)
+
+| Datum (UTC) | Was | Beleg |
+|---|---|---|
+| 30.09. 13:38 | Pull `f6d3daf` (Paket 4 Stufe 1, Zeitplaner), Start mit Schema-Abgleich | `git reflog`; Entrypoint-Sicherung `vor-schema-abgleich-20260930-134318.sql` (1.690.897 Bytes) |
+| 01.10. 06:30 | Pull `da5c743` (Paket 3, individuelle E-Mail), Start mit Schema-Abgleich (die zwei Tabellen der individuellen E-Mail) | `git reflog`; `vor-schema-abgleich-20261001-063314.sql` (1.726.202 Bytes) |
+| 02.10. 07:44 / 07:47 | Pull `b6e1c8a` (Reihenfolge der Checklisten-Punkte), Neubau, Container 07:47:30 (Image `sha256:5b1a01dd32ef…`); ohne Schemaänderung, daher keine Sicherung | `git reflog`, `docker inspect` |
+| 09.10. | Etappe A der Fassung vom 09.10. im Chat übergeben — **lief nicht**: Es gab am 14.10. kein Etikett `hr-portal-app:f6d3daf` | `docker image ls hr-portal-app` |
+| bis 14.10. | HR hat Paket 3 genutzt: 12 individuelle E-Mails mit 7 Anhängen; Vorlage `individuelle-mail` nicht gespeichert (Text aus dem Code) | 1.7 |
+
+### Ablauf
+
+| Schritt | Ergebnis | Abweichung |
+|---|---|---|
+| 1.1 | `b6e1c8a (HEAD -> main, origin/main, origin/HEAD) fix(checklisten): …` | **STOPP** — die damalige Fassung (`ea2d41d`) erwartete `f6d3daf`. Darauf wurde diese Fassung per Workflow auf den Ausgangsstand `b6e1c8a` umgestellt (dritte Generalprobe ab `b6e1c8a`, gegengeprüft) |
+| 1.2 | drei Container `healthy`; `hr-portal-app` erstellt `2026-10-02T07:47:30Z`, Image `5b1a01dd…` | — |
+| 1.3 | `0` | — |
+| 1.4 | `2`; `775 1001 n8n backups`; App-Schreibtest `uid=1001(nextjs) gid=65533(nogroup)` + `OK`; DB-Schreibtest `OK` | — |
+| 1.5 | Projektordner 360 GB frei. **Docker-Laufwerk knapp:** 30 GB, 24 GB belegt, 4,3 GB frei (85 %). `docker system df`: Images 11,55 GB (491 MB frei machbar), Container 791 MB, Volumes 1,645 GB, Build-Cache 1,005 GB. Etiketten: nur `hr-portal-app:6124936` und `:ae490ba` (dasselbe Image `99579d69bec0`, 656 MB, Deploy 08.09.) | **Docker-Laufwerk online vergrößert** (ext4): `sudo lvextend -r -L +30G /dev/data-vg/var-lib-docker-lv` — versehentlich zweimal, jetzt **90 GiB** (`df`: 89 G, 15 G belegt, 71 G frei). Die Volume-Gruppe `data-vg` hatte 170 GB frei, jetzt rund 110 GB. Die Belegung fiel dabei von 24 auf 15 GB; die Ursache ist nicht geklärt (kein Aufräumen protokolliert, die Portal-Container liefen unverändert weiter) |
+| 1.6 | `hr_portal_credo_uploads_data`, 167 MB | 29.09.: 94 MB |
+| 1.7 | Tabellen: die zwei von Paket 3 da, die sieben neuen nicht; individuelle E-Mails `12 | 7`; Fremdschlüssel `0 | 0`; Merker `10`; Modalitäten `41`; Sperrpunkte `11 | 0` | **System-Vorlagen: zwei Zeilen, beide ausgeschaltet** („Aufforderung erweitertes Führungszeugnis“ und „… - Lehrer“, gleicher Hash `20d18c1463f6`, Pfad `/app/public/…`, 6 Platzhalter). Laut Code (`planeSystemVorlage`: ohne eingeschaltete Zeile zählt die älteste, angelegt wird nur ohne jede Zeile, der Aktiv-Schalter wird nie geschrieben) unkritisch — im Start dann „ist aktuell“, keine dritte Zeile |
+| 1.8 | 11 Läufe, alle aus | — |
+| 1.9 | Mailvorlagen: `supervisor-link-created` und `supervisor-completed` gespeichert mit altem Text (→ 5.3); `onboarding-task-completed` gespeichert, **eingeschaltet, mit An-Feld**, alter Text (→ **Handgriff 0**); die übrigen fünf nicht gespeichert; kein `ENTSCHEIDUNG`. Webhooks `(0 rows)`. Antwortadresse/SMTP `t | t`. Adressen: `FACILITY` 1 zentral, `IT` 1 zentral, `VERWALTUNG` 6 je Einrichtung, keine Platzhalter. `N8N_API_KEY` `0` | — |
+| 2.1 | Etikett `hr-portal-app:b6e1c8a` = `5b1a01dd…` = laufendes Image; `f6d3daf` fehlt | — |
+| 2.2 | 535 Dateien, 181.861.888 Bytes, `tar OK` | — |
+| 3.1 | `Updating b6e1c8a..ea2d41d`, Fast-forward | — |
+| 3.2 | vom Projektverantwortlichen als bestanden gemeldet | Ausgaben nicht übermittelt |
+| 3.3 | Build ohne Fehler; `hr_portal_credo-app:latest` = `64e1319792ff` (664 MB) | Build-Log nicht übermittelt |
+| 3.4 | `19 / 1 / 7 / 21 / 20` — genau wie in der dritten Generalprobe | DROP- und CREATE-TABLE-Prüfung nicht übermittelt |
+| Zwischenfall | Nach 3.4 kam „die App ist healthy, weiter“; die Abfragen aus 5.2 zeigten aber das **alte** Schema (`relation "ausstattungs_positionen" does not exist`). Abschnitt 4 war noch nicht gelaufen — der Container vom 02.10. lief einfach weiter, das neue Image war gebaut, aber nicht gestartet, und es gab keine Sicherung von heute. Folgen: keine. Abschnitt 4 lief danach vollständig | Lehre: nach `up -d` immer das Startprotokoll ansehen, nicht nur `healthy` |
+| 4.1 | ~11:13 angehalten; individuelle E-Mails `12 | 7`; `vor-deploy-main-2026-10-manuell.sql` 2.095.344 Bytes, `1`; Uploads-Archiv 169.813.066 Bytes, `tar OK`; Handgriff 0 `UPDATE 1` | — |
+| 4.2 | `up -d`: „Container hr-portal-app Started“ | Wortlaut statt „Recreated“; das neue Image läuft (Startprotokoll) |
+| 4.3 | Startprotokoll genau wie erwartet (unten) | — |
+| 4.5 | `vor-deploy-main-2026-10-entrypoint.sql` kopiert, drei Dateien | — |
+| 5.1 | `healthy`; `{"status":"ok", … "uhrAktiv":true,"letzterTakt":"2026-10-14T11:34:57.451Z"}` (von außen) | — |
+| 5.2 | `12 | 7 | 13 | 1` (Mails, Anhänge, Merker, Protokoll des Standardkatalogs); Katalog `20 | 13 | 0 | 0`; Schlüssel je Einrichtungsart überall `1` (Gymnasium 1, Gesamtschule 1, Grundschule 3, Berufskolleg 1, Kita 4, GmbH 3, Verein 3 = 16 Einrichtungen; keine mit der Art Verwaltung); System-Vorlagen vier Zeilen (Rückgabeprotokoll an, 2 × Führungszeugnis aus, Übergabeprotokoll aus); Mails seit dem Start `(0 rows)` | Schema-Vergleich, Personengruppen und Indizes nicht einzeln abgefragt |
+| 5.3 Schritt 1 | drei Vorlagen zurückgesetzt, `onboarding-task-completed` wieder eingeschaltet → alle `t` und „nichts (Text aktuell)“ (Handgriff 0 abgeschlossen) | — |
+| 5.3 Schritt 2 | HR nutzt Transponder → Katalogposition **„Transponder/Chip“ eingeschaltet** (14 aktiv). **Rot:** keine aktive Adresse für Verwaltung / Sekretariat in 10 Einrichtungen (Christliche Familienhilfe Minden e. V., Christlicher Schulförderverein FES Minden e.V., Christlicher Schulförderverein Minden e.V., FES Objektservice GmbH, HELEX.IT GmbH und 5 weitere — die Kitas, GmbHs und Vereine): dort fehlt im Formular das Türschild. **Gelb:** 1 ähnlicher Vorlagenpunkt | Transponder zusätzlich (Entscheidung 14.10.); rote Warnung bleibt offen (unten) |
+| 5.3 Schritt 3 | Die Vorlage „Standard-Einstellung (TV-L)“ trägt andere Titel als der Seed: „Bei Bedarf Transponder für die Zeiterfassung bestellen“ (HR), „Schluessel/Ausweis bestellen“, „Schluesseluebergabe dokumentiert“, „Transponder übergeben“ (alle drei Gebäudewirtschaft). **Entfernt:** „Schluesseluebergabe dokumentiert“. Stehen geblieben: die übrigen drei | Empfehlung „Transponder übergeben“ entfernen und „Schluessel/Ausweis bestellen“ umbenennen in „Ausweis bestellen (falls nötig)“ — Entscheidung offen (unten) |
+| 5.3 Schritt 4 | keine Webhooks | — |
+| 5.3 Schritt 5 | Übergabeprotokoll reaktiviert („Vorlage reaktiviert.“, beide Protokoll-Vorlagen an); „Rückgabe-Vorgaben übernehmen …“: `NICHTS 3/2/0`, `RUECKGABE 11/8/11`, `SPERREN 3/2/0`, `(leer) 3/2/0` | AuditLog-Zählung nach der Übernahme nicht erneut abgefragt (die Verteilung belegt die Übernahme) |
+| 5.3 Schritt 6 | Mail an das Personalbüro (Du-Form, kurz; Entwurf im Chat) | Versand durch den Projektverantwortlichen, statt des Kurztexts 8.1 |
+| 5.4, 5.5, 6.1, 6.2 | noch nicht | offen (unten) |
+
+**Startprotokoll** (gefiltert, wörtlich):
+
+```
+Schema-Unterschied erkannt — Sicherung wird angelegt...
+Sicherung abgelegt: /backups/vor-schema-abgleich-20261014-111652.sql (2095372 Bytes)
+Datenbank-Schema wird synchronisiert...
+⚠️ There might be data loss when applying the changes:
+🚀 Your database is now in sync with your Prisma schema. Done in 573ms
+Datenbank-Schema synchronisiert.
+Pruefe ob Seed notwendig...
+System-Vorlage (Aufforderung erweitertes Führungszeugnis) ist aktuell.
+System-Vorlage (Übergabeprotokoll Ausstattung) angelegt (ausgeschaltet).
+System-Vorlage (Rückgabeprotokoll Ausstattung) angelegt.
+Ausstattung & Zugaenge (SUPERVISOR_MIT_AUSSTATTUNG_V1): 41 Modalitaeten-Datensaetze ohne Merker auf false gesetzt.
+Offboarding-Sperrpunkte (OFFBOARDING_SPERRPUNKTE_V1): 11 Vorlagenpunkte mit Hinweis versehen, 0 mit eigener Beschreibung unveraendert.
+Ausstattung & Zugaenge (AUSSTATTUNG_STANDARDKATALOG_V1): 20 Katalogpositionen angelegt, 13 eingeschaltet.
+Datenbank bereits geseeded (7 User vorhanden). Seed uebersprungen.
+[Zeitplaner] Uhr gestartet (jede Minute).
+✓ Ready in 169ms
+```
+
+Unter der Warnung genau die zwei erwarteten Punkte (eindeutige Indizes an
+`offboarding_checklist_items` und `return_items` mit der neuen, leeren Spalte `ausgabeId`).
+
+**Sicherungen auf dem Server** (`/vol/container/HR_Portal_CREDO/backups`):
+
+| Datei | Größe | Zweck |
+|---|---|---|
+| `vor-deploy-main-2026-10-manuell.sql` | 2.095.344 Bytes | maßgeblich für Weg B (`pg_dump` 16 aus dem DB-Container) |
+| `vor-deploy-main-2026-10-entrypoint.sql` | 2.095.372 Bytes | Kopie der Entrypoint-Sicherung (`pg_dump` 18), aus der Rotation genommen |
+| `uploads-vor-deploy-main-2026-10.tar.gz` | 169.813.066 Bytes | Uploads vor dem Update — Personalunterlagen, bleibt auf dem Server |
+| Image `hr-portal-app:b6e1c8a` | 662 MB (`5b1a01dd…`) | Rückweg (Abschnitt 7) |
+
+**Ausgangsstand für das nächste Update:** Repo auf dem Server `ea2d41d` (`main`; danach bis zum
+nächsten Code-Commit nur Doku — diese Anleitung, CLAUDE.md, Feinpläne), Code `0974b7f`; laufendes Image `hr_portal_credo-app:latest` = `64e1319792ff`,
+Container `hr-portal-app` erstellt am 14.10.2026 gegen 11:16 UTC; Rückfall-Etikett
+`hr-portal-app:b6e1c8a` (dazu die alten `6124936`/`ae490ba` vom 08.09., für einen Rückfall zu alt);
+`system_migrations` 13; Standardkatalog 20 Positionen, 14 eingeschaltet, 17 mit „Beim Austritt“;
+Docker-Laufwerk 90 GiB. Ein künftiger Ablaufplan prüft in 1.1 diesen Stand und in 1.2 das
+Erstelldatum `2026-10-14T11:1…`.
+
+### Offen nach dem Deploy
+
+1. **Mail an das Personalbüro** verschicken (Freigabe; Entwurf im Chat). Der Infotext für
+   Führungskräfte und Abteilungen (8.2) ist noch nicht verschickt.
+2. **6.2 Lauf „Aufbewahrung erzeugter Dokumente“**: erst „Probelauf jetzt“, dann einschalten. Dringlich,
+   weil seit dem 01.10. schon 12 individuelle E-Mails mit 7 Anhängen da sind — ohne den Lauf werden
+   Text und Anhänge nie gelöscht, obwohl der Dialog 12 Monate zusagt; derselbe Lauf löscht künftig
+   Freitexte und Ausgaben der Ausstattung.
+3. **Adressen Verwaltung / Sekretariat** für die 10 Einrichtungen ohne Eintrag (Einstellungen →
+   Abteilungen, je Einrichtung). Bis dahin fehlt dort das Türschild im Formular (rote Warnung im
+   Katalog).
+4. **Checklisten-Vorlage „Standard-Einstellung (TV-L)“**: „Transponder übergeben“ (doppelt zu
+   „Transponder/Chip bereitstellen“) entfernen? „Schluessel/Ausweis bestellen“ umbenennen in
+   „Ausweis bestellen (falls nötig)“ oder stehen lassen, falls Schlüssel vorab bestellt werden?
+   Danach prüfen, ob die gelbe Warnung im Katalog verschwindet.
+5. **6.1 Freigabeliste** (`allowedRecipientDomains`), sobald HR die dienstlichen Domains genannt hat.
+6. **5.4 Probe im Browser** (Onboarding, Offboarding, Katalog ansehen; nichts klicken, was Mails an
+   andere schickt).
+7. **Übrige automatische Läufe** einschalten (Abschnitt 9, „Danach“), darunter
+   „Onboarding-Erinnerungen“ für die Sammelmail vor Dienstbeginn.
+8. **Führungszeugnis-System-Vorlage doppelt und beide aus:** mit HR klären, ob eine davon gebraucht
+   wird (der Start schaltet sie nicht ein; so bleibt es ohne Folgen).
+9. **IT informieren:** Docker-Laufwerk ist jetzt 90 GiB groß (`data-vg`, rund 110 GB frei); die
+   Ursache des Rückgangs der Belegung von 24 auf 15 GB ist ungeklärt.
+10. **Claude:** diese Fassung samt Protokoll nach `main` bringen (der Projektverantwortliche spult
+    `main` vor), danach `main` in `ux-umbau` mergen. Die neue Oberfläche (Branch `ux-umbau`,
+    Vertragsende-Pilot) kommt mit einem eigenen Ablaufplan.
+
+---
 
 **Grundregel wie bisher:** Wo „STOPP“ steht, wird angehalten und die Ausgabe an Claude geschickt.
 Das Portal läuft bis Schritt 4.1 unverändert weiter — Anhalten kostet bis dahin nichts.
@@ -64,38 +217,45 @@ kein Befehl gibt ein Geheimnis aus. `git` auf dem Server immer mit `sudo` (Proje
 
 ## 0 · Worum es geht
 
-Der Server läuft seit dem 30.09.2026 auf `f6d3daf`. Seitdem sind auf `main` die individuelle
-E-Mail mit Anhang (Paket 3), mehrere Fehlerbehebungen (Vertragsende, Checklisten, Verbeamtung,
-Elternzeit, Zeitzone) und eine Sicherheitskorrektur dazugekommen, dazu das Modul „Ausstattung &
-Zugänge“ (A1–A4) und zwei Korrekturen im Offboarding (Reiter „Rückgaben“ ging nicht; Unterrouten
-ohne Prüfung von Rolle und Mandant). Dieses Update bringt alles in einem Schritt auf den Server.
+Der Server läuft seit dem 02.10.2026 auf `b6e1c8a` — die individuelle E-Mail mit Anhang (Paket 3)
+und die Reihenfolge der Checklisten-Punkte sind also schon in Betrieb (Kopf). Seitdem sind auf
+`main` mehrere Fehlerbehebungen (Vertragsende, Verbeamtung, Elternzeit, Zeitzone, Seed) und eine
+Sicherheitskorrektur dazugekommen, dazu das Modul „Ausstattung & Zugänge“ (A1–A4) und zwei
+Korrekturen im Offboarding (Reiter „Rückgaben“ ging nicht; Unterrouten ohne Prüfung von Rolle und
+Mandant). Dieses Update bringt alles in einem Schritt auf den Server.
 
-An der Datenbank kommen neun neue Tabellen und 19 neue Spalten an bestehenden Tabellen dazu —
-nichts wird umbenannt oder gelöscht. Beim Start laufen drei einmalige Datenmigrationen, und zwei
-neue Brief-Vorlagen werden angelegt. Die dritte Migration legt den **Standardkatalog
-„Ausstattung & Zugänge“** an: 20 Positionen (IT, Gebäudewirtschaft, Verwaltung / Sekretariat),
-13 davon eingeschaltet, ohne „Beim Austritt“. Ab dem Start sieht deshalb jede Führungskraft,
-deren Vorgesetzten-Link **nach** dem Update entsteht, im Formular den neuen Schritt
-„Ausstattung & Zugänge“ — für jede Position, deren Stelle am Arbeitsort eine aktive Adresse hat.
-Schon verschickte Links bleiben ohne den Schritt. Als letzten Schritt vor der Freigabe an HR
-schaltet 5.3 auch **Stufe 2** ein (Übergabe und Rückgabe laut Portal, A4): „Rückgabe-Vorgaben
-übernehmen …“ gibt 17 der 20 Positionen ein „Beim Austritt“, und die Brief-Vorlage
-„Übergabeprotokoll Ausstattung“ wird eingeschaltet — nur, wenn auf die Offboarding-Ereignisse der
-Abteilungen kein Webhook aktiv ist. Nach dem Start passiert nichts von selbst: Eine Mail geht erst
-hinaus, wenn jemand im Portal etwas versendet. Das Portal ist nur beim Neustart einige Minuten
-nicht erreichbar.
+An der Datenbank kommen sieben neue Tabellen und 19 neue Spalten an bestehenden Tabellen dazu —
+nichts wird umbenannt oder gelöscht; die beiden Tabellen der individuellen E-Mail gibt es schon.
+Beim Start laufen drei einmalige Datenmigrationen, und zwei neue Brief-Vorlagen werden angelegt. Die
+dritte Migration legt den **Standardkatalog „Ausstattung & Zugänge“** an: 20 Positionen (IT,
+Gebäudewirtschaft, Verwaltung / Sekretariat), 13 davon eingeschaltet, ohne „Beim Austritt“. Ab dem
+Start sieht deshalb jede Führungskraft, deren Vorgesetzten-Link **nach** dem Update entsteht, im
+Formular den neuen Schritt „Ausstattung & Zugänge“ — für jede Position, deren Stelle am Arbeitsort
+eine aktive Adresse hat. Schon verschickte Links bleiben ohne den Schritt. Als letzten Schritt vor
+der Freigabe an HR schaltet 5.3 auch **Stufe 2** ein (Übergabe und Rückgabe laut Portal, A4):
+„Rückgabe-Vorgaben übernehmen …“ gibt 17 der 20 Positionen ein „Beim Austritt“, und die
+Brief-Vorlage „Übergabeprotokoll Ausstattung“ wird eingeschaltet — nur, wenn auf die
+Offboarding-Ereignisse der Abteilungen kein Webhook aktiv ist. Nach dem Start passiert nichts von
+selbst: Eine Mail geht erst hinaus, wenn jemand im Portal etwas versendet. Das Portal ist nur beim
+Neustart einige Minuten nicht erreichbar.
 
 ### Was ausgerollt wird
 
-Bis `a2e2e64` (Fassung vom 09.10., unverändert):
+**Schon live seit dem 02.10.2026** (`f6d3daf..b6e1c8a`, 6 Commits — kommen mit diesem Update
+**nicht** neu, stehen hier nur, weil die Fassung vom 09.10. sie mitzählte):
 
 | Commit | Was | Merkt HR davon? |
 |---|---|---|
 | `1c0967b` | Handbuch: Kapitel „Automatische Läufe“ und Reiter „E-Mails“ (nur die Datei im Repo, das Portal zeigt das Handbuch nicht) | nein |
-| `da5c743` | **Paket 3:** Karte „Individuelle E-Mail“ im Reiter Dokumente von Onboarding, Offboarding, Verbeamtung und Vertragsverlängerung — freie Nachricht mit Betreff und bis zu 10 Anhängen (PDF/JPG/PNG/WebP, zusammen 9 MB). Zwei neue Tabellen, neue Mailvorlage `individuelle-mail` | **ja**, neue Karte |
-| `226338d`, `2fbc4e4` | Checklisten-Vorlagen: Punkte per Ziehen, Pfeilen und „+ Punkt darunter“ ordnen | ja (wer Vorlagen bearbeitet) |
-| `bfb0665` | Prüfbefehl `npm run pruefen` und Sperrklinke gegen Altmuster (nur Tests). Ändert `package.json` um eine Zeile — deshalb baut Docker die Abhängigkeiten neu (3.3) | nein |
-| `b6e1c8a` | Reihenfolge der Vorlage gilt im Vorgang (vorher alphabetisch nach Kategorie); Nachbesserungen am Verschieben | **ja**, Reihenfolge in Vorgängen kann sich ändern |
+| `da5c743` | **Paket 3:** Karte „Individuelle E-Mail“ im Reiter Dokumente von Onboarding, Offboarding, Verbeamtung und Vertragsverlängerung — freie Nachricht mit Betreff und bis zu 10 Anhängen (PDF/JPG/PNG/WebP, zusammen 9 MB). Tabellen `individuelle_mails`, `individuelle_mail_anhaenge`, Mailvorlage `individuelle-mail` | seit 02.10. sichtbar; ob HR damals Bescheid bekam, ist nicht bekannt (8.1) |
+| `226338d`, `2fbc4e4` | Checklisten-Vorlagen: Punkte per Ziehen, Pfeilen und „+ Punkt darunter“ ordnen | seit 02.10. (wer Vorlagen bearbeitet) |
+| `bfb0665` | Prüfbefehl `npm run pruefen` und Sperrklinke gegen Altmuster (nur Tests; eine Zeile in `package.json`) | nein |
+| `b6e1c8a` | Reihenfolge der Vorlage gilt im Vorgang (vorher alphabetisch nach Kategorie); Nachbesserungen am Verschieben | seit 02.10. |
+
+**Neu mit diesem Deploy** — zuerst der Rest der Fassung vom 09.10. (bis `a2e2e64`, unverändert):
+
+| Commit | Was | Merkt HR davon? |
+|---|---|---|
 | `6982015`, `3f6d3b0` | **Sicherheit:** Der Link-Schlüssel der Führungskraft (Vertragsende) steht nicht mehr in den Antworten der HR-Schnittstellen | nein |
 | `232579e`, `099680d`, Merge `aea163a` | Tagesabstände werden schneller berechnet, gleiches Ergebnis | nein |
 | `b7c8532` | Vertragsende: Betriebsstätte im Verlängerungsschreiben (vorher „___“) und in der Ansicht (vorher „—“) | ja |
@@ -105,7 +265,7 @@ Bis `a2e2e64` (Fassung vom 09.10., unverändert):
 | `75d8277` | Verbeamtung: Reiter Dokumente ordnet Dateien ihrer Dokumentart zu | ja |
 | `a2e2e64` | Elternzeit: Der Upload der Person ersetzt nur ihre eigene Geburtsurkunde, nicht die von HR | kaum |
 
-Neu in dieser Fassung (nach `a2e2e64`):
+Dann, ebenfalls neu mit diesem Deploy, alles nach `a2e2e64`:
 
 | Commit | Was | Merkt HR davon? |
 |---|---|---|
@@ -125,19 +285,20 @@ Neu in dieser Fassung (nach `a2e2e64`):
 
 ### Was sich an Datenbank und Betrieb ändert
 
-- **Schema, rein additiv** (Zählung in 3.4, in beiden Generalproben gemessen):
-  - neun neue Tabellen — `individuelle_mails`, `individuelle_mail_anhaenge` (Paket 3) und
-    `ausstattungs_positionen`, `ausstattungs_ausblendungen`, `onboarding_ausstattung`,
-    `onboarding_ausstattung_aufgaben`, `onboarding_stellen_hinweise`,
-    `onboarding_ausstattung_aenderungen`, `ausgaben`;
+- **Schema, rein additiv** (Zählung in 3.4, ab `b6e1c8a` in der dritten Generalprobe gemessen):
+  - sieben neue Tabellen — `ausstattungs_positionen`, `ausstattungs_ausblendungen`,
+    `onboarding_ausstattung`, `onboarding_ausstattung_aufgaben`, `onboarding_stellen_hinweise`,
+    `onboarding_ausstattung_aenderungen`, `ausgaben`. Die beiden Tabellen von Paket 3
+    (`individuelle_mails`, `individuelle_mail_anhaenge`) gibt es seit dem 02.10.; sie bleiben, wie
+    sie sind, samt ihrem Inhalt;
   - 19 neue Spalten an sieben bestehenden Tabellen (`onboarding_processes`, `supervisor_data`,
     `checklist_items`, `offboarding_processes`, `offboarding_checklist_items`, `return_items`,
     `offboarding_department_links`), alle leer bis auf `checklist_items.eilt` (Standard `false`);
   - ein neuer Wert `UEBERGABEPROTOKOLL` im Enum `DocumentType`;
-  - 25 Indizes, davon zwei eindeutige an bestehenden Tabellen (`offboarding_checklist_items`,
+  - 21 Indizes, davon zwei eindeutige an bestehenden Tabellen (`offboarding_checklist_items`,
     `return_items`). Sie enthalten eine neue, überall leere Spalte und können deshalb nicht an
     Dubletten scheitern — `db push` warnt trotzdem (4.3);
-  - 23 Fremdschlüssel, davon **einer an einer schon vorhandenen Spalte**
+  - 20 Fremdschlüssel, davon **einer an einer schon vorhandenen Spalte**
     (`offboarding_processes."onboardingId"`). Das ist die einzige Stelle, an der der Push
     scheitern könnte; 1.7 prüft sie vorher.
   - Kein `DROP`, kein `RENAME`, kein Typwechsel.
@@ -175,19 +336,24 @@ Neu in dieser Fassung (nach `a2e2e64`):
   `{rueckgaben_liste}` nennt jede Zeile mit Zustand samt Wort, `{rueckgaben_offen_liste}`/
   `{rueckgaben_offen_anzahl}` zählen nur noch Gegenstände ohne Zustand. Betroffene eigene Vorlagen
   zeigt 1.9, HR erfährt es über den Kurztext (8.1, Punkt 12).
-- **Betriebsdateien:** `docker-compose.yml`, `Dockerfile`, `entrypoint.sh`, `package-lock.json`,
-  `.env.production.example`, `.dockerignore`, `next.config.ts`, `src/middleware.ts` unverändert.
-  Geändert: `package.json` (ein neues Skript, keine neue Abhängigkeit — `npm ci` läuft im Build
-  trotzdem neu, 3.3), `prisma/seed-check.js` (die Migrationen samt der Liste des Standardkatalogs
-  und die Vorlagen oben), `prisma/seed.ts` (läuft nur in einer Datenbank ohne Benutzer), dazu zwei
-  neue Dateien unter `public/system-dokumente/`.
+- **Betriebsdateien** (ab `b6e1c8a`): `docker-compose.yml`, `Dockerfile`, `entrypoint.sh`,
+  `package.json`, `package-lock.json`, `.env.production.example`, `.dockerignore`,
+  `next.config.ts`, `src/middleware.ts` unverändert — die eine neue Zeile in `package.json`
+  (`bfb0665`) kam schon am 02.10. mit. Deshalb kommt `npm ci` im Build voraussichtlich aus dem
+  Zwischenspeicher vom 02.10. (3.3). Geändert: `prisma/seed-check.js` (die Migrationen samt der
+  Liste des Standardkatalogs und die Vorlagen oben), `prisma/seed.ts` (läuft nur in einer
+  Datenbank ohne Benutzer), dazu zwei neue Dateien unter `public/system-dokumente/`.
 - **Keine neue Umgebungsvariable**, die `.env` bleibt, wie sie ist.
-- **Neue Dateien** unter `uploads/individuelle-mails/` im Volume `uploads_data` (gehört `nextjs`,
-  kein `chown` nötig).
+- **Volume `uploads_data`:** nichts zu tun. Den Ordner `uploads/individuelle-mails/` gibt es,
+  sobald HR seit dem 02.10. eine individuelle E-Mail **mit Anhang** verschickt hat (angelegt erst
+  beim Ablegen des ersten Anhangs, das Image legt nur `uploads/` an; 1.7 zählt die Anhänge). Er
+  gehört dann `nextjs`, und 4.1 sichert ihn mit.
 - **Mailvorlagen** (eine gespeicherte Zeile in der Datenbank überschreibt den Text aus dem Code
   vollständig; 1.9 zeigt je Vorlage, was zu tun ist):
-  - neu, ohne gespeicherte Zeile: `individuelle-mail`, `onboarding-department-abgesagt`,
-    `onboarding-ausstattung-offen` — **nicht vorsorglich speichern** (6.3);
+  - neu, ohne gespeicherte Zeile: `onboarding-department-abgesagt`, `onboarding-ausstattung-offen`
+    — **nicht vorsorglich speichern** (6.3). `individuelle-mail` ist seit dem 02.10. da und bleibt
+    von diesem Update unberührt (Text von `b6e1c8a` bis `0974b7f` gleich); 1.9 fragt sie deshalb
+    nicht mehr ab;
   - neuer Standardtext, gespeicherte Zeile seit dem 24.09.: `supervisor-link-created`,
     `supervisor-completed` → **direkt nach dem Start, vor der Freigabe an HR** „Text auf Standard
     zurücksetzen“ (5.3 Schritt 1; der Standardkatalog ist ab dem Start eingeschaltet);
@@ -240,8 +406,12 @@ System-Vorlagen `SYSTEM_VORLAGEN`/`planeSystemVorlage` in `prisma/seed-check.js`
 `src/lib/webhooks.ts`; Datumsstellen in
 `src/lib/contract-end-reminder.ts`, `src/lib/laeufe/vertragsende-erinnerungen.ts`,
 `src/lib/bem-einladung.ts`, `src/lib/mailer.ts` (`testSmtpConnection`),
-`src/app/api/onboarding/[id]/export/route.ts`. Schema-Delta der Ausstattung allein (ab `8c1ef05`,
-ohne die zwei Tabellen von Paket 3: 19/1/7/21/20): `docs/module/onboarding/ausstattung-schema-delta.sql`.</sub>
+`src/app/api/onboarding/[id]/export/route.ts`. Schema-Delta ab `b6e1c8a` (die Schema-Datei von
+`b6e1c8a` ist gleich der von `a2e2e64` und `8c1ef05`, die von `0974b7f` gleich der von `80ccfc3`;
+19/1/7/21/20): dieselben Spalten wie in `docs/module/onboarding/ausstattung-schema-delta.sql` (dort
+zweigeteilt in A1–A3 und A4, deshalb nicht byte-gleich). Ausgangsstand: Server-Ausgaben vom
+14.10.2026 (Kopf); Zählungen `b6e1c8a..0974b7f` und Mailvorlagen-Prüfsummen je Commit aus dem Repo
+nachgerechnet.</sub>
 
 ### Was NICHT dabei ist
 
@@ -266,8 +436,8 @@ Updates läuft weiter, und Stufe 2 kommt unter „Danach“ (Abschnitt 9).
 | Abschnitt | Dauer | Portal |
 |---|---|---|
 | 1–2 Vorher prüfen, altes Image sichern | 30–40 min (mehr Prüfungen als am 09.10.) | läuft |
-| 3 Holen, bauen, Vorschau | 15–30 min (Generalproben: Build 328 s bzw. 256 s, Teile aus dem Zwischenspeicher; auf dem Server mit `npm ci` länger) | läuft |
-| 4.1–4.3 Anhalten, Sicherungen, Start | etwa 5 min (24.09.: 2 min; dazu die Uploads-Sicherung, am 29.09. 94 MB; Generalproben: Entrypoint bis „Ready“ 8 bzw. 9 s) | **nicht erreichbar** |
+| 3 Holen, bauen, Vorschau | 15–30 min (Generalproben: Build 328 s, 256 s bzw. 19 s, je nach Zwischenspeicher; auf dem Server kommt `npm ci` voraussichtlich aus dem Zwischenspeicher vom 02.10., sonst einige Minuten länger) | läuft |
+| 4.1–4.3 Anhalten, Sicherungen, Start | etwa 5 min (24.09.: 2 min; dazu die Uploads-Sicherung, am 29.09. 94 MB; Generalproben: Entrypoint bis „Ready“ 8, 9 bzw. 10 s) | **nicht erreichbar** |
 | 5.1–5.3 Nachher prüfen; vor der Freigabe Mailvorlagen, Abteilungen, Vorlagenpunkte, Webhooks, Stufe 2 | 45–75 min | läuft (HR wartet bis zur Freigabe am Ende von 5.3) |
 | 5.4–5.5 Probe | 20–30 min | läuft |
 | 6 Handschritte | 20–40 min | läuft |
@@ -341,7 +511,7 @@ cd /vol/container/HR_Portal_CREDO
 mkdir -p ~/deploy-main-2026-10
 ```
 
-**Erwartet:** keine Ausgabe (auch nicht, wenn der Ordner aus Etappe A schon da ist). In
+**Erwartet:** keine Ausgabe (auch nicht, wenn der Ordner schon da ist, etwa aus Etappe A). In
 `~/deploy-main-2026-10/` landen die Arbeitsdateien.
 
 ### 1.1 Stand des Repos (der wichtigste Schritt)
@@ -350,21 +520,27 @@ mkdir -p ~/deploy-main-2026-10
 sudo git log -1 --oneline
 ```
 
-**Erwartet:**
+**Erwartet** (Stand `b6e1c8a` am 14.10.2026 auf dem Server per `sudo git reflog` belegt, siehe
+Kopf):
 
 ```
-f6d3daf docs: Deploy-Ablauf Paket 4 auf den Zeitplaner umgestellt
+b6e1c8a fix(checklisten): Reihenfolge wirkt im Vorgang; Verschieben, Ziehen und Fokus nachgebessert
 ```
 
-Weicht ab → **STOPP, Ausgabe an Claude.** Diese Anleitung gilt nur für diesen Ausgangsstand — auch
-dann STOPP, wenn dort schon `a2e2e64 …` oder `8c1ef05 …` steht.
+Steht hinter `b6e1c8a` noch `(HEAD -> main, origin/main, origin/HEAD)`, ist das in Ordnung (Git
+zeigt die Etiketten im Terminal von selbst an). Weicht sonst etwas ab → **STOPP, Ausgabe an
+Claude.** Diese Anleitung gilt nur für diesen Ausgangsstand — auch dann STOPP, wenn dort
+`f6d3daf …` (Annahme der vorigen Fassung) oder schon `a2e2e64 …`, `8c1ef05 …` bzw. `0974b7f …`
+steht.
 
 ```bash
 sudo git status --short
 ```
 
 **Erwartet:** nur Zeilen `?? backups/<datei>` — die Sicherungen früherer Deploys, z. B.
-`?? backups/vor-schema-abgleich-20260930-….sql` oder `?? backups/vor-deploy-paket4-manuell.sql`.
+`?? backups/vor-schema-abgleich-20261002-….sql` (der Schema-Abgleich für Paket 3, je nach Build
+auch mit `20261001`), `?? backups/vor-schema-abgleich-20260930-….sql` oder
+`?? backups/vor-deploy-paket4-manuell.sql`.
 Weicht ab (Zeilen mit `M`, oder `??` außerhalb von `backups/`) → **STOPP, Ausgabe an Claude.** Nie
 `git add -A`, `git stash -u` oder `git clean` — das sammelt oder löscht die Sicherungen.
 
@@ -388,19 +564,27 @@ sudo docker compose ps
 sudo docker inspect --format '{{.Created}} {{.Image}}' hr-portal-app
 ```
 
-**Erwartet:** Die Zeile beginnt mit `2026-09-30T` (UTC), danach `sha256:…`. Ein anderes Datum →
-**STOPP, Ausgabe an Claude** (dann wurde seit dem 30.09. neu gebaut oder neu angelegt). Das
-Etikett aus Etappe A ändert dieses Datum nicht.
+**Erwartet** (am 14.10.2026 so gesehen):
 
-### 1.3 Die Datenbank entspricht dem Schema von `f6d3daf`
+```
+2026-10-02T07:47:30.627061392Z sha256:5b1a01dd32efde8c7de85f0f78204e994614fe4d1c399554c5a1b06002fa9f72
+```
+
+Maßgeblich sind der Anfang `2026-10-02T07:47:30` (UTC) und `sha256:5b1a01dd32ef`. Ein anderes Datum
+oder ein anderes Image → **STOPP, Ausgabe an Claude** (dann wurde seit dem 02.10. neu gebaut oder
+neu angelegt). Ein Etikett (falls je eines gesetzt wurde) ändert weder Datum noch Image.
+Die volle ID braucht 2.1 noch einmal; sie steht dort schon im Befehl.
+
+### 1.3 Die Datenbank entspricht dem Schema von `b6e1c8a`
 
 ```bash
 sudo docker exec hr-portal-app sh -c 'npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel ./prisma/schema.prisma --exit-code >/dev/null 2>&1; echo $?'
 ```
 
-**Erwartet:** `0`. Bei `2` wurde die Datenbank außerhalb eines Deploys verändert, bei `1` gab es
-einen Fehler → **STOPP, Ausgabe an Claude.** Es ist derselbe Vergleich, den der Entrypoint bei
-jedem Start macht.
+**Erwartet:** `0` (am 14.10.2026 auf dem Server so gemessen). Bei `2` wurde die Datenbank außerhalb
+eines Deploys verändert, bei `1` gab es einen Fehler → **STOPP, Ausgabe an Claude.** Es ist derselbe
+Vergleich, den der Entrypoint bei jedem Start macht; er vergleicht mit der Schema-Datei im
+laufenden Image, also mit `b6e1c8a`.
 
 ### 1.4 Sicherungsverzeichnis (sonst bricht der Start ab)
 
@@ -461,23 +645,27 @@ df -h . "$(sudo docker info --format '{{.DockerRootDir}}')"
 **Erwartet:** unter einer Kopfzeile zwei Zeilen — die **erste** gilt für den Projektordner, die
 **zweite** für Docker (die letzte Spalte zeigt nur, wo das Laufwerk eingehängt ist, etwa `/`;
 beide Zeilen dürfen gleich aussehen). Maßgeblich ist die Spalte `Avail` (bei deutscher Sprache
-`Verf.`): in der zweiten Zeile (Docker) **mindestens 3 GB** (24.09.: 15 GB) — diesmal entsteht
-auch die Schicht mit den Abhängigkeiten neu, und das neue Image wird gut 900 MB groß
-(erste Generalprobe: 907 MB) —, in der ersten mindestens 1 GB (24.09.: 362 GB). Weniger → **STOPP,
-Ausgabe an Claude.**
+`Verf.`): in der zweiten Zeile (Docker) **mindestens 3 GB** (24.09.: 15 GB) — das neue Image wird
+gut 900 MB groß (Generalproben: 907 MB), und ist der Zwischenspeicher vom 02.10. weg, entsteht auch
+die Schicht mit den Abhängigkeiten neu —, in der ersten mindestens 1 GB (24.09.: 362 GB). Weniger →
+**STOPP, Ausgabe an Claude** — nicht selbst mit `docker image prune` oder `docker system prune`
+Platz schaffen (mit `-a` löschten beide auch das Image für den Rückweg, 7.1).
 
 ```bash
 sudo docker image ls
 ```
 
-**Erwartet:** eine Liste; Zeile `hr_portal_credo-app   latest` mit einer Größe um 700 MB (24.09.:
-656 MB). Nur notieren. Fehlermeldung statt Liste → **STOPP, Ausgabe an Claude.**
+**Erwartet:** eine Liste; darin die Zeile `hr_portal_credo-app   latest` (das laufende Image vom
+02.10.; Größe notieren, 24.09.: 656 MB) und — falls je eines gesetzt wurde — eine Zeile
+`hr-portal-app   f6d3daf` (welche IMAGE ID sie trägt, prüft 2.1; nach den Haltepunkten der
+Fassung vom 09.10. fehlt sie eher). Nur notieren. Fehlermeldung statt Liste → **STOPP, Ausgabe an
+Claude.**
 
 ```bash
 sudo du -sh backups
 ```
 
-**Erwartet:** eine Größe (24.09.: 4,9 MB, seit 30.09. eher mehr). Nur notieren.
+**Erwartet:** eine Größe (24.09.: 4,9 MB, seit 30.09. und 02.10. eher mehr). Nur notieren.
 
 ### 1.6 Uploads-Volume finden
 
@@ -500,16 +688,28 @@ sudo du -sh "$(sudo docker volume inspect --format '{{.Mountpoint}}' "$UPLOADS_V
 
 **Erwartet:** eine Größe (29.09.: 94 MB). Notieren — die Sicherung in 4.1 wird etwa so groß.
 
-### 1.7 Die neuen Tabellen gibt es noch nicht; Vorab-Prüfungen für den Start
+### 1.7 Paket 3 ist da, die Tabellen der Ausstattung noch nicht; Vorab-Prüfungen für den Start
 
-**Neue Tabellen** (alle neun):
+**Tabellen** (die zwei von Paket 3 und die sieben neuen):
 
 ```bash
 sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c "SELECT t AS tabelle, to_regclass(t) AS vorhanden FROM unnest(ARRAY['public.individuelle_mails', 'public.individuelle_mail_anhaenge', 'public.ausstattungs_positionen', 'public.ausstattungs_ausblendungen', 'public.onboarding_ausstattung', 'public.onboarding_ausstattung_aufgaben', 'public.onboarding_stellen_hinweise', 'public.onboarding_ausstattung_aenderungen', 'public.ausgaben']) t;"
 ```
 
-**Erwartet:** `(9 rows)`, die Spalte `vorhanden` ist in **allen** neun Zeilen leer. Steht dort ein
-Name → **STOPP, Ausgabe an Claude** (widerspricht 1.3).
+**Erwartet:** `(9 rows)`. In den ersten beiden Zeilen steht in `vorhanden` der Name
+(`individuelle_mails` bzw. `individuelle_mail_anhaenge` — seit dem 02.10. da, am 14.10. so
+gesehen), in den übrigen **sieben** Zeilen ist `vorhanden` leer. Fehlt einer der beiden Namen oder
+steht bei den sieben ein Name → **STOPP, Ausgabe an Claude** (widerspricht 1.3).
+
+**Bestand der individuellen E-Mails** (zählt nur Zeilen, zeigt keinen Inhalt):
+
+```bash
+sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT (SELECT COUNT(1) FROM individuelle_mails) AS mails, (SELECT COUNT(1) FROM individuelle_mail_anhaenge) AS anhaenge;'
+```
+
+**Erwartet:** zwei Zahlen, `0 | 0` oder mehr (seit dem 02.10. kann HR individuelle E-Mails
+versenden). Nur **notieren** — kein STOPP. Der Deploy lässt diese Tabellen unverändert; 4.1 zählt
+bei angehaltenem Portal noch einmal, 5.2 vergleicht damit.
 
 **Der neue Fremdschlüssel an der bestehenden Spalte** (CLAUDE.md, „Vorab-Pruefung“). Ein Wert
 ohne passendes Onboarding ließe `db push` scheitern — nach der Sicherung, aber der Container
@@ -540,7 +740,9 @@ ist dann leer, also `20` angelegt, `13` eingeschaltet):
 sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT (SELECT COUNT(1) FROM system_migrations) AS merker, (SELECT COUNT(1) FROM supervisor_data) AS modalitaeten;'
 ```
 
-**Erwartet:** `merker` = `10` (alle Merker seit dem 24.09.); `modalitaeten` ist eine Zahl —
+**Erwartet:** `merker` = `10` (alle Merker seit dem 24.09.; die Deploys vom 30.09. und 02.10.
+brachten keine neue Migration — `prisma/seed-check.js` ist von `f6d3daf` bis `b6e1c8a` gleich, so
+auch in der dritten Generalprobe); `modalitaeten` ist eine Zahl —
 **notieren**, so viele Datensätze setzt die erste Migration auf `false`. Weicht `merker` ab →
 **STOPP, Ausgabe an Claude.**
 
@@ -549,7 +751,7 @@ sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db
 ```
 
 **Erwartet:** zwei Zahlen, voraussichtlich `14 | 0` (4 Standard + 4 Bildungseinrichtung + 3 Beamte
-+ 3 Minijob, so in beiden Generalproben). **Notieren** — die zweite Migration versieht genau
++ 3 Minijob, so in allen drei Generalproben). **Notieren** — die zweite Migration versieht genau
 `bekommen_hinweis` Punkte mit dem Hinweis und lässt `eigene_beschreibung` Punkte unverändert.
 Andere Zahlen sind kein Fehler (HR hat Vorlagen geändert), nur notieren.
 
@@ -589,11 +791,14 @@ alten und dem neuen Standardtext und nennt die Handlung. Sie ist lang — als **
 kopieren. Dieselbe Abfrage läuft in 5.3 Schritt 1 noch einmal.
 
 ```bash
-sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT b.event, (t.id IS NOT NULL) AS gespeichert, t."isActive" AS aktiv, (coalesce(t."recipientTo", $$$$) <> $$$$) AS an_feld, (t.subject ~ b.sperre) AS betreff_gesperrt, CASE WHEN t.id IS NULL THEN b.ohne WHEN md5(t.subject || t."bodyHtml" || coalesce(t."bodyText", $$$$)) = b.neu THEN $$nichts (Text aktuell)$$ WHEN md5(t.subject || t."bodyHtml" || coalesce(t."bodyText", $$$$)) = b.alt THEN b.bei_alt ELSE $$ENTSCHEIDUNG: eigener Text, an Claude$$ END AS handlung FROM (VALUES ($$supervisor-link-created$$, $$ce419ba932eeaa511236c0e9d204768e$$, $$d8d7073062a58e8d5afa9418379ef314$$, NULL, $$nichts$$, $$nach dem Start zuruecksetzen$$), ($$supervisor-completed$$, $$3a2a7474334636bc5c263b621068abc3$$, $$12a4257cc108b6209ba403a3163dbed7$$, NULL, $$nichts$$, $$nach dem Start zuruecksetzen$$), ($$onboarding-department-assigned$$, $$ca108648d5a35c854f19757349e35e58$$, $$7688e3c3ff89a7574efc144660193827$$, $$\{\{[#/]?(aufgabenliste|angaben|nachtrag_liste|link|magicLink)(_html)?\}\}$$, $$nichts$$, $$nach dem Start zuruecksetzen$$), ($$onboarding-department-reminder$$, $$bae87c284786e4ec9cd145755d9197c5$$, $$bae87c284786e4ec9cd145755d9197c5$$, $$\{\{[#/]?(aufgabenliste|angaben|nachtrag_liste|link|magicLink)(_html)?\}\}$$, $$nichts$$, $$nichts$$), ($$onboarding-task-completed$$, $$f0453fb4bea69031527439158521cff7$$, $$6945e306a76c318688a8d257e75e180a$$, $$\{\{[#/]?(aufgabenliste|angaben|nachtrag_liste|link|magicLink|kommentar|kommentar_text|ausgabe_vermerk)(_html)?\}\}$$, $$nichts$$, $$Handgriff 0: vor dem Start aus, nach dem Start zuruecksetzen, dann ein$$), ($$onboarding-department-completed$$, $$c0860083fa95ce9575a4d24c4078f096$$, $$c0860083fa95ce9575a4d24c4078f096$$, NULL, $$nichts$$, $$nichts$$), ($$onboarding-department-abgesagt$$, NULL, $$6e4cf12165ff37233191c2c37bbc9481$$, $$\{\{[#/]?(aufgabenliste|angaben|nachtrag_liste|link|magicLink|erledigte_liste|ausgaben_liste)(_html)?\}\}$$, $$nichts, nicht speichern$$, NULL), ($$onboarding-ausstattung-offen$$, NULL, $$09e21acf521c633696aec35189984874$$, $$\{\{[#/]?(offene_liste|offene_liste_html|portalLink)\}\}$$, $$nichts, nicht speichern$$, NULL), ($$individuelle-mail$$, NULL, $$7834f86437689c9089b4083c07076b6e$$, $$\{\{[#/]?(nachricht|anhaenge_liste)(_html)?\}\}$$, $$nichts, nicht speichern$$, NULL)) b(event, alt, neu, sperre, ohne, bei_alt) LEFT JOIN email_templates t ON t.event = b.event ORDER BY b.event;'
+sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT b.event, (t.id IS NOT NULL) AS gespeichert, t."isActive" AS aktiv, (coalesce(t."recipientTo", $$$$) <> $$$$) AS an_feld, (t.subject ~ b.sperre) AS betreff_gesperrt, CASE WHEN t.id IS NULL THEN b.ohne WHEN md5(t.subject || t."bodyHtml" || coalesce(t."bodyText", $$$$)) = b.neu THEN $$nichts (Text aktuell)$$ WHEN md5(t.subject || t."bodyHtml" || coalesce(t."bodyText", $$$$)) = b.alt THEN b.bei_alt ELSE $$ENTSCHEIDUNG: eigener Text, an Claude$$ END AS handlung FROM (VALUES ($$supervisor-link-created$$, $$ce419ba932eeaa511236c0e9d204768e$$, $$d8d7073062a58e8d5afa9418379ef314$$, NULL, $$nichts$$, $$nach dem Start zuruecksetzen$$), ($$supervisor-completed$$, $$3a2a7474334636bc5c263b621068abc3$$, $$12a4257cc108b6209ba403a3163dbed7$$, NULL, $$nichts$$, $$nach dem Start zuruecksetzen$$), ($$onboarding-department-assigned$$, $$ca108648d5a35c854f19757349e35e58$$, $$7688e3c3ff89a7574efc144660193827$$, $$\{\{[#/]?(aufgabenliste|angaben|nachtrag_liste|link|magicLink)(_html)?\}\}$$, $$nichts$$, $$nach dem Start zuruecksetzen$$), ($$onboarding-department-reminder$$, $$bae87c284786e4ec9cd145755d9197c5$$, $$bae87c284786e4ec9cd145755d9197c5$$, $$\{\{[#/]?(aufgabenliste|angaben|nachtrag_liste|link|magicLink)(_html)?\}\}$$, $$nichts$$, $$nichts$$), ($$onboarding-task-completed$$, $$f0453fb4bea69031527439158521cff7$$, $$6945e306a76c318688a8d257e75e180a$$, $$\{\{[#/]?(aufgabenliste|angaben|nachtrag_liste|link|magicLink|kommentar|kommentar_text|ausgabe_vermerk)(_html)?\}\}$$, $$nichts$$, $$Handgriff 0: vor dem Start aus, nach dem Start zuruecksetzen, dann ein$$), ($$onboarding-department-completed$$, $$c0860083fa95ce9575a4d24c4078f096$$, $$c0860083fa95ce9575a4d24c4078f096$$, NULL, $$nichts$$, $$nichts$$), ($$onboarding-department-abgesagt$$, NULL, $$6e4cf12165ff37233191c2c37bbc9481$$, $$\{\{[#/]?(aufgabenliste|angaben|nachtrag_liste|link|magicLink|erledigte_liste|ausgaben_liste)(_html)?\}\}$$, $$nichts, nicht speichern$$, NULL), ($$onboarding-ausstattung-offen$$, NULL, $$09e21acf521c633696aec35189984874$$, $$\{\{[#/]?(offene_liste|offene_liste_html|portalLink)\}\}$$, $$nichts, nicht speichern$$, NULL)) b(event, alt, neu, sperre, ohne, bei_alt) LEFT JOIN email_templates t ON t.event = b.event ORDER BY b.event;'
 ```
 
-**Erwartet:** `(9 rows)`. Voraussichtlich (nicht in den Generalproben gemessen — die Kopie hatte
-keine gespeicherten Vorlagen):
+**Erwartet:** `(8 rows)`. Die Vorlage `individuelle-mail` fragt die Abfrage nicht mehr ab (in der
+vorigen Fassung, Commit `ea2d41d`, waren es 9 Zeilen): Sie ist seit dem 02.10. in Betrieb, ihr
+Standardtext ändert sich mit diesem Update nicht, und ein seitdem gespeicherter eigener Text von HR
+bleibt gültig. Voraussichtlich (nicht in den Generalproben gemessen — die Kopien hatten keine
+gespeicherten Vorlagen):
 
 - `supervisor-link-created` und `supervisor-completed`: `gespeichert` = `t`, `handlung` = `nach
   dem Start zuruecksetzen` (beide wurden am 24.09. per SQL gespeichert);
@@ -716,20 +921,71 @@ Claude — die Adressen trägt HR ein, nicht dieser Ablauf.
 
 ### 2.1 Altes Image etikettieren (für den Rückfall)
 
+Das laufende Image ist das vom 02.10. mit `b6e1c8a`, seine ID hat 1.2 bestätigt. Genau diese ID
+bekommt das Etikett `hr-portal-app:b6e1c8a` — fest eingetragen, nicht „das, was gerade läuft“:
+So lässt sich die Zeile gefahrlos wiederholen, auch nach dem Start in 4.2 (dann liefe schon das
+neue Image, und das Etikett wanderte sonst unbemerkt mit):
+
 ```bash
-sudo docker tag "$(sudo docker inspect --format '{{.Image}}' hr-portal-app)" hr-portal-app:f6d3daf
+sudo docker tag sha256:5b1a01dd32efde8c7de85f0f78204e994614fe4d1c399554c5a1b06002fa9f72 hr-portal-app:b6e1c8a
 ```
 
-**Erwartet:** keine Ausgabe. Wurde das Etikett schon in Etappe A gesetzt, setzt der Befehl es auf
-dasselbe Image noch einmal — unschädlich.
+**Erwartet:** keine Ausgabe. `No such image` → **STOPP, Ausgabe an Claude** (dann stimmt 1.2
+nicht mehr).
+
+Worauf die Etiketten zeigen — das neue und, falls es eines gibt, ein altes `f6d3daf` (nur lesend):
+
+```bash
+for t in b6e1c8a f6d3daf; do printf '%-9s %s\n' "$t" "$(sudo docker image inspect --format '{{.Id}}' hr-portal-app:$t 2>/dev/null | grep . || echo fehlt)"; done; printf '%-9s %s\n' laufend "$(sudo docker inspect --format '{{.Image}}' hr-portal-app)"
+```
+
+**Erwartet** (nicht gemessen; die ID aus 1.2) drei Zeilen. Die erste und die dritte stehen fest,
+die mittlere ist **eine** der beiden Varianten — beide gleichwertig, keine ist ein Fehler:
+
+```
+b6e1c8a   sha256:5b1a01dd32efde8c7de85f0f78204e994614fe4d1c399554c5a1b06002fa9f72
+f6d3daf   fehlt
+laufend   sha256:5b1a01dd32efde8c7de85f0f78204e994614fe4d1c399554c5a1b06002fa9f72
+```
+
+oder in der Mitte:
+
+```
+f6d3daf   sha256:5b1a01dd32efde8c7de85f0f78204e994614fe4d1c399554c5a1b06002fa9f72
+```
+
+- Zeile `b6e1c8a` mit genau dieser ID und gleich `laufend` — das ist die Bedingung. Weicht sie ab
+  oder steht dort `fehlt` → **STOPP, Ausgabe an Claude.** (Wird die Prüfung nach 4.2 wiederholt,
+  zeigt `laufend` das neue Image; dann zählt nur die Zeile `b6e1c8a` mit dieser ID.)
+- Zeile `f6d3daf` mit `fehlt`: Es gibt kein solches Etikett (der wahrscheinliche Fall, siehe Kopf).
+  Den Befehl darunter **überspringen**.
+- Zeile `f6d3daf` mit **derselben** ID: Das Image vom 02.10. wurde schon einmal etikettiert, das
+  Etikett heißt also falsch. Es wird mit dem Befehl darunter entfernt (das Image selbst bleibt, es
+  trägt ja `b6e1c8a`).
+- Zeile `f6d3daf` mit einer **anderen** ID → kein Befehl darunter, **STOPP, Ausgabe an Claude** (dann
+  gibt es ein anderes Image unter diesem Namen, etwa aus dem Deploy vom 02.10.; es wird nicht
+  angefasst). Das Portal läuft weiter.
+
+Nur bei gleicher ID — das falsche Etikett entfernen:
+
+```bash
+sudo docker image rm hr-portal-app:f6d3daf
+```
+
+**Erwartet:** genau `Untagged: hr-portal-app:f6d3daf`, **keine** Zeile `Deleted: …`. Steht dort
+doch `Deleted:` oder eine Fehlermeldung → **STOPP, Ausgabe an Claude.**
 
 ```bash
 sudo docker image ls hr-portal-app
 ```
 
-**Erwartet:** eine Zeile `hr-portal-app   f6d3daf`, dazu die älteren Etiketten `7bc91ec` und
-`ae490ba`, falls noch vorhanden. Fehlt die Zeile `f6d3daf` → **STOPP, Ausgabe an Claude.** Ohne
-dieses Etikett wäre das alte Image nach dem Build namenlos und könnte beim Aufräumen verschwinden.
+**Erwartet:** eine Zeile `hr-portal-app   b6e1c8a`, dazu die älteren Etiketten `7bc91ec` und
+`ae490ba`, falls noch vorhanden; **keine** Zeile `f6d3daf` (außer im STOPP-Fall oben). Fehlt die
+Zeile `b6e1c8a` → **STOPP, Ausgabe an Claude.** Ohne dieses Etikett wäre das alte Image nach dem
+Build namenlos und könnte beim Aufräumen (`docker image prune`) verschwinden; vor
+`docker image prune -a` und `docker system prune -a` schützt auch das Etikett nicht (7.1). Die
+Etiketten `7bc91ec` und `ae490ba` sind **älter** als `b6e1c8a` und taugen nicht für einen
+Rückfall (7.1).
 
 ### 2.2 Leseprobe der Uploads
 
@@ -737,7 +993,7 @@ Liest das ganze Volume mit derselben Kennung und demselben Image wie die Sicheru
 nur lesend und ohne ein Archiv zu schreiben. `UPLOADS_VOL` stammt aus 1.6.
 
 ```bash
-sudo docker run --rm --user nextjs --entrypoint sh -v "$UPLOADS_VOL:/daten:ro" hr-portal-app:f6d3daf -c 'set -o pipefail; find /daten -type f | wc -l; tar cf - -C /daten . | wc -c && echo "tar OK"'
+sudo docker run --rm --user nextjs --entrypoint sh -v "$UPLOADS_VOL:/daten:ro" hr-portal-app:b6e1c8a -c 'set -o pipefail; find /daten -type f | wc -l; tar cf - -C /daten . | wc -c && echo "tar OK"'
 ```
 
 **Erwartet:** zwei Zahlen (Anzahl der Dateien, 29.09.: 315; Bytes ungefähr wie in 1.6) und
@@ -762,8 +1018,10 @@ fehlte sonst darin. So lief es auch am 24.09. und am 30.09.
 sudo git fetch origin && sudo git checkout main && sudo git pull
 ```
 
-**Erwartet:** `Already on 'main'`, dann `Updating f6d3daf..…` und `Fast-forward` mit einer
-Dateiliste. Normal und kein Grund zum Anhalten sind davor Zeilen vom Holen (`From …`, dazu Zeilen
+**Erwartet:** `Already on 'main'`, dann `Updating b6e1c8a..…` und `Fast-forward` mit einer
+Dateiliste. Hinter den zwei Punkten steht der neueste Doku-Commit auf `main` (beim Schreiben dieser
+Fassung der Commit, der sie enthält; `ea2d41d` war die Fassung davor) — nur notieren, geprüft wird
+in 3.2. Normal und kein Grund zum Anhalten sind davor Zeilen vom Holen (`From …`, dazu Zeilen
 mit `[new branch]` oder `-> origin/…` für andere Branches) und
 `Your branch is behind 'origin/main' by … commits … (use "git pull" to update your local branch)`
 — das `git pull` steckt schon im selben Befehl. Weicht ab (Konflikt, `error`, `fatal`, eine Frage
@@ -772,18 +1030,24 @@ nach Zugangsdaten) → **STOPP, Ausgabe an Claude.** Das Portal läuft unveränd
 ### 3.2 Was angekommen ist
 
 ```bash
-sudo git log --oneline -3
+sudo git log --oneline -4
 ```
 
-**Erwartet:** drei Zeilen, oben der Commit, der diese Anleitung enthält (ein `docs(deploy)`-Commit;
-ebenso in Ordnung: ein späterer Doku-Commit), darunter
+**Erwartet:** vier Zeilen, oben der Commit, der diese Fassung enthält (ein `docs(deploy)`-Commit
+mit den Etiketten `(HEAD -> main, origin/main, origin/HEAD)`; ebenso in Ordnung: ein späterer
+Doku-Commit darüber), darunter die vorige Fassung und der Code-Stand:
 
 ```
+<neuer Commit> (HEAD -> main, origin/main, origin/HEAD) docs(deploy): …
+ea2d41d docs(deploy): gemeinsamer Deploy f6d3daf -> main mit Ausstattung & Zugaenge
 0974b7f feat(ausstattung): Standardkatalog beim Deploy anlegen (A0 erledigt)
 80ccfc3 test(ausstattung): Ablaufprobe A4 gegen die Testdatenbank
 ```
 
-Nur zum Ansehen — geprüft wird mit den nächsten Befehlen. Zählungen und Dateilisten zielen auf
+(Mit einem weiteren Doku-Commit rutschen die Zeilen ab `ea2d41d` um eine nach unten, `80ccfc3`
+fällt dann heraus, und die Etiketten stehen am obersten; die Betreffzeile von `ea2d41d` nennt noch
+den alten Ausgangsstand `f6d3daf`, der Inhalt ist überholt.) Nur zum Ansehen —
+geprüft wird mit den nächsten Befehlen. Zählungen und Dateilisten zielen auf
 den festen Code-Stand `0974b7f`; die Prüfung „nur Doku“ stellt sicher, dass der ausgecheckte Stand
 außerhalb von `docs/` genau `0974b7f` ist.
 
@@ -808,19 +1072,20 @@ sudo git rev-parse --verify 0974b7f
 Claude.**
 
 ```bash
-sudo git rev-list --count f6d3daf..0974b7f
+sudo git rev-list --count b6e1c8a..0974b7f
 ```
 
-**Erwartet:** `37`. Weicht ab → **STOPP, Ausgabe an Claude.**
+**Erwartet:** `31` (ab `f6d3daf` wären es 37 — die sechs bis `b6e1c8a` sind seit dem 02.10. live).
+Weicht ab → **STOPP, Ausgabe an Claude.**
 
 ```bash
-sudo git rev-list --count --merges f6d3daf..0974b7f
+sudo git rev-list --count --merges b6e1c8a..0974b7f
 ```
 
 **Erwartet:** `4` (`aea163a`, `4da68f1`, `e81b07c`, `345c631`). Weicht ab → **STOPP, Ausgabe an
-Claude.** Eine Liste aller 37 Commits ist nicht nötig; wer sie sehen will:
-`sudo git --no-pager log --oneline --no-decorate f6d3daf..0974b7f` (die Commits stehen in
-Abschnitt 0).
+Claude.** Eine Liste aller 31 Commits ist nicht nötig; wer sie sehen will:
+`sudo git --no-pager log --oneline --no-decorate b6e1c8a..0974b7f` (die Commits stehen in
+Abschnitt 0, Tabellen „Neu mit diesem Deploy“).
 
 Was der Standardkatalog-Commit enthält (nur zum Abgleich mit Abschnitt 0):
 
@@ -875,14 +1140,13 @@ sudo grep -c 'await migriereAusstattungStandardkatalog' prisma/seed-check.js
 Claude.**
 
 ```bash
-sudo git diff --numstat f6d3daf 0974b7f -- docker-compose.yml Dockerfile entrypoint.sh package.json package-lock.json .env.production.example .dockerignore next.config.ts prisma/seed-check.js prisma/seed.ts public/system-dokumente src/middleware.ts src/instrumentation.ts
+sudo git diff --numstat b6e1c8a 0974b7f -- docker-compose.yml Dockerfile entrypoint.sh package.json package-lock.json .env.production.example .dockerignore next.config.ts prisma/seed-check.js prisma/seed.ts public/system-dokumente src/middleware.ts src/instrumentation.ts
 ```
 
-**Erwartet:** genau diese fünf Zeilen (Zahlen und Namen durch Tabulatoren getrennt; bei den beiden
+**Erwartet:** genau diese vier Zeilen (Zahlen und Namen durch Tabulatoren getrennt; bei den beiden
 Word-Dateien stehen statt Zahlen zwei Striche; am 14.10. so gemessen):
 
 ```
-1	0	package.json
 884	48	prisma/seed-check.js
 271	250	prisma/seed.ts
 -	-	public/system-dokumente/rueckgabeprotokoll-ausstattung.docx
@@ -891,13 +1155,15 @@ Word-Dateien stehen statt Zahlen zwei Striche; am 14.10. so gemessen):
 
 Weicht ab → **STOPP, Ausgabe an Claude.** (`--numstat` statt `--stat`, weil `--stat` je nach
 Fensterbreite anders aussieht. Bis `80ccfc3` waren es `461 48`; `0974b7f` fügt 423 Zeilen hinzu
-und entfernt keine.)
+und entfernt keine. Ab `f6d3daf` käme die Zeile `1 0 package.json` dazu — sie ist seit dem 02.10.
+auf dem Server.)
 
 ```bash
-sudo git diff --quiet f6d3daf 0974b7f -- package-lock.json && echo "package-lock unveraendert"
+sudo git diff --quiet b6e1c8a 0974b7f -- package.json package-lock.json && echo "package.json und package-lock unveraendert"
 ```
 
-**Erwartet:** `package-lock unveraendert`. Weicht ab → **STOPP, Ausgabe an Claude.**
+**Erwartet:** `package.json und package-lock unveraendert` (darauf beruht die Erwartung in 3.3).
+Weicht ab → **STOPP, Ausgabe an Claude.**
 
 ```bash
 sudo git status --short
@@ -911,19 +1177,23 @@ sudo git status --short
 sudo docker compose build app
 ```
 
-**Erwartet:** Der Build endet ohne `ERROR`. Der Schritt `RUN npm ci --ignore-scripts` läuft neu
-(nicht `CACHED`), weil sich `package.json` seit dem letzten Server-Build (`f6d3daf`) geändert hat;
-`package-lock.json` ist unverändert. Das dauert einige Minuten länger als sonst. Der alte
-Container läuft dabei unverändert weiter. In beiden Generalproben stand im Build-Log u. a.
+**Erwartet:** Der Build endet ohne `ERROR`. `package.json` und `package-lock.json` sind seit dem
+letzten Server-Build (`b6e1c8a`, 02.10.) unverändert (3.2). Ist dessen Zwischenspeicher noch da,
+steht beim Schritt `RUN npm ci --ignore-scripts` voraussichtlich `CACHED` (nicht gemessen); ist er
+weg (etwa nach `docker builder prune`), läuft `npm ci` neu — mit demselben Ergebnis, nur einige
+Minuten länger. Beides ist in Ordnung. `npx prisma generate` und `npm run build` laufen in jedem Fall
+neu (Schema, `prisma/seed-check.js` und Code haben sich geändert). Der alte Container läuft dabei
+unverändert weiter. In den ersten beiden Generalproben stand im Build-Log u. a.
 `Prisma CLI: 6.9.0 (muss zum generierten Client passen)` und `✓ Compiled successfully …`; dazu
-nur ESLint-Warnungen (`react-hooks/exhaustive-deps`), keine Fehler.
+nur ESLint-Warnungen (`react-hooks/exhaustive-deps`), keine Fehler (die dritte kam ganz aus dem
+Zwischenspeicher der zweiten, 19 s).
 
-Dabei zum ersten Mal zu sehen und **bekannt, kein Grund zum Abbruch:** Zeilen `npm warn deprecated …`
+**Bekannt, kein Grund zum Abbruch:** nur wenn `npm ci` neu läuft, Zeilen `npm warn deprecated …`
 (etwa zu `glob` mit dem Satz „… widely publicized security vulnerabilities …“, zu `inflight`,
 `@types/bcryptjs`, `whatwg-encoding`), eine Zusammenfassung wie `… vulnerabilities (…)` mit dem
-Rat `npm audit fix` (nicht ausführen) und `npm notice …` zu einer neuen npm-Version. Ebenfalls
-bekannt (in beiden Generalproben so): `⚠ Compiled with warnings` mit dem Hinweis, `jose` nutze eine
-Node.js-API, die die Edge Runtime nicht kennt (`CompressionStream`) — danach folgt trotzdem
+Rat `npm audit fix` (nicht ausführen) und `npm notice …` zu einer neuen npm-Version. In jedem Fall
+(in den ersten beiden Generalproben so): `⚠ Compiled with warnings` mit dem Hinweis, `jose` nutze
+eine Node.js-API, die die Edge Runtime nicht kennt (`CompressionStream`) — danach folgt trotzdem
 `✓ Compiled successfully …`.
 
 **STOPP, Ausgabe an Claude** nur bei `ERROR` (`npm error`, `ERROR: failed to solve …`) oder einer
@@ -933,7 +1203,7 @@ läuft weiter; ein zweiter Versuch später schadet nicht.
 **Eine Ausnahme ohne STOPP:** Steht im Fehler „An error occurred in `next/font`“ (dazu „Failed to
 fetch `Montserrat` from Google Fonts“ oder „Cannot read properties of null“), war Google Fonts
 beim Bauen kurz nicht richtig erreichbar – der Build lädt die Schrift jedes Mal neu. Am 09.10.2026
-lokal genau so passiert; der zweite Versuch kurz danach lief durch (in den beiden Generalproben am
+lokal genau so passiert; der zweite Versuch kurz danach lief durch (in den drei Generalproben am
 14.10. trat der Fehler nicht auf). Den Befehl oben also einfach noch einmal ausführen. Erst wenn
 er ein zweites Mal so endet: STOPP, Ausgabe an Claude.
 
@@ -948,8 +1218,8 @@ sudo docker compose run --rm -T --no-deps --entrypoint sh app -c 'npx prisma mig
 
 **Erwartet:** keine Ausgabe, oder nur harmlose Hinweise: ein Kasten „Update available 6.9.0 ->
 8.0.0-rc.22 … major update …“ von Prisma und fünf Zeilen `npm notice` („New major version of npm
-available! 10.9.9 -> 12.2.0“ — so in beiden Generalproben). Eine Fehlermeldung → **STOPP, Ausgabe an
-Claude.**
+available! 10.9.9 -> 12.2.0“ — so in allen drei Generalproben). Eine Fehlermeldung → **STOPP,
+Ausgabe an Claude.**
 
 Die folgenden Befehle lesen diese Datei über ihren vollen Pfad — sie gehen also auch nach einer
 neuen Anmeldung (dann vorher nur 1.0).
@@ -958,26 +1228,30 @@ neuen Anmeldung (dann vorher nur 1.0).
 for m in 'ADD COLUMN' 'ADD VALUE' 'CREATE TABLE' 'INDEX' 'ADD CONSTRAINT'; do printf '%-15s %s\n' "$m" "$(grep -c "$m" ~/deploy-main-2026-10/vorschau-delta.sql)"; done
 ```
 
-**Erwartet** (in beiden Generalproben genau so gemessen, die Vorschau-Dateien waren byte-gleich —
-der Standardkatalog ändert das Schema nicht):
+**Erwartet** (in der dritten Generalprobe ab `b6e1c8a` genau so gemessen; dieselben Zahlen ergibt
+die Rechnung Schema gegen Schema):
 
 ```
 ADD COLUMN      19
 ADD VALUE       1
-CREATE TABLE    9
-INDEX           25
-ADD CONSTRAINT  23
+CREATE TABLE    7
+INDEX           21
+ADD CONSTRAINT  20
 ```
 
 - `ADD COLUMN`: 19 neue Spalten an sieben bestehenden Tabellen (Liste unten).
 - `ADD VALUE`: der neue Enum-Wert `UEBERGABEPROTOKOLL`.
-- `CREATE TABLE`: die neun neuen Tabellen.
-- `INDEX`: 25 Zeilen `CREATE INDEX` und `CREATE UNIQUE INDEX` zusammen — 4 an den Tabellen der
-  individuellen E-Mail, 14 an den sieben Tabellen der Ausstattung, 7 an bestehenden Tabellen
-  (davon zwei eindeutig: `offboarding_checklist_items_offboardingId_ausgabeId_herkunf_key` und
+- `CREATE TABLE`: die sieben neuen Tabellen der Ausstattung.
+- `INDEX`: 21 Zeilen `CREATE INDEX` und `CREATE UNIQUE INDEX` zusammen — 14 an den sieben Tabellen
+  der Ausstattung, 7 an bestehenden Tabellen (davon zwei eindeutig:
+  `offboarding_checklist_items_offboardingId_ausgabeId_herkunf_key` und
   `return_items_offboardingId_ausgabeId_key`).
-- `ADD CONSTRAINT`: die 23 Fremdschlüssel; die Primärschlüssel stehen in den
+- `ADD CONSTRAINT`: die 20 Fremdschlüssel; die Primärschlüssel stehen in den
   `CREATE TABLE`-Blöcken und zählen hier nicht mit.
+- **Die vorige Fassung (`ea2d41d`) erwartete hier 9/25/23** — das war die Zählung ab `f6d3daf`,
+  mit den zwei Tabellen der individuellen E-Mail (4 Indizes, 3 Fremdschlüssel). Steht auf dem
+  Server 9/25/23, fehlen die Tabellen von Paket 3 in der Datenbank — dann widerspräche das 1.7:
+  **STOPP**.
 
 ```bash
 grep -nE 'DROP|RENAME|ALTER COLUMN .* TYPE|SET NOT NULL' ~/deploy-main-2026-10/vorschau-delta.sql || echo "keine DROP/RENAME/TYPE-Zeile"
@@ -989,12 +1263,11 @@ grep -nE 'DROP|RENAME|ALTER COLUMN .* TYPE|SET NOT NULL' ~/deploy-main-2026-10/v
 grep 'CREATE TABLE' ~/deploy-main-2026-10/vorschau-delta.sql
 ```
 
-**Erwartet:** genau diese neun Zeilen (in den Generalproben in dieser Reihenfolge; eine andere ist
-auch in Ordnung):
+**Erwartet:** genau diese sieben Zeilen (in der dritten Generalprobe in dieser Reihenfolge; eine
+andere ist auch in Ordnung). `individuelle_mails` und `individuelle_mail_anhaenge` stehen **nicht**
+darin — es gibt sie seit dem 02.10.:
 
 ```
-CREATE TABLE "individuelle_mails" (
-CREATE TABLE "individuelle_mail_anhaenge" (
 CREATE TABLE "ausstattungs_positionen" (
 CREATE TABLE "ausstattungs_ausblendungen" (
 CREATE TABLE "onboarding_ausstattung" (
@@ -1008,9 +1281,10 @@ CREATE TABLE "ausgaben" (
 grep 'ADD COLUMN' ~/deploy-main-2026-10/vorschau-delta.sql
 ```
 
-**Erwartet:** genau diese 19 Zeilen (die Leerzeichen hinter `ADD COLUMN` dürfen anders aussehen,
-und die Reihenfolge der sieben `ALTER TABLE`-Blöcke darf abweichen — sie hängt davon ab, ob gegen
-die Datenbank oder Schema gegen Schema gerechnet wird). Die einzige Spalte mit `NOT NULL` ist
+**Erwartet:** genau diese 19 Zeilen (so in der dritten Generalprobe; die Leerzeichen hinter
+`ADD COLUMN` dürfen anders aussehen, und die Reihenfolge der sieben `ALTER TABLE`-Blöcke darf
+abweichen — sie hängt davon ab, ob gegen die Datenbank oder Schema gegen Schema gerechnet wird). Die
+einzige Spalte mit `NOT NULL` ist
 `eilt`, und sie hat einen Standardwert — alle anderen sind leer erlaubt:
 
 ```
@@ -1039,8 +1313,8 @@ ADD COLUMN     "mitAusstattung" BOOLEAN;
 grep -E 'ADD VALUE|offboarding_processes_onboardingId_fkey' ~/deploy-main-2026-10/vorschau-delta.sql
 ```
 
-**Erwartet:** genau diese zwei Zeilen — der neue Enum-Wert und der eine Fremdschlüssel an der schon
-vorhandenen Spalte (geprüft in 1.7):
+**Erwartet:** genau diese zwei Zeilen (so in der dritten Generalprobe) — der neue Enum-Wert und der
+eine Fremdschlüssel an der schon vorhandenen Spalte (geprüft in 1.7):
 
 ```
 ALTER TYPE "DocumentType" ADD VALUE 'UEBERGABEPROTOKOLL';
@@ -1067,6 +1341,17 @@ sudo docker compose stop app
 
 **Erwartet:** `Container hr-portal-app  Stopped`. **Ab hier ist das Portal nicht erreichbar.**
 
+Stand der individuellen E-Mails bei angehaltenem Portal (derselbe Zählbefehl wie in 1.7; bis eben
+konnte HR noch versenden):
+
+```bash
+sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT (SELECT COUNT(1) FROM individuelle_mails) AS mails, (SELECT COUNT(1) FROM individuelle_mail_anhaenge) AS anhaenge;'
+```
+
+**Erwartet:** zwei Zahlen, gleich wie in 1.7 oder höher. **Notieren** — 5.2 muss genau diese
+beiden Zahlen zeigen. Eine Fehlermeldung → **STOPP:** mit Befehl B (unten) das alte Portal wieder
+starten, dann Ausgabe an Claude.
+
 Datenbank (aus dem DB-Container, `pg_dump` 16, passend zum Einspielen bei einem Rückfall):
 
 ```bash
@@ -1079,7 +1364,8 @@ sudo docker exec hr-portal-db sh -c 'pg_dump -U hrportal --schema=public hr_port
 sudo ls -l backups/vor-deploy-main-2026-10-manuell.sql
 ```
 
-**Erwartet:** um 1,5 MB oder größer (24.09.: 1 561 038 Bytes).
+**Erwartet:** um 1,5 MB oder größer (24.09.: 1 561 038 Bytes; seitdem kamen u. a. die Tabellen von
+Paket 3 dazu).
 
 ```bash
 sudo grep -c 'PostgreSQL database dump complete' backups/vor-deploy-main-2026-10-manuell.sql
@@ -1097,7 +1383,7 @@ UPLOADS_VOL=$(sudo docker inspect --format '{{range .Mounts}}{{if eq .Destinatio
 **Erwartet:** keine Ausgabe.
 
 ```bash
-sudo docker run --rm --user nextjs --entrypoint sh -v "$UPLOADS_VOL:/daten:ro" -v "$PWD/backups:/sicherung" hr-portal-app:f6d3daf -c 'tar czf /sicherung/uploads-vor-deploy-main-2026-10.tar.gz -C /daten . && echo "tar OK"'
+sudo docker run --rm --user nextjs --entrypoint sh -v "$UPLOADS_VOL:/daten:ro" -v "$PWD/backups:/sicherung" hr-portal-app:b6e1c8a -c 'tar czf /sicherung/uploads-vor-deploy-main-2026-10.tar.gz -C /daten . && echo "tar OK"'
 ```
 
 **Erwartet:** `tar OK`.
@@ -1161,8 +1447,9 @@ sichern“ in 4.3 weitermachen. Erscheint nach 3 Minuten kein `✓ Ready`: `Strg
 
 ### 4.3 Was im Log stehen muss
 
-In dieser Reihenfolge, `…` steht für Zahlen und Namen. Gemessen in der zweiten Generalprobe (erster
-Start mit `0974b7f`); zwei Zeilen weichen auf dem Server ab, siehe darunter:
+In dieser Reihenfolge, `…` steht für Zahlen und Namen. Gemessen in der dritten Generalprobe (erster
+Start mit `0974b7f` ab dem Schema `b6e1c8a`; die zweite ab `f6d3daf` ergab dieselben Zeilen); zwei
+Zeilen weichen auf dem Server ab, siehe darunter:
 
 ```
 CREDO HR-Portal startet...
@@ -1206,15 +1493,16 @@ Next.js Server startet auf Port 3000...
   anhalten.
 - **Die drei Migrationszeilen sind erwartet.** Die erste Zahl der `SUPERVISOR_…`-Zeile ist
   `modalitaeten` aus 1.7, die beiden Zahlen der `OFFBOARDING_…`-Zeile sind `bekommen_hinweis` und
-  `eigene_beschreibung` aus 1.7 (Beispiel aus der Kopie der Entwicklungsdatenbank, beide
+  `eigene_beschreibung` aus 1.7 (Beispiel aus der Kopie der Entwicklungsdatenbank, alle drei
   Generalproben: `2` bzw. `14` und `0` — auf dem Server je nach Bestand). Die Zeile des
   Standardkatalogs heißt genau `… 20 Katalogpositionen angelegt, 13 eingeschaltet.` (in der zweiten
-  Generalprobe so gemessen; diese Zahlen hängen nicht vom Bestand ab). Andere Zahlen, oder bei ihr
-  stattdessen `Katalog nicht leer (… Positionen) - nichts angelegt.` bzw. `bereits gelaufen, Katalog
-  leer - nichts angelegt.` → Ausgabe an Claude, Container nicht anhalten (das Portal läuft dann ohne
-  Standardkatalog, wie vor dem Update). **Keine** Zeile der zehn älteren Migrationen: Erscheint eine
-  Zeile mit `Vertragsende-Label`, `parallele Spuren`, `Abteilungsaufgaben`, `Masernschutz`,
-  `Kostenstellen`, `Betriebsnummer`, `MINIJOB` oder `currentStep` → Ausgabe an Claude.
+  und dritten Generalprobe so gemessen; diese Zahlen hängen nicht vom Bestand ab). Andere Zahlen,
+  oder bei ihr stattdessen `Katalog nicht leer (… Positionen) - nichts angelegt.` bzw. `bereits
+  gelaufen, Katalog leer - nichts angelegt.` → Ausgabe an Claude, Container nicht anhalten (das
+  Portal läuft dann ohne Standardkatalog, wie vor dem Update). **Keine** Zeile der zehn älteren
+  Migrationen: Erscheint eine Zeile mit `Vertragsende-Label`, `parallele Spuren`,
+  `Abteilungsaufgaben`, `Masernschutz`, `Kostenstellen`, `Betriebsnummer`, `MINIJOB` oder
+  `currentStep` → Ausgabe an Claude.
 - **System-Vorlagen:** genau die drei Zeilen oben. `aktualisiert` beim Führungszeugnis ist nur in
   Ordnung, wenn 1.7 eine Abweichung bei Pfad, Prüfsumme oder Platzhaltern gezeigt hat (schreibt
   nur diese Felder). `angelegt` beim Führungszeugnis, `Duplikat der System-Vorlage …`,
@@ -1271,7 +1559,7 @@ Datenbank bereits geseeded (… User vorhanden). Seed uebersprungen.
  ✓ Ready in …
 ```
 
-Auf das Log der zweiten Generalprobe angewandt, ergab genau dieser Filter genau diese Zeilen (dort
+Auf das Log der dritten Generalprobe angewandt, ergab genau dieser Filter genau diese Zeilen (dort
 mit `… aktualisiert.` beim Führungszeugnis und `Uhr aus`, siehe oben). Ohne `|_V1` fehlen alle
 drei Migrationszeilen — keine von ihnen enthält ein anderes Wort des Filters. Die Zeile
 `Next.js Server startet auf Port 3000...` fehlt hier immer (der Filter trifft sie nicht). Eine
@@ -1299,7 +1587,7 @@ sind in Ordnung; **jede andere** Zeile mit `_V1`, `FATAL`, `Fehler`, `fehlgeschl
 
 Startet der Container später noch einmal (etwa nach einem Neustart des Servers), stehen im Log
 `Datenbank-Schema ist bereits deckungsgleich — kein Abgleich noetig.` und dreimal
-`System-Vorlage (…) ist aktuell.`, aber keine `_V1`-Zeile und keine neue Sicherung — so in beiden
+`System-Vorlage (…) ist aktuell.`, aber keine `_V1`-Zeile und keine neue Sicherung — so in allen drei
 Generalproben beim zweiten Start gemessen (der Standardkatalog schreibt bei gesetztem Merker nur
 dann eine Zeile, wenn der Katalog leer ist: `… bereits gelaufen, Katalog leer - nichts
 angelegt.`). Daran ändert auch das in 5.3 Schritt 5 eingeschaltete Übergabeprotokoll nichts: Der
@@ -1381,39 +1669,19 @@ sudo docker exec hr-portal-app sh -c 'npx prisma migrate diff --from-url "$DATAB
 
 **Erwartet:** `0` — Datenbank und neues Schema sind deckungsgleich. Weicht ab → Ausgabe an Claude.
 
-```bash
-sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c "SELECT (SELECT COUNT(1) FROM individuelle_mails) AS mails, (SELECT COUNT(1) FROM individuelle_mail_anhaenge) AS anhaenge;"
-```
-
-**Erwartet:**
-
-```
- mails | anhaenge
--------+----------
-     0 |        0
-(1 row)
-```
-
-Weicht ab → Ausgabe an Claude.
+**Die individuellen E-Mails seit dem 02.10. sind unverändert da** (derselbe Zählbefehl wie in 1.7
+und 4.1):
 
 ```bash
-sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('individuelle_mails', 'individuelle_mail_anhaenge') ORDER BY 1;"
+sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT (SELECT COUNT(1) FROM individuelle_mails) AS mails, (SELECT COUNT(1) FROM individuelle_mail_anhaenge) AS anhaenge;'
 ```
 
-**Erwartet:** sechs Zeilen (vier Indizes und zwei Primärschlüssel):
-
-```
- individuelle_mail_anhaenge_mailId_idx
- individuelle_mail_anhaenge_pkey
- individuelle_mails_createdAt_idx
- individuelle_mails_dialogKennung_key
- individuelle_mails_modul_refId_createdAt_idx
- individuelle_mails_pkey
-(6 rows)
-```
-
-Fehlt `individuelle_mails_dialogKennung_key` → Ausgabe an Claude (ohne ihn ließe sich eine Mail
-doppelt nachweisen).
+**Erwartet:** genau die beiden Zahlen aus **4.1** (dritte Generalprobe: `1 | 1` vorher und nach
+beiden Starts, Inhalt per Prüfsumme unverändert). Der Push fasst diese beiden Tabellen nicht an
+(3.4: kein `CREATE TABLE` für sie). **Nicht** `0 | 0` erwarten — die vorige Fassung (`ea2d41d`) tat
+das, weil sie die Tabellen erst mit diesem Update erwartete. Kleiner als in 4.1 → **sofort an
+Claude** (das Portal läuft weiter). Größer ist nur in Ordnung, wenn seit dem Start schon jemand eine
+individuelle E-Mail geschickt hat (bis zur Freigabe am Ende von 5.3 tut das niemand).
 
 **Die Tabellen der Ausstattung — nur der Katalog ist gefüllt:**
 
@@ -1422,8 +1690,8 @@ sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db
 ```
 
 **Erwartet:** sieben Zeilen untereinander: `ausstattungs_positionen | 20` (der Standardkatalog aus
-4.3), alle anderen sechs mit `| 0` (so in der zweiten Generalprobe gemessen). Weicht ab → Ausgabe
-an Claude.
+4.3), alle anderen sechs mit `| 0` (so in der zweiten und dritten Generalprobe gemessen). Weicht
+ab → Ausgabe an Claude.
 
 **Der Standardkatalog:**
 
@@ -1440,9 +1708,9 @@ sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db
 (1 row)
 ```
 
-In der zweiten Generalprobe genau so gemessen. `a4_werte` größer 0 hieße, dass Stufe 2 (A4) schon
-vor 5.3 Schritt 5 an einer Position eingeschaltet wäre → Ausgabe an Claude. Jede andere Abweichung
-ebenso.
+In der zweiten und dritten Generalprobe genau so gemessen. `a4_werte` größer 0 hieße, dass Stufe 2
+(A4) schon vor 5.3 Schritt 5 an einer Position eingeschaltet wäre → Ausgabe an Claude. Jede andere
+Abweichung ebenso.
 
 **Rechner und Telefon nicht für Minijob und Ehrenamt** (Entscheidung 3 in Abschnitt 0) — nur diese
 beiden Positionen haben Personengruppen:
@@ -1483,14 +1751,17 @@ Schlüssel-Position. Eine Zeile mit `0` (dort sähe die Führungskraft keinen Sc
 (die Gebäudewirtschaft bekäme zwei Schlüssel-Aufgaben) → **Hinweis an Claude**, kein STOPP; in 5.3
 Schritt 3 dann die Schlüssel-Punkte der Verwaltung stehen lassen.
 
-**Indizes der neuen Tabellen:**
+**Indizes der neuen Tabellen** (dazu die beiden Tabellen von Paket 3, deren Indizes seit dem 02.10.
+bestehen — bei `individuelle_mails` gehört `individuelle_mails_dialogKennung_key` zu den vier;
+ohne ihn ließe sich eine Mail doppelt nachweisen):
 
 ```bash
 sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c "SELECT tablename, COUNT(1) AS indizes FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('individuelle_mails', 'individuelle_mail_anhaenge', 'ausstattungs_positionen', 'ausstattungs_ausblendungen', 'onboarding_ausstattung', 'onboarding_ausstattung_aufgaben', 'onboarding_stellen_hinweise', 'onboarding_ausstattung_aenderungen', 'ausgaben') GROUP BY 1 ORDER BY 1;"
 ```
 
-**Erwartet** (je Tabelle mit Primärschlüssel; zusammen 27, so in der ersten Generalprobe — das
-Schema der zweiten war byte-gleich):
+**Erwartet** (je Tabelle samt Primärschlüssel; zusammen 27 — 6 an den zwei Tabellen von Paket 3,
+21 an den sieben der Ausstattung, also deren 14 Indizes aus 3.4 plus 7 Primärschlüssel; so in der
+ersten und in der dritten Generalprobe gemessen):
 
 ```
  ausgaben                           |       7
@@ -1528,14 +1799,14 @@ sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db
 sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c "SELECT COUNT(1) AS merker FROM system_migrations;"
 ```
 
-**Erwartet:** `13` (10 aus 1.7 plus 3; in der zweiten Generalprobe 10 → 13). Weicht ab → Ausgabe an
-Claude.
+**Erwartet:** `13` (10 aus 1.7 plus 3; in der zweiten und dritten Generalprobe 10 → 13). Weicht
+ab → Ausgabe an Claude.
 
 ```bash
 sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c "SELECT name, details->>'aufFalseGesetzt' AS auf_false, jsonb_array_length(details->'punkte') AS mit_hinweis, details->>'mitBeschreibung' AS eigene, details->>'andereVorlage' AS andere_vorlage FROM system_migrations WHERE name IN ('SUPERVISOR_MIT_AUSSTATTUNG_V1', 'OFFBOARDING_SPERRPUNKTE_V1') ORDER BY name;"
 ```
 
-**Erwartet:** zwei Zeilen (Beispiel aus der Kopie, beide Generalproben:
+**Erwartet:** zwei Zeilen (Beispiel aus der Kopie, alle drei Generalproben:
 `OFFBOARDING_SPERRPUNKTE_V1 |  | 14 | 0 | 0` und `SUPERVISOR_MIT_AUSSTATTUNG_V1 | 2 |  |  |`). Auf
 dem Server: `mit_hinweis` und `eigene` wie
 `bekommen_hinweis` und `eigene_beschreibung` aus 1.7, `auf_false` wie `modalitaeten` aus 1.7.
@@ -1546,8 +1817,8 @@ sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db
 ```
 
 **Erwartet:** eine Zeile `0 | 20 | 13 | 1` (vorher kein Katalog, 20 angelegt, 13 eingeschaltet,
-ein AuditLog-Eintrag ohne Benutzer; in der zweiten Generalprobe so gemessen, der Eintrag mit
-`processType` `SYSTEM`). Weicht ab → Ausgabe an Claude.
+ein AuditLog-Eintrag ohne Benutzer; in der zweiten und dritten Generalprobe so gemessen, der Eintrag
+mit `processType` `SYSTEM`). Weicht ab → Ausgabe an Claude.
 
 ```bash
 sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT "mitAusstattung" AS mit_ausstattung, COUNT(1) AS zeilen FROM supervisor_data GROUP BY 1 ORDER BY 1;'
@@ -1561,7 +1832,8 @@ Start ein Vorgesetzten-Link erzeugt wird — das tut bis zur Freigabe am Ende vo
 sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT COUNT(1) AS mit_hinweis FROM checklist_template_items WHERE description LIKE $$Gemeint ist alles, was nicht als eigene Aufgabe%$$;'
 ```
 
-**Erwartet:** dieselbe Zahl wie `bekommen_hinweis` in 1.7 (beide Generalproben: 14).
+**Erwartet:** dieselbe Zahl wie `bekommen_hinweis` in 1.7 (erste und zweite Generalprobe: 14; die
+dritte meldete im Log dieselbe Zahl).
 
 **System-Vorlagen:**
 
@@ -1569,8 +1841,8 @@ sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db
 sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT name, modul, "originalName", "isActive" AS aktiv, "fileSize", left(hash, 12) AS hash_anfang, jsonb_array_length(platzhalter) AS platzhalter FROM document_templates WHERE "isSystem" ORDER BY modul, "originalName", "createdAt";'
 ```
 
-**Erwartet:** genau drei Zeilen (so in beiden Generalproben; die Größe der Führungszeugnis-Vorlage
-ist unverändert):
+**Erwartet:** genau drei Zeilen (so in den ersten beiden Generalproben, in der dritten Name, Modul
+und Aktiv-Schalter gleich; die Größe der Führungszeugnis-Vorlage ist unverändert):
 
 ```
  Rückgabeprotokoll Ausstattung            | OFFBOARDING | Rueckgabeprotokoll-Ausstattung.docx | t | 3318 | a8d703ff8351 | 12
@@ -1589,11 +1861,17 @@ sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db
 
 **Erwartet:** `11 | 0` (kein neuer Lauf, nichts eingeschaltet). Weicht ab → Ausgabe an Claude.
 
+Die Abfrage zählt nur Mails **seit dem Start**: Untergrenze ist der Zeitpunkt der letzten
+einmaligen Datenmigration (`appliedAt` in `system_migrations`, nach 4.3 der Standardkatalog — der
+Seed-Check läuft vor dem Server, also vor jeder Mail des neuen Containers). Mails, die HR vor 4.1
+ausgelöst hat (etwa eine individuelle E-Mail), liegen davor und zählen nicht mit. Das setzt voraus,
+dass die Merker-Abfrage oben `13` gezeigt hat:
+
 ```bash
-sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT event, status, COUNT(1) AS mails FROM email_logs WHERE "createdAt" > (now() AT TIME ZONE $$UTC$$) - interval $$30 minutes$$ GROUP BY 1, 2 ORDER BY 1, 2;'
+sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT event, status, COUNT(1) AS mails FROM email_logs WHERE "createdAt" > (SELECT max("appliedAt") FROM system_migrations) GROUP BY 1, 2 ORDER BY 1, 2;'
 ```
 
-**Erwartet:** `(0 rows)` — der Start verschickt nichts (beide Generalproben: Versandprotokoll
+**Erwartet:** `(0 rows)` — der Start verschickt nichts (alle drei Generalproben: Versandprotokoll
 vorher und nachher 28 Zeilen). In Ordnung sind auch einzelne gewöhnliche Mails, die über
 öffentliche Links ausgelöst wurden (etwa `supervisor-completed`, wenn eine Führungskraft ihr
 Formular abgegeben hat). Eine Zeile `automatischer-lauf-bericht`, `onboarding-ausstattung-offen` oder
@@ -1641,9 +1919,10 @@ wie in 1.9 (bei Handgriff 0 wieder `t`); `betreff_gesperrt` ist nirgends `t`. Ei
 `handlung` → **STOPP, Ausgabe an Claude**, HR noch keinen Bescheid geben (das Portal läuft).
 
 Zeigte 1.9 `hr_postfach_gesetzt` = `f`: jetzt nichts ändern, aber an Claude melden (die
-Antwortadresse gilt für alle Mails, siehe Abschnitt 9). Die drei neuen Vorlagen
-(`individuelle-mail`, `onboarding-department-abgesagt`, `onboarding-ausstattung-offen`) bleiben
-**ungespeichert** (6.3); „Test senden“ an die eigene Adresse ist erlaubt.
+Antwortadresse gilt für alle Mails, siehe Abschnitt 9). Die beiden neuen Vorlagen
+(`onboarding-department-abgesagt`, `onboarding-ausstattung-offen`) bleiben **ungespeichert** (6.3);
+„Test senden“ an die eigene Adresse ist erlaubt. `individuelle-mail` (seit dem 02.10. da) bleibt,
+wie sie ist — gespeichert oder nicht.
 
 #### Schritt 2 — Adressen der Abteilungen und Adresslücken
 
@@ -1860,24 +2139,34 @@ Die Mail aus 8.1 hebt die Bitte auf.
 
 Angemeldet mit einem Konto mit Bearbeitungsrecht (z. B. dem eigenen SUPER_ADMIN-Konto).
 Abweichungen hier sind kein Grund, das Portal anzuhalten: Bildschirmfoto oder Meldung an Claude.
+Der Schwerpunkt liegt auf dem, was **neu** ist (Punkte 3, 4 und 6 bis 9, vor allem „Ausstattung &
+Zugänge“). Die Punkte 2 und 5 sind seit dem 02.10. in Betrieb und nur noch **optional** — sie
+zeigen, dass das neue Image sie nicht beschädigt hat.
 
 1. **Anmelden.** Das Dashboard lädt wie gewohnt.
-2. **Individuelle E-Mail an die eigene Adresse.**
-   - Vorgang wählen: am besten einen Testvorgang mit Ihrer eigenen Adresse (etwa aus der Probe vom
-     30.09., falls angelegt). Gibt es keinen, einen beliebigen Vorgang nehmen und unter „An“
-     „Andere Adresse…“ mit Ihrer **eigenen dienstlichen** Adresse wählen. Die Mail geht dann nur an
-     Sie, steht aber als Nachweis in diesem Vorgang (Reiter „E-Mails“ und Karte).
+2. **Optional (seit 02.10. in Betrieb): Individuelle E-Mail an die eigene Adresse — nur in einem
+   Testvorgang.** Wer sie auslässt, lässt auch 5.5 aus. Der Nutzen ist klein: Dienst, Routen,
+   Karte und Standardvorlage der individuellen E-Mail sind von `b6e1c8a` bis `0974b7f`
+   unverändert; von den gemeinsam genutzten Teilen änderten sich nur Kleinigkeiten (in `mailer.ts`
+   neue Freitext-Variablen anderer Mails, in `dokumentenpaket.ts` eine exportierte Lesefunktion).
+   - Vorgang: **nur** ein Testvorgang, dessen hinterlegte Adresse Ihre eigene ist (etwa aus der
+     Probe vom 30.09., falls angelegt). Gibt es keinen, Punkt 2 **und 5.5 auslassen** — nicht in
+     einen echten Vorgang ausweichen: Dort ist unter „An“ die Adresse der Person vorausgewählt, vor
+     dem Senden gibt es keine Rückfrage, und die Testmail stünde samt Anhang 12 Monate in dieser
+     Personalakte (Reiter „E-Mails“, „Bisher gesendete E-Mails“).
    - Reiter „Dokumente“ → Karte **„Individuelle E-Mail“** → „E-Mail schreiben…“.
-   - Betreff „Test HR-Portal – bitte ignorieren“, ein Satz als Nachricht, als Anhang eine kleine
-     PDF-Datei **ohne Personendaten** (z. B. eine leere Seite) → „E-Mail senden“.
+   - Betreff „Test HR-Portal – bitte ignorieren“ (genau so — 5.5 sucht danach), ein Satz als
+     Nachricht, als Anhang eine kleine PDF-Datei **ohne Personendaten** (z. B. eine leere Seite).
+   - **Vor „E-Mail senden“ prüfen:** Unter „An“ steht Ihre eigene Adresse. Erst dann senden. Die
+     Testmail bleibt 12 Monate in diesem Testvorgang sichtbar.
    - **Erwartet:** Im Dialog die grüne Meldung „✓ E-Mail „…“ an … versendet.“, darunter der
      Anhang — dort „Öffnen“ klicken, der Browser lädt die PDF herunter (immer als Download, so
      gewollt). Die Mail kommt mit Betreff, Text und Anhang an. Nach „Schließen“ zeigt die Karte
      neben „E-Mail schreiben…“ die Zeile „Zuletzt am …
      an … – „Test HR-Portal – bitte ignorieren“ · 1 Anhang“ (einen Öffnen-Verweis hat die Karte
-     nicht; später geht das über „E-Mail schreiben…“ → „Bisher gesendete E-Mails (1)“). Im Reiter
-     „E-Mails“ des Vorgangs steht die Mail. Auf die Probe-Mail **nicht antworten** — die Antwort
-     ginge an das HR-Postfach.
+     nicht; später geht das über „E-Mail schreiben…“ → „Bisher gesendete E-Mails (…)“, mit allen
+     E-Mails dieses Vorgangs seit dem 02.10.). Im Reiter „E-Mails“ des Vorgangs steht die Mail.
+     Auf die Probe-Mail **nicht antworten** — die Antwort ginge an das HR-Postfach.
    - Rote Meldung (etwa „SMTP …“, „Adresse nicht freigegeben“) → Meldung an Claude.
 3. **Verbeamtung:** einen Vorgang mit hochgeladenen Unterlagen öffnen, Reiter „Dokumente“.
    **Erwartet:** Jede hochgeladene Datei steht bei ihrer Dokumentart; Arten mit Datei stehen nicht
@@ -1887,8 +2176,9 @@ Abweichungen hier sind kein Grund, das Portal anzuhalten: Bildschirmfoto oder Me
    Betriebsstätte gewählt, steht bei „Betriebsstätte“ ein Name statt „—“. **Nicht** „Anfrage an
    Vorgesetzten senden →“, „Anfrage erneut senden“ oder „Erinnerung senden“ klicken — das schickt
    echte Mails an Führungskräfte.
-5. **Optional, Checklisten-Vorlagen:** eine Vorlage zum Bearbeiten öffnen. **Erwartet:** je Punkt
-   ein Griff zum Ziehen, zwei Pfeile und „+ Punkt darunter“. Ohne Speichern schließen.
+5. **Optional (seit 02.10. in Betrieb), Checklisten-Vorlagen:** eine Vorlage zum Bearbeiten
+   öffnen. **Erwartet:** je Punkt ein Griff zum Ziehen, zwei Pfeile und „+ Punkt darunter“. Ohne
+   Speichern schließen.
 6. **Einstellungen → Reiter „Ausstattung & Zugänge“** (nur ansehen, schon in 5.3 Schritt 2
    gelesen). **Erwartet:** die Liste mit 20 Positionen, davon 13 eingeschaltet, darüber die
    Warnungen aus 5.3 Schritt 2; nach Stufe 2 (5.3 Schritt 5) nennen 17 Zeilen „beim Austritt: …“.
@@ -1925,20 +2215,28 @@ Abweichungen hier sind kein Grund, das Portal anzuhalten: Bildschirmfoto oder Me
   abgelaufenen Vorgängen);
 - „Vorgang abschließen“, „Austritt abschließen“, „Trotzdem abschließen“.
 
-### 5.5 Versandprotokoll nach der Probe
+### 5.5 Versandprotokoll nach der Probe (nur wenn 5.4 Punkt 2 lief)
+
+Seit dem 02.10. stehen auch echte individuelle E-Mails im Versandprotokoll, und nach dem Bescheid in
+5.3 Schritt 6 darf HR wieder welche schicken. Beide Abfragen zählen deshalb nur die Probe: Betreff
+wie in 5.4 Punkt 2 **und** seit dem Start (Untergrenze wie in 5.2, `appliedAt` der letzten
+Datenmigration). Sie zeigen nur Zahlen, keine Adressen und keinen Text:
 
 ```bash
-sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c "SELECT event, status, COUNT(1) AS anzahl FROM email_logs WHERE event = 'individuelle-mail' GROUP BY event, status;"
+sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT status, COUNT(1) AS anzahl FROM email_logs WHERE event = $$individuelle-mail$$ AND subject ILIKE $$%Test HR-Portal%bitte ignorieren%$$ AND "createdAt" > (SELECT max("appliedAt") FROM system_migrations) GROUP BY status;'
 ```
 
-**Erwartet:** eine Zeile `individuelle-mail | SENT | 1` (je Probe-Mail eine mehr). `FAILED` oder
-`SKIPPED` → Ausgabe an Claude.
+**Erwartet:** eine Zeile `SENT | 1` (je Probe-Mail eine mehr). `FAILED` oder `SKIPPED` → Ausgabe an
+Claude. `(0 rows)`, obwohl die Mail ankam → Ausgabe an Claude (dann trägt eine gespeicherte
+Vorlage `individuelle-mail` einen eigenen Betreff ohne `{{betreff}}`).
 
 ```bash
-sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c "SELECT (SELECT COUNT(1) FROM individuelle_mails) AS mails, (SELECT COUNT(1) FROM individuelle_mail_anhaenge) AS anhaenge;"
+sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -c 'SELECT COUNT(DISTINCT m.id) AS mails, COUNT(a.id) AS anhaenge FROM individuelle_mails m LEFT JOIN individuelle_mail_anhaenge a ON a."mailId" = m.id WHERE m.betreff ILIKE $$%Test HR-Portal%bitte ignorieren%$$ AND m."createdAt" > (SELECT max("appliedAt") FROM system_migrations);'
 ```
 
-**Erwartet:** `1 | 1` nach einer Probe-Mail mit einem Anhang. Weicht ab → Ausgabe an Claude.
+**Erwartet:** `1 | 1` nach einer Probe-Mail mit einem Anhang (je weitere Probe-Mail mit einem
+Anhang beide Zahlen eins höher). Weicht ab → Ausgabe an Claude. Die Gesamtzahl aus 5.2 taugt hier
+nicht mehr zum Vergleich, weil HR seit 5.3 Schritt 6 selbst individuelle E-Mails senden darf.
 
 Im Portal zeigt Einstellungen → **Versandprotokoll** dieselbe Mail als „versendet“.
 
@@ -1959,7 +2257,7 @@ eingetippte Adressen von Führungskräften.
 Einstellungen → **SMTP** → Feld **„Erlaubte Domains für abweichende Empfänger“**.
 
 - **Wofür sie gilt:** für jede Adresse, die **nicht** im Vorgang hinterlegt ist — im
-  Dokumentenpaket, in der neuen individuellen E-Mail, bei „Unterlagen nachfordern“ und bei frei
+  Dokumentenpaket, in der individuellen E-Mail, bei „Unterlagen nachfordern“ und bei frei
   eingetippten Adressen von Führungskräften (Vorgesetzten-Link im Onboarding, Führungskraft im
   Offboarding, neu auch bei der Zeugnis-Bewertung im Offboarding). Der Hilfetext unter dem Feld
   nennt nur das Dokumentenpaket; er ist veraltet.
@@ -1995,8 +2293,9 @@ gesperrt. Dialog schließen.
 
 ### 6.2 Lauf „Aufbewahrung erzeugter Dokumente“: erst Probelauf, dann einschalten
 
-**Warum jetzt:** Der Dialog der individuellen E-Mail sagt zu, dass Text und Anhänge nach 12
-Monaten gelöscht werden. Das tut nur dieser Lauf; ohne ihn geschieht es nie. Derselbe Lauf löscht
+**Warum jetzt:** Der Dialog der individuellen E-Mail sagt seit dem 02.10. zu, dass Text und
+Anhänge nach 12 Monaten gelöscht werden. Das tut nur dieser Lauf; ohne ihn geschieht es nie (die
+ersten Fristen enden im Oktober 2027). Derselbe Lauf löscht
 auch erzeugte Briefe aus Vorlagen nach 12 Monaten (die führende Ablage ist das DMS) und seit diesem
 Update die Freitexte und Ausgaben der Ausstattung nach ihren Fristen (heute alles leer). Erzeugte
 Briefe gibt es erst seit Juni 2026 — gelöscht wird also frühestens im Juni 2027. Seit Stufe 2
@@ -2018,7 +2317,8 @@ wird sie übersprungen).
    „· Probelauf“; „Protokoll (1)“ aufklappen.
    **Erwartet:** „Letzter Lauf“ zeigt **„ohne Befund“**; im Protokoll fünf Zeilen, alle `0`:
    - „Würde löschen (Dokumente)“
-   - „Würde leeren (individuelle E-Mails)“ (die Probe-Mail aus 5.4 ist jünger als 12 Monate)
+   - „Würde leeren (individuelle E-Mails)“ (alle individuellen E-Mails sind seit dem 02.10.
+     entstanden, also jünger als 12 Monate)
    - „Würde leeren (Ausstattung: Bemerkungen, Angaben, Hinweise)“
    - „Würde löschen (Ausgaben nach Ablauf der Frist)“
    - „Ausgaben ohne Löschfrist, älter als drei Jahre“
@@ -2042,9 +2342,10 @@ wird sie übersprungen).
 
 Diese Liste gilt für den ganzen Ablauf; andere Stellen verweisen hierher.
 
-- Die Vorlagen **„Individuelle E-Mail aus einem Vorgang“** (`individuelle-mail`),
-  `onboarding-department-abgesagt` und `onboarding-ausstattung-offen` unter E-Mail-Vorlagen
-  **nicht speichern** (ansehen und „Test senden“ an die eigene Adresse sind in Ordnung).
+- Die neuen Vorlagen `onboarding-department-abgesagt` und `onboarding-ausstattung-offen` unter
+  E-Mail-Vorlagen **nicht speichern** (ansehen und „Test senden“ an die eigene Adresse sind in
+  Ordnung). Die Vorlage „Individuelle E-Mail aus einem Vorgang“ (`individuelle-mail`) ist seit dem
+  02.10. in Betrieb; was HR dort seitdem gespeichert hat, bleibt, wie es ist.
 - Außer der Aufbewahrung aus 6.2 **keine weiteren Läufe einschalten**, kein „Jetzt ausführen“
   (die übrigen zehn bleiben aus, auch „Onboarding-Erinnerungen“; siehe „Danach“ in Abschnitt 9).
 - **Stufe 2 nur über 5.3 Schritt 5**, genau einmal:
@@ -2080,16 +2381,26 @@ Diese Liste gilt für den ganzen Ablauf; andere Stellen verweisen hierher.
 ### 7.1 Was man NICHT tun darf
 
 - **Das alte Image mit normalem Entrypoint starten, ohne vorher 7.3 Schritt 2 und Schritt 5
-  durchzugehen.** Sein Entrypoint sähe die neun neuen Tabellen und die 19 neuen Spalten an sieben
-  bestehenden Tabellen als überzählig an und löschte sie mit `db push --accept-data-loss` ohne
-  Rückfrage — samt allem, was darin steht: Nachweise individueller E-Mails, den Katalog
-  „Ausstattung & Zugänge“ samt „Beim Austritt“, Ausgaben mit ihren Nummern, Arbeitsort,
-  Rückgabe-Zustände, Absagen, gestrichene Ausstattungsaufgaben. Die Dateien unter
-  `uploads/individuelle-mails/` blieben verwaist liegen. Gibt es ein hochgeladenes
-  Übergabeprotokoll, scheiterte sein Push am Enum `DocumentType`, und der alte Container hinge in
-  einer Neustart-Schleife. Dasselbe gilt für `sudo git checkout f6d3daf` mit neuem Build. (Ohne
-  Entrypoint: Weg C, 7.5.)
+  durchzugehen.** Sein Entrypoint sähe die sieben neuen Tabellen und die 19 neuen Spalten an
+  sieben bestehenden Tabellen als überzählig an und löschte sie mit `db push --accept-data-loss`
+  ohne Rückfrage — samt allem, was darin steht: den Katalog „Ausstattung & Zugänge“ samt „Beim
+  Austritt“, Ausgaben mit ihren Nummern, Arbeitsort, Rückgabe-Zustände, Absagen, gestrichene
+  Ausstattungsaufgaben. Gibt es ein hochgeladenes Übergabeprotokoll, scheiterte sein Push am Enum
+  `DocumentType`, und der alte Container hinge in einer Neustart-Schleife. Dasselbe gilt für
+  `sudo git checkout b6e1c8a` mit neuem Build. (Ohne Entrypoint: Weg C, 7.5.) Die Tabellen der
+  individuellen E-Mail bleiben beim Rückfall auf `b6e1c8a` stehen — das Image kennt sie.
+- **Ein Image älter als `b6e1c8a` starten** — etwa ein Etikett `7bc91ec` oder `ae490ba` aus
+  früheren Deploys, ein echtes `f6d3daf`-Image oder ein Build aus `sudo git checkout f6d3daf`. Dessen
+  Entrypoint löschte **zusätzlich** `individuelle_mails` und `individuelle_mail_anhaenge` — also die
+  Nachweise aller individuellen E-Mails seit dem 02.10.; ihre Dateien unter
+  `uploads/individuelle-mails/` blieben verwaist liegen. Zurück geht es nur auf
+  `hr-portal-app:b6e1c8a` (2.1).
 - `sudo docker compose down -v` — löscht Datenbank und Uploads.
+- **Kein `docker image prune -a` und kein `docker system prune -a`**, solange ein Rückweg offen
+  sein soll. Beide löschen jedes Image, das kein Container nutzt — auch das etikettierte
+  `hr-portal-app:b6e1c8a`, denn nach 4.2 läuft kein Container mehr damit. Danach gäbe es weder
+  Weg A noch Weg B noch Weg C, und Weg A baute ohne Image womöglich aus dem neuen Code. Fehlt
+  Platz, an Claude (1.5).
 - `node prisma/seed.js` (6.3) — im alten Image steckt zudem noch der alte Seed, der gepflegte
   Mandantennamen, Fragebogen- und Checklisten-Vorlagen überschreibt.
 - `git clean`, `git add -A`, `git stash -u` im Projektordner — sammelt oder löscht die Sicherungen.
@@ -2107,12 +2418,16 @@ deckungsgleich“ und macht weder Sicherung noch Push. **Zurück nur nach Rücks
 
 ### 7.3 Weg A: altes Image, solange in den neuen Teilen nichts gearbeitet wurde
 
-**Was sich gegenüber der Fassung vom 09.10. geändert hat.** Dort löschte der Rückweg nur zwei
-leere Tabellen. Jetzt löscht der Entrypoint des alten Images (in beiden Generalproben vorab
-gerechnet, nicht ausgeführt) neun Tabellen, 23 Fremdschlüssel, 19 Spalten an sieben
-**bestehenden** Tabellen und sieben Indizes und baut das Enum `DocumentType` ohne
-`UEBERGABEPROTOKOLL` neu. Spalten an Bestandstabellen zu löschen ist genau das, was die früheren
-Anleitungen verboten haben ([deploy-paket4-stufe1.md](deploy-paket4-stufe1.md), 7.1).
+**Was der Rückweg tut.** Das alte Image ist das vom 02.10. mit `b6e1c8a` (Etikett aus 2.1). Es
+kennt Paket 3: Die Tabellen der individuellen E-Mail, ihre Zeilen und die Dateien unter
+`uploads/individuelle-mails/` bleiben stehen, und die Karte „Individuelle E-Mail“ geht weiter.
+Sein Entrypoint löscht (in der dritten Generalprobe vorab gerechnet, nicht ausgeführt) sieben
+Tabellen, 20 Fremdschlüssel, 19 Spalten an sieben **bestehenden** Tabellen und sieben Indizes und
+baut das Enum `DocumentType` ohne `UEBERGABEPROTOKOLL` neu. Spalten an Bestandstabellen zu löschen
+ist genau das, was die früheren Anleitungen verboten haben
+([deploy-paket4-stufe1.md](deploy-paket4-stufe1.md), 7.1). Die vorige Fassung (`ea2d41d`) rechnete
+mit dem Image `f6d3daf` und deshalb mit neun Tabellen und 23 Fremdschlüsseln — samt den Tabellen
+der individuellen E-Mail; das gilt nicht mehr (7.1, zweiter Punkt).
 
 **Warum Weg A trotzdem bleibt — unter einer harten Bedingung.** Solange niemand in den neuen
 Teilen gearbeitet hat, steht in diesen Spalten nichts von Wert: `checklist_items.eilt` ist überall
@@ -2194,13 +2509,15 @@ cd /vol/container/HR_Portal_CREDO
 untereinander):
 
 ```bash
-sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -x -c 'SELECT (SELECT COUNT(1) FROM individuelle_mails) AS ind_mails, (SELECT COUNT(1) FROM individuelle_mail_anhaenge) AS ind_anhaenge, (SELECT COUNT(1) FROM ausstattungs_positionen) AS std_katalog, (SELECT COUNT(1) FROM ausstattungs_positionen WHERE "beiAustritt" IS NOT NULL OR "rueckgabeKategorie" IS NOT NULL OR "ausgabeKennung" IS NOT NULL) AS std_stufe2_positionen, (SELECT COUNT(1) FROM audit_logs WHERE action = $$AUSSTATTUNG_RUECKGABE_VORGABEN_UEBERNOMMEN$$) AS std_stufe2_protokoll, (SELECT COUNT(1) FROM audit_logs WHERE action IN ($$AUSSTATTUNG_POSITION_ANGELEGT$$, $$AUSSTATTUNG_POSITION_GEAENDERT$$, $$AUSSTATTUNG_POSITION_GELOESCHT$$, $$AUSSTATTUNG_AUSBLENDUNG_GEAENDERT$$, $$AUSSTATTUNG_VORSCHLAEGE_UEBERNOMMEN$$)) AS g1_katalog_geaendert, (SELECT COUNT(1) FROM ausstattungs_ausblendungen) AS g1_ausblendungen, (SELECT COUNT(1) FROM onboarding_ausstattung) AS g1_ausstattung, (SELECT COUNT(1) FROM onboarding_ausstattung_aufgaben) AS g1_ausst_aufgaben, (SELECT COUNT(1) FROM onboarding_stellen_hinweise) AS g1_stellen_hinweise, (SELECT COUNT(1) FROM onboarding_ausstattung_aenderungen) AS g1_ausst_aenderungen, (SELECT COUNT(1) FROM ausgaben) AS g1_ausgaben, (SELECT COUNT(1) FROM documents WHERE type::text = $$UEBERGABEPROTOKOLL$$) AS g1_uebergabeprotokolle, (SELECT COUNT(1) FROM checklist_items WHERE herkunft IS NOT NULL OR eilt OR "entfaelltAm" IS NOT NULL OR "ausgabenGeloeschtAm" IS NOT NULL) AS g1_ob_aufgaben, (SELECT COUNT(1) FROM supervisor_data WHERE "mitAusstattung" IS TRUE OR "ausgabenAngeboten" IS NOT NULL OR "ausstattungGespeichertAm" IS NOT NULL) AS g1_modalitaeten, (SELECT COUNT(1) FROM onboarding_processes WHERE "ausgabenGeloeschtAm" IS NOT NULL OR "ausstattungSammelmailAm" IS NOT NULL) AS g1_ob_merker, (SELECT COUNT(1) FROM offboarding_checklist_items WHERE herkunft IS NOT NULL OR "ausgabeId" IS NOT NULL) AS g1_off_aufgaben, (SELECT COUNT(1) FROM return_items WHERE "ausgabeId" IS NOT NULL) AS g1_rueckgaben_aus_ausgabe, (SELECT COUNT(1) FROM offboarding_processes WHERE "ausgabenGeloeschtAm" IS NOT NULL) AS g1_off_merker, (SELECT COUNT(1) FROM onboarding_processes WHERE "arbeitsortId" IS NOT NULL) AS g2_ob_arbeitsort, (SELECT COUNT(1) FROM return_items WHERE zustand IS NOT NULL) AS g2_rueckgabe_zustand, (SELECT COUNT(1) FROM offboarding_processes WHERE "weitereBeschaeftigung" IS NOT NULL OR "arbeitsortId" IS NOT NULL) AS g2_off_zuordnung, (SELECT COUNT(1) FROM offboarding_department_links WHERE "abgesagtAm" IS NOT NULL) AS g2_absagen, (SELECT COUNT(1) FROM onboarding_processes WHERE "expiredAt" IS NOT NULL) AS info_ob_expired_at, (SELECT COUNT(1) FROM offboarding_processes WHERE "onboardingId" IS NOT NULL) AS info_off_zugeordnet;'
+sudo docker exec -e PGOPTIONS='-c default_transaction_read_only=on' hr-portal-db psql -U hrportal -d hr_portal -x -c 'SELECT (SELECT COUNT(1) FROM individuelle_mails) AS info_ind_mails, (SELECT COUNT(1) FROM individuelle_mail_anhaenge) AS info_ind_anhaenge, (SELECT COUNT(1) FROM ausstattungs_positionen) AS std_katalog, (SELECT COUNT(1) FROM ausstattungs_positionen WHERE "beiAustritt" IS NOT NULL OR "rueckgabeKategorie" IS NOT NULL OR "ausgabeKennung" IS NOT NULL) AS std_stufe2_positionen, (SELECT COUNT(1) FROM audit_logs WHERE action = $$AUSSTATTUNG_RUECKGABE_VORGABEN_UEBERNOMMEN$$) AS std_stufe2_protokoll, (SELECT COUNT(1) FROM audit_logs WHERE action IN ($$AUSSTATTUNG_POSITION_ANGELEGT$$, $$AUSSTATTUNG_POSITION_GEAENDERT$$, $$AUSSTATTUNG_POSITION_GELOESCHT$$, $$AUSSTATTUNG_AUSBLENDUNG_GEAENDERT$$, $$AUSSTATTUNG_VORSCHLAEGE_UEBERNOMMEN$$)) AS g1_katalog_geaendert, (SELECT COUNT(1) FROM ausstattungs_ausblendungen) AS g1_ausblendungen, (SELECT COUNT(1) FROM onboarding_ausstattung) AS g1_ausstattung, (SELECT COUNT(1) FROM onboarding_ausstattung_aufgaben) AS g1_ausst_aufgaben, (SELECT COUNT(1) FROM onboarding_stellen_hinweise) AS g1_stellen_hinweise, (SELECT COUNT(1) FROM onboarding_ausstattung_aenderungen) AS g1_ausst_aenderungen, (SELECT COUNT(1) FROM ausgaben) AS g1_ausgaben, (SELECT COUNT(1) FROM documents WHERE type::text = $$UEBERGABEPROTOKOLL$$) AS g1_uebergabeprotokolle, (SELECT COUNT(1) FROM checklist_items WHERE herkunft IS NOT NULL OR eilt OR "entfaelltAm" IS NOT NULL OR "ausgabenGeloeschtAm" IS NOT NULL) AS g1_ob_aufgaben, (SELECT COUNT(1) FROM supervisor_data WHERE "mitAusstattung" IS TRUE OR "ausgabenAngeboten" IS NOT NULL OR "ausstattungGespeichertAm" IS NOT NULL) AS g1_modalitaeten, (SELECT COUNT(1) FROM onboarding_processes WHERE "ausgabenGeloeschtAm" IS NOT NULL OR "ausstattungSammelmailAm" IS NOT NULL) AS g1_ob_merker, (SELECT COUNT(1) FROM offboarding_checklist_items WHERE herkunft IS NOT NULL OR "ausgabeId" IS NOT NULL) AS g1_off_aufgaben, (SELECT COUNT(1) FROM return_items WHERE "ausgabeId" IS NOT NULL) AS g1_rueckgaben_aus_ausgabe, (SELECT COUNT(1) FROM offboarding_processes WHERE "ausgabenGeloeschtAm" IS NOT NULL) AS g1_off_merker, (SELECT COUNT(1) FROM onboarding_processes WHERE "arbeitsortId" IS NOT NULL) AS g2_ob_arbeitsort, (SELECT COUNT(1) FROM return_items WHERE zustand IS NOT NULL) AS g2_rueckgabe_zustand, (SELECT COUNT(1) FROM offboarding_processes WHERE "weitereBeschaeftigung" IS NOT NULL OR "arbeitsortId" IS NOT NULL) AS g2_off_zuordnung, (SELECT COUNT(1) FROM offboarding_department_links WHERE "abgesagtAm" IS NOT NULL) AS g2_absagen, (SELECT COUNT(1) FROM onboarding_processes WHERE "expiredAt" IS NOT NULL) AS info_ob_expired_at, (SELECT COUNT(1) FROM offboarding_processes WHERE "onboardingId" IS NOT NULL) AS info_off_zugeordnet;'
 ```
 
 **Erwartet:**
 
-- `ind_mails` und `ind_anhaenge` höchstens so groß wie die Zahl Ihrer eigenen Probe-Mails aus 5.4
-  (deren Nachweis geht dann verloren);
+- `info_ind_mails` und `info_ind_anhaenge` beliebig: Die individuellen E-Mails bleiben beim
+  Rückfall auf `b6e1c8a` erhalten (das Image kennt sie, Schritt 5 zeigt kein `DROP` dafür). Die
+  vorige Fassung (`ea2d41d`) machte daraus eine Bedingung für Weg A, weil sie mit dem Image
+  `f6d3daf` rechnete — sie entfällt;
 - `std_katalog` = `20` (der Standardkatalog aus 4.3; er geht verloren und wird bei einem späteren
   Deploy neu angelegt, siehe oben);
 - `std_stufe2_positionen` = `17` und `std_stufe2_protokoll` = `1`, wenn 5.3 Schritt 5 lief (Stufe
@@ -2233,14 +2550,27 @@ gälten.
 sudo docker image ls hr-portal-app
 ```
 
-**Erwartet:** eine Zeile `hr-portal-app   f6d3daf` (aus 2.1). Fehlt sie → **STOPP, kein Weg A,
+**Erwartet:** eine Zeile `hr-portal-app   b6e1c8a` (aus 2.1). Fehlt sie → **STOPP, kein Weg A,
 Ausgabe an Claude** — ohne das Image versuchte Docker in Schritt 5 womöglich, es neu zu bauen, und
-zwar aus dem neuen Code.
+zwar aus dem neuen Code. **Nie** ein anderes Etikett nehmen: `7bc91ec` und `ae490ba` sind älter
+als `b6e1c8a`, und ein Etikett `f6d3daf` gab es entweder nie, ist nach 2.1 entfernt oder zeigt auf
+ein anderes Image (7.1).
+
+Worauf das Etikett zeigt (nur lesend; dieselbe Prüfung gilt als Voraussetzung für Weg B und
+Weg C):
+
+```bash
+sudo docker image inspect --format '{{.Id}}' hr-portal-app:b6e1c8a
+```
+
+**Erwartet:** genau `sha256:5b1a01dd32efde8c7de85f0f78204e994614fe4d1c399554c5a1b06002fa9f72`
+(die ID aus 1.2 und 2.1). Eine andere ID — etwa die des neuen Images, wenn das Etikett nach dem
+Build verrutscht ist — oder eine Fehlermeldung → **STOPP, kein Weg A, Ausgabe an Claude.**
 
 **Schritt 4 — Override-Datei anlegen** (wirkt erst beim Start in Schritt 10):
 
 ```bash
-printf 'services:\n  app:\n    image: hr-portal-app:f6d3daf\n' | sudo tee docker-compose.override.yml
+printf 'services:\n  app:\n    image: hr-portal-app:b6e1c8a\n' | sudo tee docker-compose.override.yml
 ```
 
 **Erwartet:** genau diese drei Zeilen:
@@ -2248,7 +2578,7 @@ printf 'services:\n  app:\n    image: hr-portal-app:f6d3daf\n' | sudo tee docker
 ```
 services:
   app:
-    image: hr-portal-app:f6d3daf
+    image: hr-portal-app:b6e1c8a
 ```
 
 **Schritt 5 — Vorschau, was das alte Image tun wird** (nur lesend, das Portal läuft weiter):
@@ -2261,20 +2591,22 @@ sudo docker compose run --rm -T --no-deps --entrypoint sh app -c 'npx prisma mig
 Zeilen `npm notice`). Eine Fehlermeldung (etwa `No such image` oder `Error`) → **STOPP: Befehl E,
 Ausgabe an Claude.**
 
-Die Zahlen unten wurden in beiden Generalproben genau so gemessen (Vorschau mit dem Image `80ccfc3`
-bzw. `0974b7f` gegen das alte Schema; beide Dateien hatten 162 Zeilen und waren byte-gleich).
+Die Zahlen unten wurden in der dritten Generalprobe genau so gemessen (nach dem Start von
+`0974b7f` gegen die Schema-Datei von `b6e1c8a` gerechnet, 147 Zeilen; dieselben Zeilen ergibt die
+Rechnung Schema gegen Schema). Die vorige Fassung (`ea2d41d`) erwartete 9/23 — das war der Rückweg
+auf `f6d3daf`.
 
 ```bash
 grep -c 'DROP TABLE' ~/deploy-main-2026-10/rueckfall-delta.sql
 ```
 
-**Erwartet:** `9`.
+**Erwartet:** `7`.
 
 ```bash
 grep -c 'DROP CONSTRAINT' ~/deploy-main-2026-10/rueckfall-delta.sql
 ```
 
-**Erwartet:** `23` (alle neuen Fremdschlüssel; beim Fremdschlüssel an
+**Erwartet:** `20` (alle neuen Fremdschlüssel; beim Fremdschlüssel an
 `offboarding_processes."onboardingId"` fällt nur die Einschränkung weg, Spalte und Werte bleiben).
 
 ```bash
@@ -2293,19 +2625,28 @@ grep -c 'DROP INDEX' ~/deploy-main-2026-10/rueckfall-delta.sql
 grep 'DROP TABLE' ~/deploy-main-2026-10/rueckfall-delta.sql
 ```
 
-**Erwartet:** genau diese neun Zeilen, **Reihenfolge egal** (in den Generalproben alphabetisch):
+**Erwartet:** genau diese sieben Zeilen, **Reihenfolge egal** (in der dritten Generalprobe
+alphabetisch) — **keine** Zeile mit `individuelle`:
 
 ```
 DROP TABLE "ausgaben";
 DROP TABLE "ausstattungs_ausblendungen";
 DROP TABLE "ausstattungs_positionen";
-DROP TABLE "individuelle_mail_anhaenge";
-DROP TABLE "individuelle_mails";
 DROP TABLE "onboarding_ausstattung";
 DROP TABLE "onboarding_ausstattung_aenderungen";
 DROP TABLE "onboarding_ausstattung_aufgaben";
 DROP TABLE "onboarding_stellen_hinweise";
 ```
+
+Gegenprobe, dass das alte Image die individuellen E-Mails kennt:
+
+```bash
+grep -c individuelle ~/deploy-main-2026-10/rueckfall-delta.sql
+```
+
+**Erwartet:** `0` (so in der dritten Generalprobe). Eine Zahl größer 0 heißt, dass das Image
+älter als `b6e1c8a` ist und die individuellen E-Mails löschte → **STOPP: Befehl E, Ausgabe an
+Claude.**
 
 ```bash
 grep -c -v -E '^--|^$|DROP' ~/deploy-main-2026-10/rueckfall-delta.sql
@@ -2389,7 +2730,7 @@ sudo docker compose logs -f app
 
 **Erwartet** (nicht geprobt): `Schema-Unterschied erkannt — Sicherung wird angelegt...`,
 `Sicherung abgelegt: …`, `Datenbank-Schema wird synchronisiert...`, eine Warnung
-`⚠️  There might be data loss …` — hier **erwartet**, solange ihre Punkte nur die neun Tabellen,
+`⚠️  There might be data loss …` — hier **erwartet**, solange ihre Punkte nur die sieben Tabellen,
 die 19 Spalten aus Schritt 5 oder den Enum-Wert `UEBERGABEPROTOKOLL` nennen —,
 `Datenbank-Schema synchronisiert.`, voraussichtlich `System-Vorlage (Fuehrungszeugnis) ist
 aktuell.` (alte Schreibweise), `Datenbank bereits geseeded …`,
@@ -2403,7 +2744,7 @@ oder `invalid input value for enum`, jede andere Warnung, `FATAL` oder nach 3 Mi
 
 - Die Override-Datei bleibt, solange das alte Image laufen soll. Solange sie existiert, **nie**
   `sudo docker compose up -d --build` — der neue Build bekäme sonst das Etikett
-  `hr-portal-app:f6d3daf` und überschriebe das alte Image. Vor dem nächsten Vorwärts-Deploy wird
+  `hr-portal-app:b6e1c8a` und überschriebe das alte Image. Vor dem nächsten Vorwärts-Deploy wird
   sie mit Befehl E gelöscht.
 - Unter Brief-Vorlagen „Rückgabeprotokoll Ausstattung“ und — falls 5.3 Schritt 5 lief —
   „Übergabeprotokoll Ausstattung“ deaktivieren (oben, „Was auch nach Weg A stehen bleibt“). Lief
@@ -2418,21 +2759,39 @@ oder `invalid input value for enum`, jede andere Warnung, `FATAL` oder nach 3 Mi
 
 Nur, wenn Weg A nicht geht oder die Datenbank selbst beschädigt ist, und nur direkt nach dem
 Update: Weg B verwirft **alles**, was seit 4.1 geschrieben wurde, in allen Tabellen (auch
-Fragebögen über öffentliche Links, Abhaken der Stellen über ihre Links). Ablauf wie in
-[deploy-paket4-stufe1.md](deploy-paket4-stufe1.md), Abschnitt 7.3, mit der Sicherung
-`backups/vor-deploy-main-2026-10-manuell.sql` und dem Etikett `hr-portal-app:f6d3daf`; vorher die
-Prüfung „ob gearbeitet wurde“ aus [deploy-onboarding-pakete-2026-09.md](deploy-onboarding-pakete-2026-09.md),
-Abschnitt 7.3. Die genauen Befehle gibt Claude im Ernstfall. Die Uploads bleiben, wie sie sind;
-das Archiv aus 4.1 ist nur für einen Schaden am Volume da.
+Fragebögen über öffentliche Links, Abhaken der Stellen über ihre Links, und alles, was HR seit
+dem Bescheid in 5.3 Schritt 6 gearbeitet hat). Was dabei schon **außerhalb der Datenbank**
+geschah, holt Weg B nicht zurück: Mails, die seit 5.3 Schritt 6 hinausgingen — darunter
+individuelle E-Mails und Dokumentenpakete —, verlieren ihren Nachweis (`individuelle_mails`,
+`email_logs`, AuditLog, Versandnachweise), obwohl sie zugestellt wurden; ihre Anhänge und andere
+seitdem abgelegte Dateien bleiben verwaist unter `uploads/` liegen (etwa
+`uploads/individuelle-mails/`). Ob diese Nachweise aus der Sicherung des jetzigen Stands
+(`vor-rueckfall-…`, unten) nachgetragen werden, klärt Claude vorher.
+
+Ablauf grundsätzlich wie in [deploy-paket4-stufe1.md](deploy-paket4-stufe1.md), Abschnitt 7.3, in
+dieser Reihenfolge: (1) die Prüfung „ob gearbeitet wurde“ aus
+[deploy-onboarding-pakete-2026-09.md](deploy-onboarding-pakete-2026-09.md), Abschnitt 7.3, und
+hier 7.3 Schritt 3 (beide Befehle: Etikett da, ID richtig); (2) Portal anhalten und den jetzigen
+Stand sichern wie hier in 7.3 Schritt 6 bis 8; (3) die Sicherung
+`backups/vor-deploy-main-2026-10-manuell.sql` einspielen; (4) Override-Datei mit
+`image: hr-portal-app:b6e1c8a`, der Schema-Vergleich muss `0` zeigen; (5) erst dann starten.
+**Aus dem dortigen Block nie die Datei `vor-deploy-paket4-manuell.sql` und nie das Etikett
+`7bc91ec` übernehmen:** Beide liegen auf dem Server noch vor und passen zueinander, sodass der
+Schema-Vergleich des Blocks `0` zeigte — die Datenbank stünde dann still wieder auf dem 30.09.
+(alles seither verworfen, auch alle individuellen E-Mails seit dem 02.10.), und es liefe ein Image
+ohne Paket 3. Der dortige Block ist außerdem mehrzeilig und hält sich nicht an die Kopierregel
+dieser Anleitung. Die genauen Befehle gibt Claude im Ernstfall, je Kasten eine Zeile. Die Uploads
+bleiben, wie sie sind; das Archiv aus 4.1 ist nur für einen Schaden am Volume da.
 
 ### 7.5 Weg C: altes Image ohne Entrypoint (nur mit Claude, nicht geprobt)
 
-Für den Fall, dass 7.3 Schritt 2 nicht wie erwartet ausfällt — echte individuelle E-Mails,
+Für den Fall, dass 7.3 Schritt 2 nicht wie erwartet ausfällt —
 Arbeitsorte, Rückgabe-Zustände, Katalogänderungen, Ausgaben oder andere Ausstattungsdaten also
 bleiben sollen. Dann gehen weder Weg A (löschte sie) noch Weg B (verwürfe alles seit 4.1). Wie in
 [deploy-paket4-stufe1.md](deploy-paket4-stufe1.md), Abschnitt 7.4: das alte Image über eine
-Override-Datei mit `image: hr-portal-app:f6d3daf` **und** `entrypoint: ["node", "server.js"]`
-starten. Ohne Entrypoint gibt es weder Sicherung noch Push noch Seed-Check; Tabellen und Spalten
+Override-Datei mit `image: hr-portal-app:b6e1c8a` **und** `entrypoint: ["node", "server.js"]`
+starten — vorher 7.3 Schritt 3 (beide Befehle: Etikett vorhanden, ID `sha256:5b1a01dd32ef…`).
+Ohne Entrypoint gibt es weder Sicherung noch Push noch Seed-Check; Tabellen und Spalten
 bleiben samt Inhalt stehen, der alte Code kennt sie nicht. Das hat Folgen, die Claude im Ernstfall
 vorher prüft: Gestrichene Ausstattungsaufgaben erscheinen im alten Image als offen, Arbeitsorte und
 Rückgabe-Zustände werden nicht beachtet, und ein hochgeladenes Übergabeprotokoll (ein Dokumenttyp,
@@ -2440,8 +2799,9 @@ den der alte Code nicht kennt) kann Dokumentlisten scheitern lassen. Mit Stufe 2
 Vermerkte Ausgaben und ihre Nummern bleiben in der Tabelle, aber weder Karte noch Link-Seite zeigen
 sie, Rücknahme- und Sperraufgaben stehen im alten Offboarding voraussichtlich als gewöhnliche
 Aufgaben ohne Zustand (nicht geprüft), und der Lauf, der Ausgaben nach Frist löscht, fehlt dem alten
-Image. Die Karten „Individuelle E-Mail“ und „Ausstattung & Zugänge“ gibt es in dieser Zeit nicht,
-und Führungskräfte mit neuem Vorgesetzten-Link sehen das alte Formular ohne den Ausstattungsschritt.
+Image. Die Karte „Ausstattung & Zugänge“ gibt es in dieser Zeit nicht (die Karte „Individuelle
+E-Mail“ schon — das Image `b6e1c8a` kennt sie), und Führungskräfte mit neuem Vorgesetzten-Link
+sehen das alte Formular ohne den Ausstattungsschritt.
 Der Entrypoint muss bei **jedem** Start umgangen sein (die Override-Datei bleibt so lange stehen),
 sonst tritt 7.1 ein. Beim nächsten Vorwärts-Deploy findet der neue Entrypoint alles schon vor;
 nichts geht verloren. Die genauen Befehle gibt Claude im Ernstfall.
@@ -2459,6 +2819,13 @@ Bedingung nicht erfüllt ist. Die Klammern im Einzelnen — drei davon sind eine
 Einsetzen (Punkt 9 „[Titel aus dem Protokoll]“, Punkt 10 „[das Personal-Postfach / …]“, Punkt 13
 „[mit Stufe 2:] … [ohne Stufe 2:]“), die übrigen sind Bedingungen:
 
+- **„[seit 02.10. – nur wenn HR damals nicht informiert wurde:]“** vor den Punkten 1 und 2 — ein
+  Hinweis für den Projektverantwortlichen: Beide Punkte sind seit dem nicht protokollierten Deploy
+  vom 02.10.2026 im Portal (Kopf), kommen mit diesem Update also **nicht** neu. Ob HR damals
+  Bescheid bekam, ist nicht bekannt — vermutlich nicht. Wurde HR informiert, beide Punkte streichen
+  und die übrigen in der Mail neu nummerieren (die Verweise dieser Anleitung auf „Punkt 4“ bis
+  „Punkt 15“ meinen dann die Nummern 2 bis 13). Sonst stehen lassen: Sie sind im Text als „seit dem
+  2. Oktober“ gekennzeichnet, nicht als neu.
 - **„[nur wenn 6.2 eingeschaltet:]“** — die Löschung nach 12 Monaten geschieht nur über den Lauf
   aus 6.2. Endete 6.2 im STOPP, den Satz streichen.
 - **„[nur wenn 6.1 erledigt:]“** — Punkt 7 stimmt erst mit gepflegter Freigabeliste (leer heißt:
@@ -2496,8 +2863,9 @@ hat (die Aufgaben dieser Stelle gingen an den Platzhalter).
 > das HR-Portal wurde am [Datum] aktualisiert. Ab jetzt können Sie alles wieder nutzen, auch die
 > neuen Teile und die Links an Führungskräfte. Für Sie ändert sich Folgendes:
 >
-> 1. **Individuelle E-Mail aus dem Vorgang.** Im Reiter „Dokumente“ von Onboarding, Offboarding,
->    Verbeamtung und Vertragsverlängerung gibt es unter dem Dokumentenpaket die neue Karte
+> 1. [seit 02.10. – nur wenn HR damals nicht informiert wurde:] **Schon seit dem 2. Oktober:
+>    Individuelle E-Mail aus dem Vorgang.** Im Reiter „Dokumente“ von Onboarding, Offboarding,
+>    Verbeamtung und Vertragsverlängerung gibt es unter dem Dokumentenpaket die Karte
 >    „Individuelle E-Mail“: eine freie Nachricht an die Person mit eigenem Betreff und bis zu 10
 >    Anhängen (PDF, JPG, PNG oder WebP, zusammen höchstens 9 MB), etwa für den gegengezeichneten
 >    Vertrag. Die Mail steht danach im Vorgang, auch im Reiter „E-Mails“; Antworten der Person
@@ -2505,10 +2873,10 @@ hat (die Aufgaben dieser Stelle gingen an den Platzhalter).
 >    gelöscht; Datum, Empfänger, Betreff und Dateinamen bleiben als Nachweis. [nur mit beigelegtem
 >    Handbuch:] Eine Anleitung finden Sie im beigefügten Handbuch unter „Eine individuelle E-Mail
 >    mit Anhang schreiben“.
-> 2. **Reihenfolge der Checklisten.** Die Punkte einer Checklisten-Vorlage lassen sich jetzt
->    verschieben, und Vorgänge zeigen sie in der Reihenfolge der Vorlage statt alphabetisch nach
->    Kategorie – in laufenden Vorgängen kann sich die Anzeige deshalb einmalig verschieben, es geht
->    nichts verloren.
+> 2. [seit 02.10. – nur wenn HR damals nicht informiert wurde:] **Schon seit dem 2. Oktober:
+>    Reihenfolge der Checklisten.** Die Punkte einer Checklisten-Vorlage lassen sich verschieben,
+>    und Vorgänge zeigen sie in der Reihenfolge der Vorlage statt alphabetisch nach Kategorie – in
+>    laufenden Vorgängen hat sich die Anzeige deshalb einmalig verschoben, es ging nichts verloren.
 > 3. **Vertragsende.** Kommt eine Anfrage oder Erinnerung bei der Führungskraft nicht an, meldet
 >    das Portal das jetzt; nach ihrer Antwort lässt sich keine neue Anfrage mehr senden, und im
 >    Verlängerungsschreiben steht die gewählte Betriebsstätte statt „___“.
@@ -2667,38 +3035,38 @@ im Container sind UTC.
 
 | Schritt | Uhrzeit | Ergebnis / Ausgabe | Abweichung |
 |---|---|---|---|
-| 1.1 Serverstand (`git log -1`) | | | |
-| 1.2 Container, Erstelldatum | | | |
+| 1.1 Serverstand (`git log -1`, erwartet `b6e1c8a`) | | | |
+| 1.2 Container, Erstelldatum und Image (`2026-10-02T07:47:30`, `sha256:5b1a01dd32ef…`) | | | |
 | 1.3 Drift (erwartet `0`) | | | |
 | 1.4 Sicherungsverzeichnis, beide Schreibtests | | | |
 | 1.5 Freier Platz (Docker / `/vol/container`), Image-Größe | | | |
 | 1.6 Uploads-Volume (Name, Größe) | | | |
-| 1.7 Neue Tabellen (9 × leer); Fremdschlüssel (`0 / 0`); Merker (`10`), `modalitaeten`; Sperrpunkte (`bekommen_hinweis` / `eigene_beschreibung`); System-Vorlagen (1 Zeile?) | | | |
+| 1.7 Tabellen (`individuelle_*` da, 7 × leer); individuelle E-Mails (`mails` / `anhaenge`); Fremdschlüssel (`0 / 0`); Merker (`10`), `modalitaeten`; Sperrpunkte (`bekommen_hinweis` / `eigene_beschreibung`); System-Vorlagen (1 Zeile?) | | | |
 | 1.8 Läufe (alle `f`?) | | | |
-| 1.9 Mailvorlagen (`handlung` je Zeile, Handgriff 0 nötig?); Webhooks (Onboarding: löschen; Offboarding aktiv? → geklärt mit dem Projektverantwortlichen); `hr_postfach_gesetzt` / `smtp_aktiv`; `SKIPPED` von `onboarding-task-completed`; eigene Vorlagen mit Rückgabeliste; offene Rückgaben (Austritte / Gegenstände); `N8N_API_KEY` (`0`/`1`); Adressen `FACILITY` / `IT` / `VERWALTUNG` (`aktiv_mit_adresse`, `seed_platzhalter`) | | | |
-| 2.1 Etikett `hr-portal-app:f6d3daf` | | | |
+| 1.9 Mailvorlagen (8 Zeilen, `handlung` je Zeile, Handgriff 0 nötig?); Webhooks (Onboarding: löschen; Offboarding aktiv? → geklärt mit dem Projektverantwortlichen); `hr_postfach_gesetzt` / `smtp_aktiv`; `SKIPPED` von `onboarding-task-completed`; eigene Vorlagen mit Rückgabeliste; offene Rückgaben (Austritte / Gegenstände); `N8N_API_KEY` (`0`/`1`); Adressen `FACILITY` / `IT` / `VERWALTUNG` (`aktiv_mit_adresse`, `seed_platzhalter`) | | | |
+| 2.1 Etikett `hr-portal-app:b6e1c8a` auf die feste ID `sha256:5b1a01dd32ef…` (= laufend?); altes Etikett `f6d3daf` (fehlt / gleiche ID / andere ID → STOPP); `Untagged:` ja/nein | | | |
 | 2.2 Leseprobe (Dateien, Bytes, `tar OK`) | | | |
-| 3.1 `git pull` (von … nach …) | | | |
-| 3.2 Anker `a2e2e64`/`0974b7f`, voller Hash `0974b7f…`, Commits (`37`, Merges `4`), Dateien von `0974b7f` (16), nach `0974b7f` nur Doku (welche Dateien?), Migration im Seed-Check (`1`), Betriebsdateien (5 Zeilen, `884 48`), `package-lock` unverändert | | | |
-| 3.3 Build (Dauer, `npm ci` neu) | | | |
-| 3.4 Vorschau (19/1/9/25/23, kein DROP, Spalten, Enum-Wert, Fremdschlüssel) | | | |
-| 4.1 Portal angehalten; DB-Sicherung (Bytes, `1`); Uploads (Bytes, Zeilen, `tar OK`); Handgriff 0 (ja/nein, `UPDATE …`) | | | |
+| 3.1 `git pull` (von `b6e1c8a` nach …) | | | |
+| 3.2 Anker `a2e2e64`/`0974b7f`, voller Hash `0974b7f…`, Commits ab `b6e1c8a` (`31`, Merges `4`), Dateien von `0974b7f` (16), nach `0974b7f` nur Doku (welche Dateien?), Migration im Seed-Check (`1`), Betriebsdateien (4 Zeilen, `884 48`), `package.json` und `package-lock` unverändert | | | |
+| 3.3 Build (Dauer; `npm ci` `CACHED` oder neu) | | | |
+| 3.4 Vorschau (19/1/7/21/20, kein DROP, 7 Tabellen ohne `individuelle_*`, Spalten, Enum-Wert, Fremdschlüssel) | | | |
+| 4.1 Portal angehalten; individuelle E-Mails bei angehaltenem Portal (`mails` / `anhaenge`); DB-Sicherung (Bytes, `1`); Uploads (Bytes, Zeilen, `tar OK`); Handgriff 0 (ja/nein, `UPDATE …`) | | | |
 | 4.2 Start | | | |
 | 4.3 Log: Entrypoint-Sicherung (Bytes), Warnung (2 Punkte?), `db push` (ms), System-Vorlagen (3 Zeilen, Führungszeugnis `ist aktuell`?), Migrationszeilen (3, Zahlen; Standardkatalog `20`/`13`?), `Ready` (ms) | | | |
 | 4.5 Entrypoint-Sicherung kopiert | | | |
 | 5.1 Health (`uhrAktiv`, `letzterTakt`), Portal wieder erreichbar ab | | | |
-| 5.2 Drift `0`; individuelle Mails `0/0`, 6 Indizes; Ausstattung (Katalog `20`, sonst 6 × `0`); Katalog `20 / 13 / 0 / 0`; Personengruppen (2 Zeilen); Schlüssel je Einrichtungsart (überall `1`?); Indizes je Tabelle (27); Bestand (3 Zeilen); Merker `13` und Werte; Merker Standardkatalog `0 / 20 / 13 / 1`; `mitAusstattung`; Sperrpunkte mit Hinweis; System-Vorlagen (3); Läufe `11 / 0`; Mails seit dem Start | | | |
+| 5.2 Drift `0`; individuelle E-Mails gleich 4.1; Ausstattung (Katalog `20`, sonst 6 × `0`); Katalog `20 / 13 / 0 / 0`; Personengruppen (2 Zeilen); Schlüssel je Einrichtungsart (überall `1`?); Indizes je Tabelle (27); Bestand (3 Zeilen); Merker `13` und Werte; Merker Standardkatalog `0 / 20 / 13 / 1`; `mitAusstattung`; Sperrpunkte mit Hinweis; System-Vorlagen (3); Läufe `11 / 0`; Mails seit dem Start | | | |
 | 5.3 Schritt 1: Vorlagen zurückgesetzt (welche), Handgriff 0 abgeschlossen, Betreff korrigiert | | | |
 | 5.3 Schritt 2: Katalog `20`/`13`; Warnungen (Adresslücken je Stelle, ähnliche Vorlagenpunkte, Freigabeliste); Abteilungen IT / Verwaltung / Gebäudewirtschaft | | | |
 | 5.3 Schritt 3: Vorlagenpunkte vorher (Zeilen), je Punkt entfernt / umbenannt / stehen gelassen (Grund), nachher (Zeilen); Transponder laut HR (ja/nein/offen); Hinweistext des entfernten Punkts „Benutzerkonto …“ (wörtlich) | | | |
 | 5.3 Schritt 4: Onboarding-Webhooks gelöscht (welche); Offboarding-Webhooks (`(0 rows)` / gelöscht / STOPP) | | | |
 | 5.3 Schritt 5: Übergabeprotokoll reaktiviert; Meldung der Rückgabe-Vorgaben (wörtlich, oder „verpasst“; ohne Webhook-Hinweis?); Prüfabfrage (3 / 11 / 3 / 3); `1 / 2` — oder: Stufe 2 ausgelassen (Grund) | | | |
 | 5.3 Schritt 6: HR Bescheid gegeben um | | | |
-| 5.4 Probe: individuelle E-Mail / Verbeamtung / Vertragsende / Checklisten / Ausstattung-Reiter / Onboarding / Offboarding / Brief-Vorlagen | | | |
-| 5.5 Versandprotokoll (`SENT`) | | | |
+| 5.4 Probe: individuelle E-Mail (optional, nur Testvorgang mit eigener Adresse) / Verbeamtung / Vertragsende / Checklisten (optional) / Ausstattung-Reiter / Onboarding / Offboarding / Brief-Vorlagen | | | |
+| 5.5 Versandprotokoll der Probe (Betreff seit dem Start: `SENT` mit `1`; `mails` / `anhaenge` `1 / 1`) — oder: ausgelassen (kein Testvorgang mit eigener Adresse) | | | |
 | 6.1 Freigabeliste (eingetragene Domains) | | | |
 | 6.2 Aufbewahrung: Probelauf („ohne Befund“, 5 × `0`), eingeschaltet um | | | |
-| 8 Kurztext an HR verschickt (welche Klammern gestrichen bzw. eingesetzt, mit oder ohne Stufe 2, Handbuch beigelegt?); Infotext 8.2 an HR zum Weitergeben | | | |
+| 8 Kurztext an HR verschickt (welche Klammern gestrichen bzw. eingesetzt, Punkte 1 und 2 „seit 02.10.“ stehen gelassen oder gestrichen, mit oder ohne Stufe 2, Handbuch beigelegt?); Infotext 8.2 an HR zum Weitergeben | | | |
 
 **Sicherungen auf dem Server** (Größen eintragen):
 
@@ -2707,7 +3075,7 @@ im Container sind UTC.
 | `backups/vor-deploy-main-2026-10-manuell.sql` | | maßgeblich für Weg B (`pg_dump` 16 aus dem DB-Container) |
 | `backups/vor-deploy-main-2026-10-entrypoint.sql` | | Kopie der Entrypoint-Sicherung (`pg_dump` 18), aus der Rotation genommen |
 | `backups/uploads-vor-deploy-main-2026-10.tar.gz` | | Uploads vor dem Update — enthält Personalunterlagen, bleibt auf dem Server |
-| Image `hr-portal-app:f6d3daf` | | altes Image für Weg A und Weg C |
+| Image `hr-portal-app:b6e1c8a` | | altes Image (Deploy vom 02.10.) für Weg A, Weg B und Weg C |
 
 **Log des Starts** (Auszug aus `start-log.txt`, wörtlich — nie mit einer Zeile
 `INITIALES PASSWORT`, siehe 4.3): _…_
@@ -2716,14 +3084,14 @@ im Container sind UTC.
 
 | Wann | Was | Weiter erst nach Antwort? |
 |---|---|---|
-| 1.1–2.2 | jede Abweichung, auch jede STOPP-Zeile aus 1.7 und 1.9 (Fremdschlüssel, Duplikat einer System-Vorlage, `ENTSCHEIDUNG`, ausgeschaltete Abteilungsvorlage mit aktivem Webhook, SMTP aus) | **ja** |
+| 1.1–2.2 | jede Abweichung, auch jede STOPP-Zeile aus 1.7, 1.9 und 2.1 (Etikett `f6d3daf` mit anderer ID) (Fremdschlüssel, Duplikat einer System-Vorlage, `ENTSCHEIDUNG`, ausgeschaltete Abteilungsvorlage mit aktivem Webhook, SMTP aus) | **ja** |
 | 1.9 | `N8N_API_KEY` = `1`; ein aktiver Webhook mit `feuert weiter …` (Stufe 2 hängt daran, Klärung bis 5.3 Schritt 4); `aktiv_mit_adresse` = `0` oder `seed_platzhalter` = `1` bei einer der drei Stellen | nein (bei `seed_platzhalter` = `1` bleiben die Punkte dieser Stelle in 5.3 Schritt 3 stehen, solange Claude die Adresse nicht bestätigt hat) |
 | 3.1–3.4 | Konflikt, Ausgabe beim Diff, Build-Fehler, `vorschau-delta.sql` bei abweichender Zählung | **ja** (das Portal läuft weiter) |
-| 4.1 | Sicherung zu klein, `grep` `0`, kein `tar OK`, Fehler bei Handgriff 0 | **ja** (vorher Befehl B) |
+| 4.1 | Fehler beim Zählen der individuellen E-Mails, Sicherung zu klein, `grep` `0`, kein `tar OK`, Fehler bei Handgriff 0 | **ja** (vorher Befehl B) |
 | 4.3 | `start-log.txt`, **immer** (außer mit Seed-Zeile, 4.3: dann nur diese Zeile) | nein, außer bei Fehlern |
 | 4.4 | jeder Fehlschlag, bei einer Neustart-Schleife nach Befehl D | **ja** |
 | 4.5 | Kopie fehlt oder die beiden `.sql` weichen deutlich voneinander ab | nein (das Portal läuft weiter) |
-| 5.1–5.2 | Ergebnisse und Abweichungen; in 5.2 eine Zeile `schluessel_positionen` ≠ `1` (Hinweis, kein STOPP) | nein, außer bei Fehlern |
+| 5.1–5.2 | Ergebnisse und Abweichungen; in 5.2 weniger individuelle E-Mails als in 4.1 (**sofort**); eine Zeile `schluessel_positionen` ≠ `1` (Hinweis, kein STOPP) | nein, außer bei Fehlern |
 | 5.3 Schritt 1 | eine `handlung` nach dem Zurücksetzen nicht `nichts (Text aktuell)`; `hr_postfach_gesetzt` = `f` | **ja** vor dem Bescheid an HR, wenn eine `handlung` abweicht; sonst nein |
 | 5.3 Schritt 2 | Bildschirmfoto der Katalog-Warnungen; eine andere Zahl von Positionen | nein; bei anderer Zahl **ja** |
 | 5.3 Schritt 3 | Ausgabe der Vorlagenpunkt-Abfrage (vorher), Zeilen mit anderem Titel, Fehler beim Speichern | nein für Schritt 4 und 5; bei Zeilen mit anderem Titel oder Fehler beim Speichern **ja** vor dem Bescheid an HR (Schritt 6) |
@@ -2779,7 +3147,12 @@ im Container sind UTC.
    sie genannt hat, 6.1 samt Gegenprobe ausführen und HR Punkt 7 des Kurztexts (8.1) nachreichen.
 
 **Nach dem Update (Claude):** das Protokoll hier eintragen; im Kopf von
-[deploy-paket4-stufe1.md](deploy-paket4-stufe1.md) den Deploy vom 30.09.2026 nachtragen; in
-CLAUDE.md (Abschnitt „Ausstattung & Zugänge“, „Vorlagen und Betrieb“ und „Vor dem Einschalten“)
-vermerken, dass A1–A4 deployt sind, Stufe 1 mit dem Standardkatalog in Betrieb ist und Stufe 2 am
-Tag des Updates eingeschaltet wurde (bzw. noch aus ist, wenn 5.3 Schritt 5 ausgelassen wurde).
+[deploy-paket4-stufe1.md](deploy-paket4-stufe1.md) den Deploy vom 30.09.2026 nachtragen **und
+gleich dahinter den ebenfalls nicht protokollierten Deploy vom 02.10.2026** — `da5c743` (Paket 3)
+bis `b6e1c8a` (Checklisten-Reihenfolge), Pulls laut `git reflog` am 01.10. 06:30 UTC und 02.10.
+07:44 UTC, Container 07:47:30 UTC, Image `sha256:5b1a01dd32ef…`, Tabellen von Paket 3 seitdem
+vorhanden (Quelle: Server-Ausgaben vom 14.10., Kopf dieser Datei), dazu, ob HR damals informiert
+wurde (Antwort des Projektverantwortlichen zu 8.1, Punkte 1 und 2); in CLAUDE.md (Abschnitt
+„Ausstattung & Zugänge“, „Vorlagen und Betrieb“ und „Vor dem Einschalten“) vermerken, dass A1–A4
+deployt sind, Stufe 1 mit dem Standardkatalog in Betrieb ist und Stufe 2 am Tag des Updates
+eingeschaltet wurde (bzw. noch aus ist, wenn 5.3 Schritt 5 ausgelassen wurde).

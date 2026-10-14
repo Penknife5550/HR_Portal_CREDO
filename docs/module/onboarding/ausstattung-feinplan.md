@@ -2,6 +2,7 @@
 
 Stand: 12.10.2026, zweite Fassung nach geprüfter Mängelliste (26 Punkte, Umgang am Ende unter „Verworfene Einwände“) · Branch `feature/ausstattung-zugaenge` (auf `main` 8c1ef05 + Plan 6a1acc5)
 Grundlage: [`ausstattung-zugaenge-plan.html`](ausstattung-zugaenge-plan.html) (Regeln 1–20, Datenmodell Stufe 1, Entscheidungen E-A1 bis E-A39, alle „wie empfohlen“) und `CLAUDE.md` im Arbeitsverzeichnis.
+**In Betrieb seit dem 14.10.2026** (A1–A4 samt Standardkatalog, Stufe 2 eingeschaltet, „Transponder/Chip“ zusätzlich an) — Ablauf, Abweichungen und offene Punkte im Protokoll [`docs/historie/deploy-main-2026-10.md`](../../historie/deploy-main-2026-10.md). Was auf dem Server mit den Vorlagenpunkten geschah, steht dort (5.3 Schritt 3); die Tabelle „Aufräumen der Vorlagenpunkte“ in Abschnitt 8 beschreibt den Seed-Stand, der Server trug andere Titel.
 
 ---
 
