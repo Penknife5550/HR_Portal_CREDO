@@ -11,6 +11,7 @@
 const mockPrisma = {
   emailTemplate: { findUnique: jest.fn() },
   emailLog: { create: jest.fn() },
+  emailLogText: { create: jest.fn() },
   smtpConfig: { findUnique: jest.fn() },
   webhookConfig: { findMany: jest.fn() },
 };
@@ -82,6 +83,7 @@ beforeEach(() => {
   mockPrisma.smtpConfig.findUnique.mockResolvedValue(activeSmtpConfig);
   mockPrisma.emailTemplate.findUnique.mockResolvedValue(baseTemplate);
   mockPrisma.emailLog.create.mockResolvedValue({});
+  mockPrisma.emailLogText.create.mockResolvedValue({});
   mockPrisma.webhookConfig.findMany.mockResolvedValue([]);
   mockSendMail.mockResolvedValue({
     messageId: "<msg-1>",
@@ -834,5 +836,122 @@ describe("Vorgangsbezug im Versandprotokoll (Reiter „E-Mails“)", () => {
     expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ vorgangTyp: null, vorgangId: null }),
     });
+  });
+});
+
+// =============================================
+// Mailtext im Versandprotokoll (10/2026)
+// =============================================
+describe("sendEventEmail: Text im Protokoll", () => {
+  const ECHT = "https://hr.fes-credo.de/fragebogen/3f9c7a1e-52b0-4d1b-9e6a-0c2f8d4b71aa";
+  const mitLink = { ...payload, fragebogenLink: ECHT, link: ECHT };
+
+  beforeEach(() => {
+    mockPrisma.emailLog.create.mockResolvedValue({ id: "log-1" });
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      bodyHtml: '<p>Hallo {{vorname}}</p><p><a href="{{link}}">Fragebogen</a> {{link}}</p>',
+    });
+    process.env.APP_URL = "https://hr.fes-credo.de";
+  });
+
+  afterEach(() => {
+    delete process.env.APP_URL;
+  });
+
+  it("speichert den Text nach der Zeile — mit ersetztem Link, waehrend die Mail den echten traegt", async () => {
+    const result = await sendEventEmail("onboarding-created", mitLink);
+
+    expect(result.status).toBe("SENT");
+    // Die Mail an die Person traegt den echten Link …
+    expect(mockSendMail.mock.calls[0][0].html).toContain(ECHT);
+    // … die Kopie im Protokoll nicht.
+    expect(mockPrisma.emailLogText.create).toHaveBeenCalledTimes(1);
+    const { data } = mockPrisma.emailLogText.create.mock.calls[0][0];
+    expect(data.emailLogId).toBe("log-1");
+    expect(data.bodyHtml).toContain("Hallo Max");
+    expect(data.bodyHtml).not.toContain("3f9c7a1e");
+    expect(data.bodyHtml).toContain('href="#"');
+    expect(data.gekuerzt).toBe(false);
+  });
+
+  it("schreibt die Zeile zuerst, den Text danach", async () => {
+    await sendEventEmail("onboarding-created", mitLink);
+    const zeileZuerst =
+      mockPrisma.emailLog.create.mock.invocationCallOrder[0] <
+      mockPrisma.emailLogText.create.mock.invocationCallOrder[0];
+    expect(zeileZuerst).toBe(true);
+  });
+
+  it("die Zeile bleibt unveraendert (genau diese Felder, kein Text darin)", async () => {
+    await sendEventEmail("onboarding-created", mitLink);
+    const { data } = mockPrisma.emailLog.create.mock.calls[0][0];
+    expect(Object.keys(data).sort()).toEqual(
+      ["bcc", "cc", "detail", "event", "isTest", "messageId", "recipient", "status", "subject", "vorgangId", "vorgangTyp"].sort(),
+    );
+  });
+
+  it("speichert den Text auch, wenn die Mail nicht zugestellt wurde (FAILED)", async () => {
+    mockSendMail.mockRejectedValue(new Error("Connection timeout"));
+    const result = await sendEventEmail("onboarding-created", mitLink);
+
+    expect(result.status).toBe("FAILED");
+    expect(mockPrisma.emailLogText.create).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.emailLogText.create.mock.calls[0][0].data.bodyHtml).not.toContain("3f9c7a1e");
+  });
+
+  it("speichert nichts bei SKIPPED (Vorlage aus, kein Empfaenger)", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({ ...baseTemplate, isActive: false });
+    expect((await sendEventEmail("onboarding-created", mitLink)).status).toBe("SKIPPED");
+    expect(mockPrisma.emailLogText.create).not.toHaveBeenCalled();
+
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({ ...baseTemplate, recipientTo: "{{gibtesnicht}}" });
+    mockPrisma.emailLog.create.mockClear();
+    const ohneEmpfaenger = await sendEventEmail("bem-frist-erinnerung", {});
+    expect(ohneEmpfaenger.status).toBe("SKIPPED");
+    expect(mockPrisma.emailLogText.create).not.toHaveBeenCalled();
+  });
+
+  it("speichert nichts beim Test-Versand", async () => {
+    const result = await sendEventEmail("onboarding-created", mitLink, { isTest: true, overrideTo: "admin@example.org" });
+    expect(result.status).toBe("SENT");
+    expect(mockPrisma.emailLogText.create).not.toHaveBeenCalled();
+  });
+
+  it("speichert nichts bei BEM", async () => {
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue({
+      ...baseTemplate,
+      event: "bem-frist-erinnerung",
+      recipientTo: "beauftragte@example.org",
+      bodyHtml: "<p>Fall BEM-2026-001: Frist faellig</p>",
+    });
+    const result = await sendEventEmail("bem-frist-erinnerung", { fallnummer: "BEM-2026-001" });
+    expect(result.status).toBe("SENT");
+    expect(mockPrisma.emailLogText.create).not.toHaveBeenCalled();
+  });
+
+  it("verliert weder Zeile noch Mail, wenn der Text nicht gespeichert werden kann", async () => {
+    const konsole = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockPrisma.emailLogText.create.mockRejectedValue(
+      Object.assign(new Error("Mailtext mit Anna Beispiel konnte nicht geschrieben werden"), { code: "P2002" }),
+    );
+
+    const result = await sendEventEmail("onboarding-created", mitLink);
+
+    expect(result.status).toBe("SENT");
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledTimes(1);
+    // In die Konsole gehoert nur die Kennung, nie die Meldung (kann Namen tragen).
+    const ausgabe = konsole.mock.calls.map((a) => a.join(" ")).join(" ");
+    expect(ausgabe).toContain("P2002");
+    expect(ausgabe).not.toContain("Anna Beispiel");
+    konsole.mockRestore();
+  });
+
+  it("speichert ohne Zeilen-Id nichts (Protokoll nicht schreibbar)", async () => {
+    mockPrisma.emailLog.create.mockRejectedValue(new Error("DB down"));
+    const konsole = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    expect((await sendEventEmail("onboarding-created", mitLink)).status).toBe("SENT");
+    expect(mockPrisma.emailLogText.create).not.toHaveBeenCalled();
+    konsole.mockRestore();
   });
 });
