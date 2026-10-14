@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 12.10.2026 (Übergabe vor einem Neustart – **0.0 zuerst lesen**; davor 09.10.: Bestandsaufnahme, vier Fehler auf `main`, Deploy-Anleitung, Prototyp-Tag vorbereitet)
+Letzte Änderung: 14.10.2026 (Mailtext im Protokoll, siehe Abschnitt 7; davor 12.10.: Übergabe vor einem Neustart – **0.0 zuerst lesen**; 09.10.: Bestandsaufnahme, vier Fehler auf `main`, Deploy-Anleitung, Prototyp-Tag vorbereitet)
 
 ## 0. Übergabe (Stand 12.10.2026)
 
@@ -1602,6 +1602,33 @@ Etappen festgelegt (A–D, siehe 0.0), Etappe A (Abschnitte 1–2 der Anleitung)
 ausgegeben; bis zur Übergabe am 12.10. kamen keine Ausgaben zurück. Abschnitt 0.0 neu
 geschrieben; sonst keine Änderung am Code.
 
+### 14.10.2026 – Mailtext im Versandprotokoll (Nebenstrang, auf `ux-umbau` gebaut)
+
+Wunsch des Projektverantwortlichen: im Reiter „E-Mails“ und im Versandprotokoll den Text sehen,
+den die Empfänger bekommen haben. Plan mit Mockups: `docs/module/betrieb/mailtext-im-protokoll-plan.html`
+(freigegeben am 14.10.2026). Gebaut auf `ux-umbau`, damit der Dialog die neuen Bausteine nutzt;
+deployt wird zusammen mit dem Umbau.
+
+- **Backend (`466662b`, eigener Commit, bei Bedarf allein nach `main` zu übernehmen):** Tabelle
+  `email_log_texte`, `mail-text-archiv.ts` (Links ersetzen, fail-closed), `mail-text-dienst.ts`,
+  `sendEventEmail` schreibt den Text nach der Zeile. Wer den Backend-Teil früh live will, damit
+  schon Texte entstehen, nimmt nur diesen Commit (Schema +1 Tabelle).
+- **Routen und Oberfläche (`da1c62e`):** zwei Leseroutinen, Dialog „E-Mail ansehen“ aus `Dialog`,
+  `Segment`, `Hinweis`, `Skelett`, Knopf im Reiter und im Versandprotokoll.
+- **Geprüft:** alle Suites (ohne die fremden Kopien unter `.claude/worktrees`, siehe 0.3), `tsc`,
+  `next lint`; gegen die Entwicklungsdatenbank eine Mail mit echtem Link ausgelöst (FAILED, da
+  kein Mailserver): Text 5744 Zeichen ohne Token, Platzhalter und `href="#"` gesetzt, Test-Versand
+  und BEM-Ereignis ohne Text; Dialog im Browser (Ansicht, Nur Text, Hinweis „nicht zugestellt“),
+  Versandprotokoll in den Einstellungen; Löschen der Zeile entfernt den Text (Cascade, 1 → 0).
+- **Abweichungen vom Plan:** die Mandantenprüfung des Reiters liegt jetzt in
+  `src/lib/vorgangs-mails-dienst.ts` (Liste und Text nehmen dieselbe; die Sperrklinke in
+  `contract-end-antwort.test.ts` führt die Listenroute nicht mehr); der Dialog zeigt kein „Antwort
+  an“ (die Adresse steht nicht im Protokoll).
+- **Mail- und Word-Vorlagen:** keine betroffen. Nach dem Deploy haben nur neue Mails einen Text.
+- **Offen:** Mitteilung an den DSB (Freitexte von HR stehen 90 Tage im Protokoll, Mutterschutz
+  eingeschlossen); Handbuch-Abschnitt zum Reiter „E-Mails“ (die Datei hat uncommittete Änderungen
+  des Projektverantwortlichen, daher nicht angefasst).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1656,6 +1683,7 @@ geschrieben; sonst keine Änderung am Code.
 | `main` | `8c1ef05` | Deploy-Anleitung: Hinweis bei vorübergehendem `next/font`-Fehler |
 | `ux-umbau` | `a4d6e7b` | Merge von `main` (Hinweis `next/font`) |
 | `ux-umbau` | `e8e4571` | Prototyp-Tag vorbereitet: Docker neu gebaut, Leitfaden gegen den Code geprüft, Bilder neu |
+| `ux-umbau` | `466662b`, `da1c62e` | Mailtext im Versandprotokoll: Backend (eigener Commit), Routen und Dialog |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.

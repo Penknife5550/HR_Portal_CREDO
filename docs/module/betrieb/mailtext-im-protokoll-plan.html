@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan Mailtext im Protokoll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+/* Bewusst einheitlich hell: Das Dokument zeigt die helle Portal-Oberfläche 1:1. */
+*, *::before, *::after { box-sizing: border-box; }
+:root {
+  color-scheme: light;
+  --grau: #575756;
+  --hellgrau: #DADADA;
+  --text: #2b2b2b;
+  --text2: #62625f;
+  --gelb: #FBC900;
+  --gruen: #6BAA24;
+  --rot: #E2001A;
+  --blau: #009AC6;
+  --weiss: #ffffff;
+  --linie: #dcdcd8;
+  --grund: #efefec;
+  --code-bg: #f1f1ee;
+  /* Portal (src/app/globals.css) */
+  --ui-bg: #fafafa;
+  --ui-border: #e5e5e5;
+  --ui-fg: #1a1a1a;
+  --ui-muted: #737373;
+  --ui-primary: #575756;
+  --hinweis-bg: #eaf5fa;
+  --warn-bg: #fef8e1;
+  --kritik-bg: #fdeeee;
+  --ok-bg: #eef6e6;
+  --pille-gruen-bg: #dcfce7; --pille-gruen-fg: #166534;
+  --pille-gelb-bg: #fef3c7;  --pille-gelb-fg: #92400e;
+  --pille-rot-bg: #fee2e2;   --pille-rot-fg: #991b1b;
+  --pille-blau-bg: #dbeafe;  --pille-blau-fg: #1d4ed8;
+}
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0; background: var(--grund); color: var(--text);
+  font-family: "Montserrat", Arial, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px; line-height: 1.65; padding: 28px 16px;
+}
+.seite { max-width: 1040px; margin: 0 auto; background: #fff; box-shadow: 0 2px 16px rgba(40,40,30,.08); }
+.credo-balken { display: flex; height: 6px; }
+.credo-balken span { display: block; }
+.credo-balken .g { flex: 1; background: var(--hellgrau); }
+.credo-balken .y, .credo-balken .n, .credo-balken .r, .credo-balken .b { flex: .125; }
+.credo-balken .y { background: var(--gelb); } .credo-balken .n { background: var(--gruen); }
+.credo-balken .r { background: var(--rot); } .credo-balken .b { background: var(--blau); }
+.kopf { background: var(--grau); color: #fff; padding: 38px 44px 28px; }
+.kopf .etikett { display: inline-block; background: var(--blau); font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; padding: 3px 10px; border-radius: 4px; }
+.kopf h1 { font-size: 26px; line-height: 1.25; margin: 14px 0 0; font-weight: 700; text-wrap: balance; }
+.kopf .unter { margin: 8px 0 0; font-size: 14px; opacity: .88; max-width: 64ch; }
+.kopf .meta { margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.22); font-size: 11.5px; opacity: .75; display: flex; flex-wrap: wrap; gap: 6px 22px; }
+.nav { background: #f5f5f3; border-bottom: 1px solid var(--linie); padding: 18px 44px; }
+.nav ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 36px; }
+.nav li { font-size: 13px; margin-bottom: 3px; break-inside: avoid; }
+.nav a { color: var(--grau); text-decoration: none; font-weight: 500; }
+.nav a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--blau); outline-offset: 2px; }
+.rumpf { padding: 6px 44px 44px; }
+section.abschnitt { margin-top: 42px; }
+.titel { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid var(--grau); padding-bottom: 9px; margin-bottom: 16px; }
+.titel .nr { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--grau); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+.titel h2 { margin: 0; font-size: 19px; line-height: 1.3; }
+h3 { font-size: 15px; margin: 26px 0 8px; }
+h4 { font-size: 13px; margin: 18px 0 6px; color: var(--grau); text-transform: uppercase; letter-spacing: .05em; }
+p { margin: 0 0 12px; }
+ul, ol { margin: 0 0 12px; padding-left: 22px; }
+li { margin-bottom: 4px; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-size: 12.5px; font-family: Consolas, "SFMono-Regular", Menlo, monospace; }
+table.t { width: 100%; border-collapse: collapse; margin: 6px 0 16px; font-size: 13px; }
+table.t th, table.t td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--linie); }
+table.t th { background: #f5f5f3; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--grau); }
+.kasten { border-left: 4px solid var(--blau); background: var(--hinweis-bg); padding: 12px 16px; margin: 14px 0; border-radius: 0 6px 6px 0; }
+.kasten.warn { border-color: var(--gelb); background: var(--warn-bg); }
+.kasten.ok { border-color: var(--gruen); background: var(--ok-bg); }
+.kasten.rot { border-color: var(--rot); background: var(--kritik-bg); }
+.kasten > :last-child { margin-bottom: 0; }
+.antwort { display: flex; gap: 18px; align-items: stretch; flex-wrap: wrap; margin: 14px 0; }
+.antwort .gross { flex: 0 0 auto; background: var(--ok-bg); border: 1px solid #c7e3a6; border-radius: 10px; padding: 16px 22px; text-align: center; min-width: 170px; }
+.antwort .gross strong { display: block; font-size: 30px; line-height: 1.1; color: #3d6d10; }
+.antwort .gross span { font-size: 12px; color: var(--text2); }
+.antwort .text { flex: 1 1 320px; }
+.kacheln { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0 16px; }
+.kachel { border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; background: #fafaf8; }
+.kachel b { display: block; font-size: 20px; line-height: 1.2; }
+.kachel span { font-size: 12px; color: var(--text2); }
+
+/* Fluss */
+.fluss { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 14px 0; }
+.fbox { flex: 1 1 150px; border: 1px solid var(--linie); border-radius: 8px; padding: 10px 12px; background: #fafaf8; font-size: 12.5px; position: relative; }
+.fbox b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--grau); margin-bottom: 3px; }
+.fbox.neu { border-color: var(--blau); background: var(--hinweis-bg); }
+.fbox.bleibt { border-color: #c7e3a6; background: var(--ok-bg); }
+.fpfeil { align-self: center; color: var(--grau); font-weight: 700; flex: 0 0 auto; }
+
+/* Mockup-Rahmen */
+.mock { border: 1px solid var(--linie); border-radius: 10px; margin: 14px 0 8px; overflow: hidden; background: var(--ui-bg); }
+.mock-kopf { background: #f1f1ee; border-bottom: 1px solid var(--linie); padding: 7px 14px; font-size: 11.5px; color: var(--text2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.mock-kopf .punkte { display: inline-flex; gap: 5px; margin-right: 6px; }
+.mock-kopf .punkte i { width: 9px; height: 9px; border-radius: 50%; background: #cfcfca; display: block; }
+.mock-inhalt { padding: 18px; }
+.mock-inhalt.dialogbuehne { background: rgba(0,0,0,.4); padding: 26px 14px; }
+
+/* Portal-Bausteine im Mockup */
+.m-karte { background: #fff; border: 1px solid var(--ui-border); border-radius: 10px; padding: 18px; color: var(--ui-fg); }
+.m-kopf { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.m-kopf h5 { margin: 0; font-size: 14px; font-weight: 600; }
+.m-kopf small { color: var(--ui-muted); font-size: 12px; }
+.m-select, .m-knopf { font: inherit; font-size: 13px; border: 1px solid var(--ui-border); background: #fff; border-radius: 8px; padding: 4px 10px; color: var(--ui-fg); }
+.m-liste { border: 1px solid var(--ui-border); border-radius: 8px; }
+.m-zeile { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid var(--ui-border); position: relative; }
+.m-zeile:last-child { border-bottom: 0; }
+.m-pillen { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pille { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 500; }
+.pille.g { background: var(--pille-gruen-bg); color: var(--pille-gruen-fg); }
+.pille.y { background: var(--pille-gelb-bg); color: var(--pille-gelb-fg); }
+.pille.r { background: var(--pille-rot-bg); color: var(--pille-rot-fg); }
+.pille.b { background: var(--pille-blau-bg); color: var(--pille-blau-fg); }
+.m-raster { display: grid; grid-template-columns: auto 1fr; gap: 1px 12px; margin-top: 4px; font-size: 12px; color: var(--ui-muted); }
+.m-raster .w { color: var(--ui-fg); overflow-wrap: anywhere; }
+.m-neu-knopf { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; font-weight: 600; border: 1px solid var(--ui-primary); color: var(--ui-primary); background: #fff; border-radius: 8px; padding: 3px 11px; margin-top: 7px; cursor: default; }
+.m-neu-knopf svg { width: 14px; height: 14px; }
+.m-aus { margin-top: 7px; font-size: 12px; color: var(--ui-muted); font-style: italic; }
+.callout { position: absolute; top: 8px; right: 8px; }
+.nr-punkt { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; background: var(--rot); color: #fff; font-size: 11px; font-weight: 700; align-items: center; justify-content: center; vertical-align: middle; }
+.legende { margin: 6px 0 14px; padding: 0; list-style: none; font-size: 13px; }
+.legende li { display: flex; gap: 8px; align-items: flex-start; }
+
+/* Dialog */
+.m-dialog { background: #fff; max-width: 720px; margin: 0 auto; border-radius: 12px; box-shadow: 0 12px 34px rgba(0,0,0,.28); color: var(--ui-fg); }
+.m-dialog-kopf { display: flex; gap: 12px; justify-content: space-between; padding: 16px 20px 10px; border-bottom: 1px solid var(--ui-border); }
+.m-dialog-kopf h5 { margin: 0; font-size: 16px; }
+.m-dialog-kopf small { color: var(--ui-muted); font-size: 12px; }
+.m-x { border: 0; background: transparent; font-size: 20px; line-height: 1; color: var(--ui-muted); }
+.m-dialog-rumpf { padding: 14px 20px; }
+.m-dialog-fuss { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--ui-border); }
+.m-primaer { font: inherit; font-size: 13px; font-weight: 600; background: var(--ui-primary); color: #fff; border: 0; border-radius: 8px; padding: 7px 16px; }
+.m-kopfzeilen { display: grid; grid-template-columns: 78px 1fr; gap: 2px 10px; font-size: 13px; margin-bottom: 12px; }
+.m-kopfzeilen dt { color: var(--ui-muted); margin: 0; }
+.m-kopfzeilen dd { margin: 0; overflow-wrap: anywhere; }
+.m-segment { display: inline-flex; border: 1px solid var(--ui-border); border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+.m-segment span { padding: 5px 14px; font-size: 13px; font-weight: 500; color: var(--ui-muted); background: #fff; }
+.m-segment span.an { background: var(--ui-primary); color: #fff; }
+.m-hinweis { display: flex; gap: 8px; align-items: flex-start; border-radius: 8px; padding: 9px 12px; font-size: 12.5px; margin-bottom: 10px; }
+.m-hinweis.info { background: rgba(29,111,165,.12); }
+.m-hinweis.wait { background: rgba(217,119,6,.14); }
+.m-hinweis.rot { background: rgba(180,35,24,.10); }
+.m-rahmen { border: 1px solid var(--ui-border); border-radius: 8px; background: #f4f4f5; max-height: 420px; overflow: auto; }
+.m-rahmen.text { background: #fff; padding: 14px 16px; font-family: Consolas, "SFMono-Regular", Menlo, monospace; font-size: 12.5px; white-space: pre-wrap; line-height: 1.55; }
+/* Die dargestellte Mail */
+.mail { max-width: 560px; margin: 0 auto; font-family: Arial, Helvetica, sans-serif; padding: 18px 10px; }
+.mail .kopfband { background: #1a1a2e; color: #fff; border-radius: 8px 8px 0 0; padding: 16px 22px; }
+.mail .kopfband b { font-size: 17px; display: block; }
+.mail .kopfband span { color: #a0a0c0; font-size: 12px; }
+.mail .koerper { background: #fff; padding: 22px; color: #374151; font-size: 13.5px; line-height: 1.6; }
+.mail h6 { margin: 0 0 12px; font-size: 17px; color: #1a1a2e; }
+.mail .frist { background: #f9fafb; border-left: 4px solid #575756; padding: 10px 14px; margin: 14px 0; color: #2d2d2d; font-size: 13px; }
+.mail .button { display: inline-block; background: #575756; color: #fff; border-radius: 8px; padding: 11px 22px; font-weight: bold; font-size: 14px; margin: 4px 0 10px; }
+.mail .klein { color: #6b7280; font-size: 11.5px; margin: 0 0 4px; }
+.mail .liste { background: #f9fafb; border: 1px solid #eceef1; border-radius: 8px; padding: 12px 16px; margin-top: 14px; font-size: 13px; line-height: 1.9; }
+.schwaerzung { display: inline-block; background: #fff3cd; border: 1px dashed #b78a00; color: #6b4e00; border-radius: 4px; padding: 1px 7px; font-size: 11.5px; font-weight: 600; }
+.echtlink { color: #575756; text-decoration: underline; font-size: 11.5px; word-break: break-all; }
+
+.zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.vier { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.zustand { border: 1px solid var(--ui-border); border-radius: 8px; background: #fff; padding: 12px; font-size: 12.5px; }
+.zustand > b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--grau); margin-bottom: 6px; }
+.fussnote { color: var(--text2); font-size: 12.5px; }
+.entsch td:first-child { white-space: nowrap; font-weight: 600; }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--ok-bg); color: #3d6d10; }
+.tag.offen { background: var(--warn-bg); color: #8a6a00; }
+@media (max-width: 760px) {
+  .kopf, .nav, .rumpf { padding-left: 18px; padding-right: 18px; }
+  .nav ol { columns: 1; }
+  .zwei { grid-template-columns: 1fr; }
+  .fpfeil { display: none; }
+  table.t { display: block; overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+<div class="seite">
+  <div class="credo-balken" aria-hidden="true"><span class="g"></span><span class="y"></span><span class="n"></span><span class="r"></span><span class="b"></span></div>
+  <header class="kopf">
+    <span class="etikett">Plan · freigegeben und umgesetzt</span>
+    <h1>Text der versendeten E-Mail im Protokoll sehen</h1>
+    <p class="unter">Im Reiter „E-Mails“ eines Vorgangs und unter Einstellungen → Versandprotokoll lässt sich künftig der Text ansehen, den die Empfängerin oder der Empfänger bekommen hat. Persönliche Zugangslinks werden dabei nie gespeichert.</p>
+    <div class="meta">
+      <span>Stand: 14.10.2026</span>
+      <span>Betrifft: Versandprotokoll (<code>EmailLog</code>), Reiter „E-Mails“</span>
+      <span>Entscheidungen und Freigabe: 14.10.2026 (Abschnitt 2)</span>
+      <span>Umgesetzt auf <code>ux-umbau</code>: Commits <code>466662b</code> (Backend) und <code>da1c62e</code> (Routen, Dialog)</span>
+    </div>
+  </header>
+  <nav class="nav" aria-label="Inhalt">
+    <ol>
+      <li><a href="#bewertung">Ist das eine große Änderung?</a></li>
+      <li><a href="#entscheidungen">Entscheidungen und ihre Folgen</a></li>
+      <li><a href="#ablauf">So funktioniert es</a></li>
+      <li><a href="#mockups">Mockups</a></li>
+      <li><a href="#arbeit">Arbeitspakete und Dateien</a></li>
+      <li><a href="#regeln">Regeln, die beim Ändern gelten müssen</a></li>
+      <li><a href="#tests">Tests</a></li>
+      <li><a href="#folgen">Folgen und Hinweise</a></li>
+      <li><a href="#offen">Offene Punkte zur Freigabe</a></li>
+    </ol>
+  </nav>
+
+  <main class="rumpf">
+
+  <!-- 1 -->
+  <section class="abschnitt" id="bewertung">
+    <div class="titel"><span class="nr">1</span><h2>Ist das eine große Änderung?</h2></div>
+    <div class="antwort">
+      <div class="gross"><strong>Nein</strong><span>klein bis mittel · rein additiv<br>ca. 1,5 Arbeitstage</span></div>
+      <div class="text">
+        <p>Der Versandweg, die Vorlagen und alle bestehenden Protokollzeilen bleiben unverändert. Es kommt eine neue Tabelle dazu, eine kleine Funktion, die Links ersetzt, zwei Leseroutinen und ein Dialog. Der Aufwand liegt nicht in der Technik, sondern im Datenschutz: Das Protokoll hat bisher bewusst <strong>keinen</strong> Mailtext gespeichert, und 18 der 66 Standardvorlagen enthalten einen persönlichen Zugangslink (Fragebogen, Unterlagen-Upload, Abteilungsaufgaben, Exit-Interview, Vorgesetzten-Link …); weitere 8 verweisen ins Portal hinter der Anmeldung.</p>
+      </div>
+    </div>
+    <div class="kacheln">
+      <div class="kachel"><b>1</b><span>neue Tabelle (nullbar, kein Datenverlust)</span></div>
+      <div class="kachel"><b>1</b><span>neue reine Datei (Links ersetzen, Text ableiten)</span></div>
+      <div class="kachel"><b>2</b><span>neue Leseroutinen (GET)</span></div>
+      <div class="kachel"><b>1</b><span>neue Komponente (Dialog), 2 Knöpfe</span></div>
+      <div class="kachel"><b>0</b><span>Änderungen an Vorlagen, Webhooks, n8n</span></div>
+    </div>
+    <table class="t">
+      <thead><tr><th>Bereich</th><th>Was ändert sich</th><th>Umfang</th></tr></thead>
+      <tbody>
+        <tr><td>Datenbank</td><td>Neue Tabelle <code>email_log_texte</code> (eine Zeile je Protokollzeile, bei Löschung der Zeile mit gelöscht). Keine bestehende Spalte wird angefasst; <code>db push</code> legt sie ohne Datenverlust an.</td><td>klein</td></tr>
+        <tr><td>Versand</td><td><code>sendEventEmail</code> reicht den schon erzeugten HTML-Text <em>nach</em> dem Versand an das Protokoll weiter. Der Versand selbst bleibt Zeile für Zeile gleich.</td><td>klein</td></tr>
+        <tr><td>Links ersetzen</td><td>Neue reine Datei <code>src/lib/mail-text-archiv.ts</code>: Positivliste für Adressen, zweite Schicht mit Token-Muster, Text aus HTML ableiten. Das ist der Kern der Änderung.</td><td>mittel</td></tr>
+        <tr><td>Routen</td><td>Zwei GET-Routen, eine je Anzeigeort, mit denselben Rollen wie die Protokollzeile.</td><td>klein</td></tr>
+        <tr><td>Oberfläche</td><td>Ein Dialog „E-Mail ansehen“ für beide Orte, ein Knopf je Zeile.</td><td>klein bis mittel</td></tr>
+        <tr><td>Tests</td><td>Etwa 25 neue Tests (umgesetzt: 140), darunter einer, der alle Standardvorlagen (derzeit 66) mit ihren Beispieldaten durchläuft und prüft, dass kein persönlicher Link übrig bleibt. Bestehende Mailer-Tests bleiben gültig (siehe 5.3).</td><td>mittel</td></tr>
+        <tr><td>Doku</td><td>CLAUDE.md (Abschnitt E-Mail-Versand), HR-Handbuch (Reiter „E-Mails“), Information an den Datenschutzbeauftragten.</td><td>klein</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 2 -->
+  <section class="abschnitt" id="entscheidungen">
+    <div class="titel"><span class="nr">2</span><h2>Entscheidungen und ihre Folgen</h2></div>
+    <p>Vier Entscheidungen waren Ihre. Sie sind getroffen und im Plan so umgesetzt:</p>
+    <table class="t entsch">
+      <thead><tr><th>Frage</th><th>Entscheidung</th><th>Folge im Plan</th></tr></thead>
+      <tbody>
+        <tr><td>Persönliche Links</td><td>Durch Platzhalter ersetzen</td><td>Die Kopie im Protokoll enthält nie einen Zugangslink. Das passt zur Regel aus Paket 4: Ein Token liegt nirgends im Klartext in der Datenbank, HR sieht einen Link nie.</td></tr>
+        <tr><td>Welche Mails</td><td>Alle außer BEM</td><td>Auch Mutterschutz wird gespeichert. Diese Mails nennen nur Name und Vorgangsnummer (bei „angelegt“ zusätzlich Einrichtung und Adresse), der Text bringt gegenüber dem Betreff wenig mehr. Trotzdem steht es in der Mitteilung an den DSB (Abschnitt 8).</td></tr>
+        <tr><td>Aufbewahrung</td><td>90 Tage wie das Protokoll</td><td>Der Text hängt fest an der Protokollzeile. Der Lauf „Wartung“ löscht die Zeile, der Text geht mit. Keine neue Löschlogik, keine neue Zusage.</td></tr>
+        <tr><td>Wo sichtbar</td><td>Beide Stellen</td><td>Reiter „E-Mails“ im Vorgang (HR-Rollen, nur eigener Mandant) und Einstellungen → Versandprotokoll (nur SUPER_ADMIN und HR_LEITUNG, alle Mandanten).</td></tr>
+      </tbody>
+    </table>
+    <p class="fussnote">Dazu kommen drei kleine Punkte, für die ich eine Empfehlung habe und die Sie bei der Freigabe bestätigen können (Abschnitt 9).</p>
+  </section>
+
+  <!-- 3 -->
+  <section class="abschnitt" id="ablauf">
+    <div class="titel"><span class="nr">3</span><h2>So funktioniert es</h2></div>
+    <h3>3.1 Beim Versand</h3>
+    <div class="fluss">
+      <div class="fbox bleibt"><b>1 · Ereignis</b>löst eine Mail aus, wie heute</div><div class="fpfeil">→</div>
+      <div class="fbox bleibt"><b>2 · Erzeugen</b><code>renderEventEmail</code> baut Betreff, Empfänger und HTML mit dem echten Link</div><div class="fpfeil">→</div>
+      <div class="fbox bleibt"><b>3 · Versenden</b>SMTP, unverändert. Die Empfängerin bekommt den echten Link</div><div class="fpfeil">→</div>
+      <div class="fbox bleibt"><b>4 · Protokollzeile</b>wie heute: Betreff, Adressen, Status</div>
+    </div>
+    <div class="fluss">
+      <div class="fbox neu"><b>5 · Kopie bilden (neu)</b>aus dem schon erzeugten HTML: Links ersetzen, auf 100.000 Zeichen begrenzen</div><div class="fpfeil">→</div>
+      <div class="fbox neu"><b>6 · Speichern (neu)</b>in <code>email_log_texte</code>, getrennt von der Zeile. Ein Fehler hier verliert nie die Protokollzeile</div><div class="fpfeil">→</div>
+      <div class="fbox neu"><b>7 · Anzeigen (neu)</b>erst beim Klick auf „Text ansehen“, nie mit der Liste</div>
+    </div>
+    <h3>3.2 Was gespeichert wird und was nicht</h3>
+    <table class="t">
+      <thead><tr><th>Gespeichert</th><th>Nicht gespeichert</th></tr></thead>
+      <tbody><tr>
+        <td><ul>
+          <li>Der HTML-Text der Mail, wie er hinausging, mit ersetzten Zugangslinks</li>
+          <li>Bei <em>nicht zugestellten</em> Mails (FAILED): der Text, der hinausgehen sollte</li>
+          <li>Die Ansicht „Nur Text“ wird beim Anzeigen aus dem HTML abgeleitet, nicht doppelt gespeichert</li>
+        </ul></td>
+        <td><ul>
+          <li>Echte Links und Tokens, in keiner Form</li>
+          <li>BEM-Mails (versiegelte Akte)</li>
+          <li>Test-Versand aus den Einstellungen</li>
+          <li>Übersprungene Mails (SKIPPED): sie wurden nie erzeugt, es gibt nichts zu zeigen</li>
+          <li>Anhänge: wie bisher nur die Dateinamen im Feld „Detail“</li>
+          <li>Mails, die vor dem Deploy hinausgingen</li>
+        </ul></td>
+      </tr></tbody>
+    </table>
+  </section>
+
+  <!-- 4 -->
+  <section class="abschnitt" id="mockups">
+    <div class="titel"><span class="nr">4</span><h2>Mockups</h2></div>
+    <p>Die Mockups zeigen die heutige Portal-Oberfläche mit den neuen Teilen. Die Beispieldaten sind erfunden. Der Text der Beispielmail ist der echte Standardtext der Vorlage „Einladung Mitarbeiter (Personalfragebogen)“.</p>
+
+    <!-- 4.1 -->
+    <h3>4.1 Reiter „E-Mails“ im Vorgang</h3>
+    <div class="mock">
+      <div class="mock-kopf"><span class="punkte"><i></i><i></i><i></i></span> Vorgang ONB-2026-GYM-014 · Reiter E-Mails</div>
+      <div class="mock-inhalt">
+        <div class="m-karte">
+          <div class="m-kopf">
+            <div>
+              <h5>E-Mails zu diesem Vorgang</h5>
+              <small>Aus dem Versandprotokoll, neueste zuerst. Einträge werden nach 90 Tagen gelöscht. Mails, die vor Einführung der Textspeicherung hinausgingen, haben keinen Text. Persönliche Links sind in den gespeicherten Texten ersetzt.</small>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <select class="m-select" aria-label="Filter"><option>Alle (4)</option></select>
+              <button class="m-knopf" type="button">Aktualisieren</button>
+            </div>
+          </div>
+          <div class="m-liste">
+            <div class="m-zeile">
+              <span class="callout nr-punkt">1</span>
+              <div class="m-pillen"><span class="pille g">versendet</span><span style="color:var(--ui-muted)">14.10.2026, 09:12</span><strong>Einladung Mitarbeiter (Personalfragebogen)</strong></div>
+              <div class="m-raster"><span>Betreff</span><span class="w">Willkommen bei FES Gymnasium Minden – Ihr Personalfragebogen (bis 28.10.2026)</span><span>An</span><span class="w">anna.beispiel@beispiel.invalid</span></div>
+              <button class="m-neu-knopf" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Text ansehen</button>
+            </div>
+            <div class="m-zeile">
+              <div class="m-pillen"><span class="pille g">versendet</span><span style="color:var(--ui-muted)">13.10.2026, 16:40</span><strong>Einladung Vorgesetzte/r (Einstellungsmodalitäten)</strong></div>
+              <div class="m-raster"><span>Betreff</span><span class="w">Einstellungsmodalitäten für Anna Beispiel</span><span>An</span><span class="w">schulleitung@beispiel.invalid</span></div>
+              <button class="m-neu-knopf" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Text ansehen</button>
+            </div>
+            <div class="m-zeile">
+              <span class="callout nr-punkt">2</span>
+              <div class="m-pillen"><span class="pille y">nicht versendet</span><span style="color:var(--ui-muted)">13.10.2026, 16:41</span><strong>Abteilungen informieren (Onboarding)</strong></div>
+              <div class="m-raster"><span>Grund</span><span class="w" style="color:var(--pille-gelb-fg)">E-Mail-Vorlage ist deaktiviert</span></div>
+              <div class="m-aus">Kein Text: Die Mail wurde nicht erzeugt.</div>
+            </div>
+            <div class="m-zeile">
+              <span class="callout nr-punkt">3</span>
+              <div class="m-pillen"><span class="pille g">versendet</span><span style="color:var(--ui-muted)">02.09.2026, 11:05</span><strong>Erinnerung Mitarbeiter (Personalfragebogen)</strong></div>
+              <div class="m-raster"><span>Betreff</span><span class="w">Erinnerung: Ihr Personalfragebogen</span><span>An</span><span class="w">anna.beispiel@beispiel.invalid</span></div>
+              <div class="m-aus">Text nicht gespeichert: Die Mail ging vor Einführung dieser Funktion hinaus.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="legende">
+      <li><span class="nr-punkt">1</span><span>Der Knopf „Text ansehen“ erscheint nur, wenn ein Text gespeichert ist. Er öffnet den Dialog (4.2).</span></li>
+      <li><span class="nr-punkt">2</span><span>Übersprungene Mails haben keinen Text. Die Zeile sagt das, statt einen toten Knopf zu zeigen.</span></li>
+      <li><span class="nr-punkt">3</span><span>Ältere Mails bleiben in der Liste, ohne Text. Der Satz erklärt, warum.</span></li>
+    </ul>
+
+    <!-- 4.2 -->
+    <h3>4.2 Dialog „E-Mail ansehen“ — Ansicht</h3>
+    <div class="mock">
+      <div class="mock-kopf"><span class="punkte"><i></i><i></i><i></i></span> Dialog nach Klick auf „Text ansehen“</div>
+      <div class="mock-inhalt dialogbuehne">
+        <div class="m-dialog" role="img" aria-label="Mockup des Dialogs E-Mail ansehen">
+          <div class="m-dialog-kopf">
+            <div><h5>E-Mail ansehen</h5><small>Einladung Mitarbeiter (Personalfragebogen) · versendet am 14.10.2026, 09:12</small></div>
+            <button class="m-x" type="button" aria-label="Schließen">×</button>
+          </div>
+          <div class="m-dialog-rumpf">
+            <dl class="m-kopfzeilen">
+              <dt>An</dt><dd>anna.beispiel@beispiel.invalid</dd>
+              <dt>Betreff</dt><dd>Willkommen bei FES Gymnasium Minden – Ihr Personalfragebogen (bis 28.10.2026)</dd>
+            </dl>
+            <div class="m-segment" role="radiogroup" aria-label="Darstellung"><span class="an">Ansicht</span><span>Nur Text</span></div>
+            <div class="m-hinweis info">
+              <span aria-hidden="true">ⓘ</span>
+              <span>Persönliche Links sind in dieser Kopie durch einen Platzhalter ersetzt. Die Mail an die Empfängerin enthielt den echten Link. Links in dieser Ansicht sind nicht klickbar.</span>
+            </div>
+            <div class="m-rahmen">
+              <div class="mail">
+                <div class="kopfband"><b>CREDO HR-Portal</b><span>FES Gymnasium Minden</span></div>
+                <div class="koerper">
+                  <h6>Herzlich willkommen, Anna!</h6>
+                  <p>Schön, dass Sie zu <strong>FES Gymnasium Minden</strong> kommen. Damit zu Ihrem Start alles bereitliegt – vom Arbeitsvertrag bis zur pünktlichen Gehaltszahlung – benötigen wir einmalig einige Angaben von Ihnen.</p>
+                  <p>Bitte füllen Sie dazu den <strong>Personalfragebogen</strong> aus. Ihre Daten werden verschlüsselt übertragen und vertraulich behandelt.</p>
+                  <div class="frist"><strong>Bitte ausfüllen bis:</strong> 28.10.2026<br><span style="color:#6b7280">Dauer: ca. 10 Minuten</span></div>
+                  <span class="button">Personalfragebogen ausfüllen →</span>
+                  <p class="klein">Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:</p>
+                  <p><span class="schwaerzung">Persönlicher Link – aus Sicherheitsgründen nicht gespeichert</span></p>
+                  <div class="liste"><strong>Das halten Sie am besten bereit</strong><br>› IBAN Ihrer Bankverbindung<br>› Steuer-Identifikationsnummer (Steuer-ID)<br>› Sozialversicherungsnummer<br>› Name Ihrer Krankenkasse</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="m-dialog-fuss"><button class="m-primaer" type="button">Schließen</button></div>
+        </div>
+      </div>
+    </div>
+    <ul class="legende">
+      <li><span class="nr-punkt" style="background:var(--grau)">•</span><span>Die Mail steht so da, wie die Person sie gesehen hat: Kopfband, Absätze, Frist, Knopf. Das ist die eigentliche Antwort auf „Welchen Text haben wir gesendet?“.</span></li>
+      <li><span class="nr-punkt" style="background:var(--grau)">•</span><span>Der gelbe Platzhalter steht an der Stelle, an der der Knopf und der sichtbare Link der Originalmail einen persönlichen Zugang enthielten (Detail in 4.5).</span></li>
+      <li><span class="nr-punkt" style="background:var(--grau)">•</span><span>Der Dialog nutzt den Baustein <code>Dialog</code>: Fokus auf „Schließen“, Escape schließt, Fokus kehrt zum Knopf in der Zeile zurück.</span></li>
+    </ul>
+
+    <!-- 4.3 -->
+    <h3>4.3 Dialog — „Nur Text“</h3>
+    <div class="mock">
+      <div class="mock-kopf"><span class="punkte"><i></i><i></i><i></i></span> Dialog, Umschalter auf „Nur Text“</div>
+      <div class="mock-inhalt dialogbuehne">
+        <div class="m-dialog" role="img" aria-label="Mockup des Dialogs, Ansicht Nur Text">
+          <div class="m-dialog-kopf">
+            <div><h5>E-Mail ansehen</h5><small>Einladung Mitarbeiter (Personalfragebogen) · versendet am 14.10.2026, 09:12</small></div>
+            <button class="m-x" type="button" aria-label="Schließen">×</button>
+          </div>
+          <div class="m-dialog-rumpf">
+            <div class="m-segment" role="radiogroup" aria-label="Darstellung"><span>Ansicht</span><span class="an">Nur Text</span></div>
+            <div class="m-rahmen text">Herzlich willkommen, Anna!
+
+Schön, dass Sie zu FES Gymnasium Minden kommen. Damit zu Ihrem
+Start alles bereitliegt – vom Arbeitsvertrag bis zur pünktlichen
+Gehaltszahlung – benötigen wir einmalig einige Angaben von Ihnen.
+
+Bitte füllen Sie dazu den Personalfragebogen aus. Ihre Daten
+werden verschlüsselt übertragen und vertraulich behandelt.
+
+Bitte ausfüllen bis: 28.10.2026
+Dauer: ca. 10 Minuten
+
+Personalfragebogen ausfüllen →
+[Persönlicher Link – aus Sicherheitsgründen nicht gespeichert]
+
+Das halten Sie am besten bereit
+› IBAN Ihrer Bankverbindung
+› Steuer-Identifikationsnummer (Steuer-ID)
+› Sozialversicherungsnummer
+› Name Ihrer Krankenkasse</div>
+          </div>
+          <div class="m-dialog-fuss"><button class="m-primaer" type="button">Schließen</button></div>
+        </div>
+      </div>
+    </div>
+    <p class="fussnote">„Nur Text“ ist nützlich zum Suchen und Zitieren und zeigt unverfälscht, was in der Mail steht, auch wenn HR eine Vorlage im Editor stark umgebaut hat.</p>
+
+    <!-- 4.4 -->
+    <h3>4.4 Einstellungen → Versandprotokoll</h3>
+    <div class="mock">
+      <div class="mock-kopf"><span class="punkte"><i></i><i></i><i></i></span> Einstellungen · Versandprotokoll · Zeile aufgeklappt</div>
+      <div class="mock-inhalt">
+        <div class="m-karte" style="padding:0;overflow:hidden">
+          <div class="m-zeile" style="background:#fafafa">
+            <div class="m-pillen"><span class="pille g">Gesendet</span><span style="font-family:Consolas,monospace;font-size:12px;color:var(--ui-muted)">onboarding-created</span><span>anna.beispiel@beispiel.invalid</span><span style="margin-left:auto;font-size:12px;color:var(--ui-muted)">14.10.2026, 09:12:41</span></div>
+            <div style="border-top:1px solid var(--ui-border);margin:10px -14px 0;padding:10px 14px 0;background:#f6f6f5;font-size:13px;">
+              <p style="margin:0 0 3px"><span style="color:var(--ui-muted)">Betreff:</span> Willkommen bei FES Gymnasium Minden – Ihr Personalfragebogen (bis 28.10.2026)</p>
+              <p style="margin:0 0 3px"><span style="color:var(--ui-muted)">CC:</span> personalbuchhaltung@fes-minden.de</p>
+              <p style="margin:0 0 8px;font-family:Consolas,monospace;font-size:12px;color:var(--ui-muted)">Message-ID: &lt;7f3c1e…@fes-minden.de&gt;</p>
+              <button class="m-neu-knopf" style="margin:0 0 10px" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Text ansehen</button>
+            </div>
+          </div>
+          <div class="m-zeile">
+            <div class="m-pillen"><span class="pille y">Übersprungen</span><span style="font-family:Consolas,monospace;font-size:12px;color:var(--ui-muted)">bem-frist-erinnerung</span><span>—</span><span style="margin-left:auto;font-size:12px;color:var(--ui-muted)">14.10.2026, 08:00:03</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="fussnote">Der Knopf steht in der aufgeklappten Zeile, nicht in der Liste. Er öffnet denselben Dialog wie im Reiter (4.2). Bei BEM-Ereignissen erscheint statt des Knopfs der Satz „Aus Datenschutzgründen wird der Text von BEM-Mails nicht gespeichert.“</p>
+
+    <!-- 4.5 -->
+    <h3>4.5 Der persönliche Link im Detail</h3>
+    <div class="zwei">
+      <div class="zustand">
+        <b>Mail an die Empfängerin (unverändert)</b>
+        <div class="mail" style="padding:0">
+          <p class="klein">Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:</p>
+          <p><span class="echtlink">https://hr.fes-credo.de/fragebogen/3f9c7a1e-52b0-4d1b-9e6a-0c2f8d4b71aa</span></p>
+          <p class="klein" style="margin-top:8px">Zugang zum Fragebogen, also zu IBAN, Steuer-ID und Sozialversicherungsnummer der Person.</p>
+        </div>
+      </div>
+      <div class="zustand">
+        <b>Kopie im Protokoll</b>
+        <div class="mail" style="padding:0">
+          <p class="klein">Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:</p>
+          <p><span class="schwaerzung">Persönlicher Link – aus Sicherheitsgründen nicht gespeichert</span></p>
+          <p class="klein" style="margin-top:8px">Auch im Rohtext der Datenbank steht der Link nicht. Er kann nicht nachträglich „sichtbar gemacht“ werden.</p>
+        </div>
+      </div>
+    </div>
+    <h4>Welche Adressen ersetzt werden</h4>
+    <table class="t">
+      <thead><tr><th>Adresse in der Mail</th><th>Beispiel</th><th>In der Kopie</th></tr></thead>
+      <tbody>
+        <tr><td>Persönliche Zugänge auf der Portal-Adresse</td><td><code>/fragebogen/…</code>, <code>/modalitaeten/…</code>, <code>/unterlagen/…</code>, <code>/exit-interview/…</code>, <code>/offboarding-tasks/…</code>, <code>/onboarding-tasks/…</code>, <code>/vertrag-formular/…</code>, <code>/elternzeit-…</code>, <code>/civil-service-…</code>, <code>/zeugnis-bewertung/…</code>, <code>/verify/…</code></td><td><span class="schwaerzung">ersetzt</span></td></tr>
+        <tr><td>Portal-Seiten hinter der Anmeldung</td><td><code>/vorgaenge/…</code>, <code>/einstellungen…</code> (Feld <code>portalLink</code> der HR-Mails)</td><td>bleibt</td></tr>
+        <tr><td>Alles Unbekannte auf der Portal-Adresse</td><td>eine künftig neu gebaute Seite mit Token</td><td><span class="schwaerzung">ersetzt</span> (Positivliste: im Zweifel ersetzen)</td></tr>
+        <tr><td>Fremde Adressen ohne Token-Muster</td><td>Datenschutzseite des Trägers</td><td>bleibt</td></tr>
+        <tr><td>Jede Adresse mit Token-Muster (UUID, ≥ 24 Zeichen Base64/Hex, <code>token=</code>)</td><td>egal, auf welcher Domain</td><td><span class="schwaerzung">ersetzt</span> (zweite Sicherung)</td></tr>
+      </tbody>
+    </table>
+
+    <!-- 4.6 -->
+    <h3>4.6 Sonderfälle</h3>
+    <div class="vier">
+      <div class="zustand">
+        <b>Nicht zugestellt (FAILED)</b>
+        <div class="m-hinweis wait"><span aria-hidden="true">!</span><span>Diese Mail wurde nicht zugestellt. Angezeigt ist der Text, der hinausgehen sollte.</span></div>
+        <span class="fussnote">Grund steht wie heute in der Zeile („SMTP ist nicht konfiguriert …“).</span>
+      </div>
+      <div class="zustand">
+        <b>Text konnte nicht geladen werden</b>
+        <div class="m-hinweis rot"><span aria-hidden="true">✕</span><span>Der Text konnte nicht geladen werden. Bitte erneut versuchen.</span></div>
+        <button class="m-knopf" type="button">Erneut versuchen</button>
+      </div>
+      <div class="zustand">
+        <b>Sehr lange Mail</b>
+        <div class="m-hinweis info"><span aria-hidden="true">ⓘ</span><span>Der Text wurde bei 100.000 Zeichen gekürzt.</span></div>
+        <span class="fussnote">Kommt bei den Standardvorlagen nicht vor (etwa 5 KB). Schutz gegen eine versehentlich riesige Vorlage.</span>
+      </div>
+      <div class="zustand">
+        <b>BEM (nur Versandprotokoll)</b>
+        <p class="m-aus" style="margin:0">Aus Datenschutzgründen wird der Text von BEM-Mails nicht gespeichert.</p>
+        <span class="fussnote">Im Vorgangs-Reiter erscheinen BEM-Mails ohnehin nicht (wie bisher).</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="abschnitt" id="arbeit">
+    <div class="titel"><span class="nr">5</span><h2>Arbeitspakete und Dateien</h2></div>
+    <h3>5.1 Reihenfolge</h3>
+    <table class="t">
+      <thead><tr><th>#</th><th>Paket</th><th>Dateien</th><th>Größe</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><strong>Schema.</strong> Neues Modell <code>EmailLogText</code> (<code>emailLogId</code> als Schlüssel und Fremdschlüssel mit <code>onDelete: Cascade</code>, <code>bodyHtml @db.Text</code>, <code>gekuerzt</code>, <code>createdAt</code>); in <code>EmailLog</code> die Gegenrelation <code>text EmailLogText?</code>. Kein Migrationsordner: <code>db push</code> legt die Tabelle an, es gibt keinen Verlust bestehender Daten.</td><td><code>prisma/schema.prisma</code></td><td>klein</td></tr>
+        <tr><td>2</td><td><strong>Kopie bilden.</strong> Rein und ohne Datenbank: <code>textFuerProtokoll(html, appUrl)</code>, <code>textAusHtml(html)</code>, <code>textSpeichernErlaubt(event)</code>, Konstanten <code>PORTAL_PFADE_ERLAUBT</code>, <code>MAX_TEXT_ZEICHEN</code>, <code>PLATZHALTER_LINK</code>.</td><td><code>src/lib/mail-text-archiv.ts</code> (neu)</td><td>mittel</td></tr>
+        <tr><td>3</td><td><strong>Schreiben.</strong> <code>writeEmailLog</code> liefert die Id der Zeile zurück; danach ein zweiter, eigener <code>try</code> mit <code>emailLogText.create</code>. <code>sendEventEmail</code> übergibt <code>rendered.html</code> bei SENT und FAILED, nie bei SKIPPED und Test.</td><td><code>src/lib/mailer.ts</code></td><td>klein</td></tr>
+        <tr><td>4</td><td><strong>Zeilen der Liste.</strong> <code>VorgangsMailZeile</code> bekommt <code>text: { vorhanden, hinweis }</code>. Der Server liefert den fertigen Hinweissatz („Kein Text: …“, „Text nicht gespeichert: …“), die Oberfläche rechnet nichts. Die Route wählt nur <code>text: { select: { emailLogId: true } }</code>, nie den Inhalt.</td><td><code>src/lib/vorgangs-mails.ts</code>, <code>src/lib/vorgangs-mails-dienst.ts</code> (neu: Mandantenprüfung für Liste und Text), <code>src/app/api/vorgaenge/[modul]/[id]/mails/route.ts</code></td><td>klein</td></tr>
+        <tr><td>5</td><td><strong>Lesen.</strong> Gemeinsame Funktion <code>mailTextLaden(logId)</code> (Kopfzeilen, HTML, abgeleiteter Text, <code>gekuerzt</code>). Zwei dünne Routen: <code>GET …/mails/[mailId]/text</code> und <code>GET /api/settings/email-log/[id]/text</code>. Beide <code>Cache-Control: no-store</code>.</td><td><code>src/lib/mail-text-dienst.ts</code> (neu), zwei <code>route.ts</code> (neu)</td><td>klein</td></tr>
+        <tr><td>6</td><td><strong>Dialog.</strong> <code>MailTextDialog</code> aus den Bausteinen <code>Dialog</code>, <code>Segment</code>, <code>Hinweis</code> und <code>Skelett</code>, Umschalter „Ansicht / Nur Text“, Rahmen als <code>&lt;iframe sandbox="" srcDoc&gt;</code>. Knopf in <code>MailZeile</code> und im aufgeklappten Bereich des Versandprotokolls.</td><td><code>src/components/vorgangs-mails/mail-text-dialog.tsx</code> (neu), <code>mail-protokoll.tsx</code>, <code>einstellungen-content.tsx</code></td><td>klein bis mittel</td></tr>
+        <tr><td>7</td><td><strong>Tests.</strong> Siehe Abschnitt 7.</td><td><code>src/__tests__/…</code></td><td>mittel</td></tr>
+        <tr><td>8</td><td><strong>Doku.</strong> CLAUDE.md (Zeilen „Protokoll“ und „Mailprotokoll je Vorgang“), Satz <code>VORGANGS_MAIL_HINWEIS</code>, Handbuch, Mitteilung an den DSB.</td><td><code>CLAUDE.md</code>, <code>docs/handbuch/handbuch.html</code></td><td>klein</td></tr>
+      </tbody>
+    </table>
+
+    <h3>5.2 Warum eine eigene Tabelle statt einer Spalte</h3>
+    <p>Die Route <code>GET /api/settings/email-log</code> liest heute mit <code>findMany</code> ohne <code>select</code>; jede neue Spalte auf <code>email_logs</code> ginge damit automatisch in jede Listenantwort, 50 Texte je Seite. Mit einer eigenen Tabelle kann der Text <em>nicht versehentlich</em> mitgeliefert werden: Er kommt nur, wenn jemand ihn ausdrücklich lädt. Die Löschung bleibt trotzdem eine einzige: Cascade am Fremdschlüssel.</p>
+
+    <h3>5.3 Warum die bestehenden Mailer-Tests gültig bleiben</h3>
+    <p>Die Protokollzeile wird mit denselben Daten angelegt wie heute (<code>emailLog.create</code> mit genau diesen Feldern). Der Text folgt in einem zweiten Schritt. Die zwölf Prüfungen in <code>email-dispatch.test.ts</code>, die den Aufruf mit <code>toHaveBeenCalledWith</code> festschreiben, ändern sich nicht. Ein Nebeneffekt, der gewollt ist: Scheitert das Schreiben des Textes, bleibt die Zeile erhalten.</p>
+  </section>
+
+  <!-- 6 -->
+  <section class="abschnitt" id="regeln">
+    <div class="titel"><span class="nr">6</span><h2>Regeln, die beim Ändern gelten müssen</h2></div>
+    <ol>
+      <li><strong>Der Versand bleibt unberührt.</strong> Die Kopie entsteht nach dem Versand aus dem fertig erzeugten HTML. Kein Eingriff in <code>renderEventEmail</code>, <code>renderTemplate</code> oder die Platzhalter.</li>
+      <li><strong>Eine Zeile geht nie wegen des Textes verloren.</strong> Die Protokollzeile wird zuerst geschrieben, der Text in einem eigenen <code>try</code>. Ein Fehler dort landet nur in der Konsole (Kennung, kein Inhalt).</li>
+      <li><strong>Links ersetzen ist geschlossen nach innen (fail-closed).</strong> Auf der Portal-Adresse bleibt nur, was in <code>PORTAL_PFADE_ERLAUBT</code> steht. Zusätzlich ersetzt ein Token-Muster jede Adresse, auch auf fremden Domains. Es gibt keine Liste „verbotener“ Pfade, die beim nächsten neuen Link veraltet.</li>
+      <li><strong>Ersetzt wird in der Textausgabe, nicht in den Variablen.</strong> Ein Abgleich nach Variablennamen (<code>{{link}}</code>, <code>{{magicUrl}}</code> …) würde bei der nächsten umbenannten Variable stillschweigend lecken. Das fertige HTML wird nach Adressen durchsucht: im <code>href</code> wird die Adresse zu <code>#</code>, im sichtbaren Text zum Platzhalter.</li>
+      <li><strong>BEM nie, Test-Versand nie, SKIPPED hat keinen Text.</strong> Die BEM-Ausnahme steht an einer Stelle (<code>textSpeichernErlaubt</code>) und hat einen Test über alle Ereignisse der Gruppe „BEM“. Neue BEM-Ereignisse sind damit automatisch ausgenommen.</li>
+      <li><strong>Der Text steht nie in einer Liste.</strong> Er wird erst auf Klick geladen, über eine Route, die die Zeile selbst prüft.</li>
+      <li><strong>Zugriff wie bei der Zeile.</strong> Reiter: <code>HR_EDIT_ROLES</code> plus <code>canAccessProcess</code>, und die Zeile muss zu genau diesem Vorgang gehören (<code>vorgangTyp</code> und <code>vorgangId</code> stimmen). Sonst 404 mit demselben Text wie „Vorgang nicht gefunden“, damit niemand fremde IDs ausprobieren kann. Versandprotokoll: <code>SUPER_ADMIN</code> und <code>HR_LEITUNG</code>.</li>
+      <li><strong>Anzeige nur in der Sandbox.</strong> <code>&lt;iframe sandbox="" srcDoc&gt;</code> ohne Skripte und ohne Same-Origin, Adressen im Dokument inaktiv, eigene CSP im Dokument (<code>default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'</code>), <code>referrerpolicy="no-referrer"</code>. Nie <code>dangerouslySetInnerHTML</code> im Portal.</li>
+      <li><strong>Aufbewahrung = Zeile.</strong> Der Text hat keine eigene Frist. Wird die Zeile nach 90 Tagen gelöscht, geht er per Cascade mit. Obergrenze 100.000 Zeichen je Text.</li>
+      <li><strong>Kein Inhalt in Konsole und Prüfprotokoll.</strong> Beim Lesen und Schreiben nur Kennungen, nie Textteile (wie bisher bei allen Mails).</li>
+    </ol>
+  </section>
+
+  <!-- 7 -->
+  <section class="abschnitt" id="tests">
+    <div class="titel"><span class="nr">7</span><h2>Tests</h2></div>
+    <table class="t">
+      <thead><tr><th>Test</th><th>Was er festhält</th></tr></thead>
+      <tbody>
+        <tr><td>Durchlauf aller Standardvorlagen</td><td>Jede der 66 Vorlagen wird mit ihrem Beispiel-Payload erzeugt und gekürzt. Im Ergebnis steht keine Adresse auf der Portal-Domain außerhalb der Positivliste und kein Token-Muster. Der wichtigste Test: Er fängt auch eine <em>künftige</em> Vorlage mit neuem Link.</td></tr>
+        <tr><td>Ersetzen, Einzelfälle</td><td><code>href</code> und sichtbarer Text, mehrfach vorkommender Link, Link in Klein-/Großschreibung, mit und ohne abschließenden Schrägstrich, mit Abfrageteil und Anker, Portal-Link bleibt, fremde Adresse bleibt, Token-Muster auf fremder Domain wird ersetzt.</td></tr>
+        <tr><td>Text ableiten</td><td>Absätze und Zeilenumbrüche, Tabellen, Entitäten (<code>&amp;amp;</code>, <code>&amp;nbsp;</code>), Aufzählungszeichen, kein Rest von Tags.</td></tr>
+        <tr><td>Mailer</td><td>SENT: Text gespeichert. FAILED: Text gespeichert. SKIPPED und Test: keiner. BEM: keiner. Text-Fehler: Zeile bleibt, Mail gilt als versendet.</td></tr>
+        <tr><td>Routen</td><td>Rolle, fremder Mandant, Zeile eines anderen Vorgangs, unbekannte Id, Zeile ohne Text (404/204 mit Hinweis), <code>no-store</code>.</td></tr>
+        <tr><td>Zeilen der Liste</td><td><code>text.vorhanden</code> und der fertige Hinweissatz je Lage (versendet mit Text, versendet ohne Text, nicht erzeugt).</td></tr>
+        <tr><td>Oberfläche</td><td>Dialog öffnet, Umschalter, Fehlerzustand mit „Erneut versuchen“, Fokus kehrt zurück, axe ohne Verstöße; <code>iframe</code> trägt <code>sandbox=""</code> und hat keine aktiven Adressen.</td></tr>
+        <tr><td>Löschung</td><td>Der Lauf „Wartung“ (<code>emailLogAufraeumen</code>) entfernt Text mit der Zeile (gegen die Datenbank, nicht nur gegen den Mock).</td></tr>
+        <tr><td>Sperrklinke</td><td><code>ui-sperrklinke</code> darf nicht steigen: Neue Teile nutzen keine festen Farbklassen und keine neue Überlagerung außerhalb von <code>DialogRahmen</code>.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 8 -->
+  <section class="abschnitt" id="folgen">
+    <div class="titel"><span class="nr">8</span><h2>Folgen und Hinweise</h2></div>
+    <ul>
+      <li><strong>Ältere Mails bleiben ohne Text.</strong> Gespeichert wird erst ab dem Deploy. Nachträglich lässt sich nichts herstellen, weil das Protokoll den Text nie hatte.</li>
+      <li><strong>Mitteilung an den DSB.</strong> Neu im Protokoll stehen für 90 Tage die Mailtexte, darunter auch Freitexte von HR (persönliche Nachricht im Dokumentenpaket, individuelle E-Mail, Kommentare der Abteilungen in den HR-Mails). Die Texte sind für <code>SUPER_ADMIN</code> und <code>HR_LEITUNG</code> über alle Mandanten sichtbar. Mutterschutz-Mails sind eingeschlossen; sie nennen nur Name und Vorgangsnummer.</li>
+      <li><strong>Kein Nachweis im rechtlichen Sinn.</strong> 90 Tage reichen für „Was ist letzte Woche hinausgegangen?“, nicht für „Haben Sie mir das im Frühjahr geschickt?“. Dafür bleiben die dauerhaften Nachweise (Dokumentenpaket, individuelle E-Mail, Unterlagen) unverändert die Quelle.</li>
+      <li><strong>Vorlagen.</strong> Keine Änderung nötig. Gespeichert wird immer, was wirklich hinausging, also auch der Text einer von HR bearbeiteten Datenbankvorlage. Die Regel „nach einem Deploy Text auf Standard zurücksetzen“ bleibt davon unberührt.</li>
+      <li><strong>Webhooks und n8n.</strong> Unverändert. Der gespeicherte Text geht an keine Webhook-URL.</li>
+      <li><strong>Deploy.</strong> Additive Tabelle. Der Entrypoint erkennt den Schema-Unterschied, legt vorher den <code>pg_dump</code> an und führt <code>db push</code> aus; <code>--accept-data-loss</code> ist hier folgenlos, weil nichts entfällt. Es ist kein Handschritt auf dem Server nötig.</li>
+      <li><strong>Beide Ansichten des Pilots.</strong> Die neue Detailseite Vertragsende bindet dieselbe Komponente <code>MailProtokoll</code> ein. Der Dialog erscheint dort ohne zusätzliche Arbeit.</li>
+    </ul>
+  </section>
+
+  <!-- 9 -->
+  <section class="abschnitt" id="offen">
+    <div class="titel"><span class="nr">9</span><h2>Offene Punkte zur Freigabe</h2></div>
+    <p>Alles Folgende hat eine Empfehlung. Sagen Sie nur, wenn Sie es anders möchten.</p>
+    <table class="t">
+      <thead><tr><th>#</th><th>Frage</th><th>Empfehlung</th><th>Warum</th></tr></thead>
+      <tbody>
+        <tr><td>O1</td><td><strong>Auf welchem Zweig gebaut wird.</strong> <code>main</code> ist vollständig in <code>ux-umbau</code> enthalten, <code>ux-umbau</code> hat 42 Commits mehr und ist nicht deployt. Die neuen Bausteine (<code>Dialog</code>, <code>Segment</code>, <code>Hinweis</code>) gibt es nur dort.</td><td><span class="tag">Entschieden 14.10.</span> Auf <code>ux-umbau</code> gebaut, mit den neuen Bausteinen; deployt wird zusammen mit dem Umbau. Der Backend-Teil liegt in einem eigenen Commit (<code>466662b</code>) und lässt sich bei Bedarf allein nach <code>main</code> übernehmen, damit schon Texte entstehen.</td><td>Die Funktion ist unabhängig vom Umbau und kann sofort deployt werden. Der Umbau liegt noch Pakete von der Auslieferung entfernt. Umstellen auf den Baustein ist später eine kleine Änderung (gleiche Eigenschaften).</td></tr>
+        <tr><td>O2</td><td><strong>Öffnen des Textes im Prüfprotokoll vermerken?</strong> (Wie bei „Unterlagen-Datei geöffnet“.)</td><td><span class="tag">Empfohlen</span> Nein.</td><td>Der Text enthält nichts, was HR im Vorgang nicht ohnehin sieht, und Links sind ersetzt. Ein Eintrag je Klick würde das Prüfprotokoll füllen. Bei Bedarf eine Zeile Code.</td></tr>
+        <tr><td>O3</td><td><strong>Individuelle E-Mail und Dokumentenpaket: Text auch hier speichern?</strong> Beide haben den Text bereits in eigenen Nachweistabellen (12 Monate, Mandanten-gebunden bzw. Prüfsummen).</td><td><span class="tag">Empfohlen</span> Ja, wie alle anderen (Ihre Antwort „alle außer BEM“).</td><td>Einfach und einheitlich. Der Unterschied ist nur, dass HR-Freitext zusätzlich 90 Tage im allgemeinen Versandprotokoll steht. Ausnehmen wäre eine Zeile in <code>textSpeichernErlaubt</code>; dann zeigt der Reiter dort den Text aus der Nachweistabelle.</td></tr>
+      </tbody>
+    </table>
+    <div class="kasten ok">
+      <p><strong>Umgesetzt am 14.10.2026</strong> auf <code>ux-umbau</code> (<code>466662b</code> Backend, <code>da1c62e</code> Routen und Dialog). Geprüft: <code>tsc</code>, <code>next lint</code>, alle Suites; gegen die Entwicklungsdatenbank eine Mail mit echtem Link ausgelöst (Text ohne Token, Platzhalter gesetzt, Test-Versand und BEM ohne Text), Dialog im Browser an beiden Orten, Cascade beim Löschen der Zeile.</p>
+      <p><strong>Noch offen:</strong> Mitteilung an den DSB (Abschnitt 8), Handbuch-Abschnitt zum Reiter „E-Mails“, Deploy zusammen mit dem Umbau.</p>
+    </div>
+  </section>
+
+  </main>
+</div>
+</body>
+</html>
