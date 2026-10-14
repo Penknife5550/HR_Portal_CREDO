@@ -18,33 +18,15 @@ import { NextResponse } from "next/server";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
+import { mandantDesVorgangs } from "@/lib/vorgangs-mails-dienst";
 import {
   VORGANGS_MAIL_HINWEIS,
   VORGANGS_MAIL_LIMIT,
   VORGANGS_MODULE,
   mailZeileBauen,
-  type VorgangTyp,
 } from "@/lib/vorgangs-mails";
 
 const NICHT_GEFUNDEN = "Vorgang nicht gefunden";
-
-/** Mandant des Vorgangs — `null`, wenn es ihn nicht gibt. */
-async function mandantDesVorgangs(typ: VorgangTyp, id: string): Promise<string | null> {
-  const where = { where: { id }, select: { organizationId: true } } as const;
-  const vorgang =
-    typ === "ONBOARDING"
-      ? await prisma.onboardingProcess.findUnique(where)
-      : typ === "OFFBOARDING"
-        ? await prisma.offboardingProcess.findUnique(where)
-        : typ === "CIVIL_SERVICE"
-          ? await prisma.civilServiceProcess.findUnique(where)
-          : typ === "CONTRACT_END"
-            ? await prisma.contractEndProcess.findUnique(where)
-            : typ === "ELTERNZEIT"
-              ? await prisma.elternzeitProzess.findUnique(where)
-              : await prisma.mutterschutzProzess.findUnique(where);
-  return vorgang?.organizationId ?? null;
-}
 
 export const GET = apiHandler(
   { roles: HR_EDIT_ROLES, logLabel: "Vorgang/E-Mails" },
@@ -71,6 +53,9 @@ export const GET = apiHandler(
         cc: true,
         bcc: true,
         detail: true,
+        // Nur OB es einen Text gibt, nie der Text selbst — den laedt die
+        // Textroute erst auf Klick (…/mails/[mailId]/text).
+        text: { select: { emailLogId: true } },
       },
     });
     return NextResponse.json(

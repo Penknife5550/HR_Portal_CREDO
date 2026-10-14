@@ -63,7 +63,6 @@ describe("Sperrklinke: Routen mit Zugriff auf den Vertragsende-Datensatz", () =>
     "contract-end/[id]/supervisor-link/route.ts": "Antwort aus einzelnen Feldern, ohne Link",
     "reports/contract-end/route.ts": "festes select ohne Token",
     "vertrag-formular/[token]/route.ts": "öffentliches Formular, Antwort aus einzelnen Feldern",
-    "vorgaenge/[modul]/[id]/mails/route.ts": "liest nur organizationId",
     "webhooks/contract-end/route.ts": "Antwort nur Status und Vorgangsnummer je Eintrag",
   };
 

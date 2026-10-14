@@ -3,6 +3,8 @@
  *
  * GET – Versandprotokoll (EmailLog) mit Filtern und Pagination
  *       Query: ?status=SENT|FAILED|SKIPPED&event=...&page=1
+ *       Je Zeile `textVorhanden` + `textHinweis`; der Text selbst steht
+ *       nur unter GET /api/settings/email-log/[id]/text.
  *       Aufbewahrung: Eintraege aelter als 90 Tage werden beim Abruf entfernt
  *       (emailLogAufraeumen, hoechstens einmal am Tag — primaer im Lauf „Wartung“).
  *
@@ -13,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { emailLogAufraeumen } from "@/lib/email-log-aufbewahrung";
+import { textHinweis } from "@/lib/mail-text-archiv";
 
 const ALLOWED_ROLES = ["SUPER_ADMIN", "HR_LEITUNG"];
 const PAGE_SIZE = 50;
@@ -51,12 +54,18 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
+        // Nur OB es einen Text gibt, nie der Text selbst (…/[id]/text).
+        include: { text: { select: { emailLogId: true } } },
       }),
     ]);
 
     return NextResponse.json({
       data: {
-        logs,
+        logs: logs.map(({ text, ...zeile }) => ({
+          ...zeile,
+          textVorhanden: text !== null,
+          textHinweis: textHinweis({ event: zeile.event, status: zeile.status, isTest: zeile.isTest, hatText: text !== null }),
+        })),
         total,
         page,
         pageSize: PAGE_SIZE,

@@ -120,4 +120,19 @@ describe("mailZeileBauen", () => {
   it("unbekanntes Event: der technische Name", () => {
     expect(mailZeileBauen({ ...basis, event: "freies-event", status: "SENT", detail: null }).ereignisName).toBe("freies-event");
   });
+
+  describe("Text im Protokoll", () => {
+    it("mit gespeichertem Text: Knopf moeglich, kein Hinweis — und der Text selbst steht nie in der Zeile", () => {
+      const z = mailZeileBauen({ ...basis, status: "SENT", detail: null, text: { emailLogId: "l1" } });
+      expect(z.textVorhanden).toBe(true);
+      expect(z.textHinweis).toBeNull();
+      expect(JSON.stringify(z)).not.toContain("bodyHtml");
+    });
+
+    it("ohne Text: der Grund steht als fertiger Satz da", () => {
+      expect(mailZeileBauen({ ...basis, status: "SENT", detail: null }).textHinweis).toMatch(/Einführung der Textspeicherung/);
+      expect(mailZeileBauen({ ...basis, status: "SKIPPED", detail: "x" }).textHinweis).toMatch(/nicht erzeugt/);
+      expect(mailZeileBauen({ ...basis, event: "bem-frist-erinnerung", status: "SENT", detail: null }).textHinweis).toMatch(/BEM/);
+    });
+  });
 });

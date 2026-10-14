@@ -268,9 +268,11 @@ export const MAIL_TEXT_MELDUNGEN = {
   test: "Test-Versand: Der Text wird nicht gespeichert.",
   nichtGespeichert:
     "Kein Text gespeichert: Die Mail ging vor Einführung der Textspeicherung hinaus, oder der Text konnte nicht gespeichert werden.",
+  nichtZugestelltTitel: "Nicht zugestellt",
   nichtZugestellt: "Diese Mail wurde nicht zugestellt. Angezeigt ist der Text, der hinausgehen sollte.",
+  zugangslinksTitel: "Persönliche Links sind ersetzt",
   zugangslinks:
-    "Persönliche Links sind in dieser Kopie durch einen Platzhalter ersetzt. Die Mail an die Empfängerin oder den Empfänger enthielt den echten Link. Links in dieser Ansicht sind nicht klickbar.",
+    "Die Mail enthielt den echten Link, hier steht ein Platzhalter. Links sind in dieser Ansicht nicht klickbar.",
   gekuerzt: "Der Text wurde bei 100.000 Zeichen gekürzt.",
   nichtGefunden: "Zu dieser Mail ist kein Text gespeichert.",
   ladefehler: "Der Text konnte nicht geladen werden.",

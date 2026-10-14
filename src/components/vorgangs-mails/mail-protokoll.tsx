@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatZeitpunktDE } from "@/lib/format";
 import type { VorgangsMailAntwort, VorgangsMailZeile } from "@/lib/vorgangs-mails";
+import { MailTextDialog, TextAnsehenKnopf } from "@/components/vorgangs-mails/mail-text-dialog";
 
 const STATUS_FARBE: Record<string, string> = {
   SENT: "bg-green-100 text-green-800",
@@ -96,7 +97,7 @@ export function MailProtokoll({
       {zeilen.length > 0 && (
         <div className="divide-y rounded-lg border">
           {zeilen.map((z) => (
-            <MailZeile key={z.id} z={z} />
+            <MailZeile key={z.id} z={z} modul={modul} vorgangId={vorgangId} />
           ))}
         </div>
       )}
@@ -104,8 +105,9 @@ export function MailProtokoll({
   );
 }
 
-function MailZeile({ z }: { z: VorgangsMailZeile }) {
+function MailZeile({ z, modul, vorgangId }: { z: VorgangsMailZeile; modul: string; vorgangId: string }) {
   const [offen, setOffen] = useState(false);
+  const [textOffen, setTextOffen] = useState(false);
   return (
     <div className="px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
@@ -153,6 +155,17 @@ function MailZeile({ z }: { z: VorgangsMailZeile }) {
         </button>
       )}
       {offen && z.anhang && <p className="mt-1 text-xs text-muted-foreground">{z.anhang}</p>}
+      {z.textVorhanden ? (
+        <div className="mt-2">
+          <TextAnsehenKnopf onClick={() => setTextOffen(true)} />
+          <MailTextDialog
+            quelle={textOffen ? `/api/vorgaenge/${modul}/${vorgangId}/mails/${z.id}/text` : null}
+            onSchliessen={() => setTextOffen(false)}
+          />
+        </div>
+      ) : (
+        z.textHinweis && <p className="mt-2 text-xs text-ink-2 italic">{z.textHinweis}</p>
+      )}
     </div>
   );
 }
