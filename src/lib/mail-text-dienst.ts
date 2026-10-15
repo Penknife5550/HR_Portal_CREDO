@@ -19,6 +19,7 @@ import { fehlerKennung } from "@/lib/fehler-kennung";
 import {
   MAIL_TEXT_MELDUNGEN,
   htmlFuerAnsicht,
+  linkWurdeErsetzt,
   textAusHtml,
   textFuerProtokoll,
   textSpeichernErlaubt,
@@ -73,9 +74,19 @@ export interface MailTextAntwort {
   gekuerzt: boolean;
   /** Fertiger Satz zu dieser Mail (z. B. „nicht zugestellt“); `null` = nichts zu sagen. */
   hinweis: string | null;
-  /** Fertiger Satz zu den ersetzten Links — immer derselbe, damit die Oberflaeche nichts erfindet. */
-  linkHinweis: string;
+  /**
+   * Fertiger Satz zu den ersetzten Links — nur, wenn in DIESEM Text wirklich
+   * einer ersetzt wurde (sonst `null`; die Oberflaeche zeigt dann keinen Kasten).
+   */
+  linkHinweis: string | null;
 }
+
+/**
+ * Bedingung „alle Zeilen“ fuer `mailTextLaden` — das allgemeine Versandprotokoll
+ * (Einstellungen) liest ueber alle Vorgaenge. Ausdruecklich benannt, damit ein
+ * vergessenes Argument nicht still alle Zeilen oeffnet.
+ */
+export const ALLE_ZEILEN: Record<string, never> = {};
 
 /**
  * Text einer Protokollzeile. `bedingung` wird in die Abfrage der Zeile
@@ -84,7 +95,7 @@ export interface MailTextAntwort {
  */
 export async function mailTextLaden(
   emailLogId: string,
-  bedingung: Record<string, unknown> = {},
+  bedingung: Record<string, unknown>,
 ): Promise<MailTextAntwort | null> {
   const zeile = await prisma.emailLog.findFirst({
     where: { id: emailLogId, ...bedingung },
@@ -117,6 +128,6 @@ export async function mailTextLaden(
     text: textAusHtml(bodyHtml),
     gekuerzt: zeile.text.gekuerzt,
     hinweis: zeile.status === "FAILED" ? MAIL_TEXT_MELDUNGEN.nichtZugestellt : null,
-    linkHinweis: MAIL_TEXT_MELDUNGEN.zugangslinks,
+    linkHinweis: linkWurdeErsetzt(bodyHtml) ? MAIL_TEXT_MELDUNGEN.zugangslinks : null,
   };
 }

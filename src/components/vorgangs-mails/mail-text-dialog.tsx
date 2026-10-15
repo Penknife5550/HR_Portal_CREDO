@@ -122,9 +122,11 @@ export function MailTextDialog({ quelle, onSchliessen }: MailTextDialogProps) {
           </dl>
 
           {daten.hinweis && <Hinweis ton="wait" ebene={3} titel={MAIL_TEXT_MELDUNGEN.nichtZugestelltTitel}>{daten.hinweis}</Hinweis>}
-          <Hinweis ton="info" ebene={3} titel={MAIL_TEXT_MELDUNGEN.zugangslinksTitel}>
-            {daten.linkHinweis}
-          </Hinweis>
+          {daten.linkHinweis && (
+            <Hinweis ton="info" ebene={3} titel={MAIL_TEXT_MELDUNGEN.zugangslinksTitel}>
+              {daten.linkHinweis}
+            </Hinweis>
+          )}
           {daten.gekuerzt && <Hinweis ton="info" ebene={3} titel={MAIL_TEXT_MELDUNGEN.gekuerzt} />}
 
           <Segment label="Darstellung" wert={darstellung} onWechsel={setDarstellung} optionen={DARSTELLUNGEN} />

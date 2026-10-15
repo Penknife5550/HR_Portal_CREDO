@@ -176,3 +176,12 @@ describe("Reiter „E-Mails“: Knopf und Hinweis je Zeile", () => {
     await screen.findByTitle("Text der E-Mail");
   });
 });
+
+describe("MailTextDialog: Hinweis auf ersetzte Links", () => {
+  it("zeigt den Kasten nur, wenn der Server einen Hinweis liefert", async () => {
+    fetchMock.mockReturnValue(antwort(200, { ...ANTWORT, linkHinweis: null }));
+    render(<MailTextDialog quelle={QUELLE} onSchliessen={() => {}} />);
+    await screen.findByTitle("Text der E-Mail");
+    expect(screen.queryByText("Persönliche Links sind ersetzt")).toBeNull();
+  });
+});

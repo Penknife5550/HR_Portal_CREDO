@@ -64,7 +64,13 @@ export async function GET(request: NextRequest) {
         logs: logs.map(({ text, ...zeile }) => ({
           ...zeile,
           textVorhanden: text !== null,
-          textHinweis: textHinweis({ event: zeile.event, status: zeile.status, isTest: zeile.isTest, hatText: text !== null }),
+          textHinweis: textHinweis({
+            event: zeile.event,
+            status: zeile.status,
+            isTest: zeile.isTest,
+            hatText: text !== null,
+            ohneBetreff: !zeile.subject,
+          }),
         })),
         total,
         page,

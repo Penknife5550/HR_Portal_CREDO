@@ -14,6 +14,7 @@ jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 import { NextRequest } from "next/server";
 import { GET as LISTE } from "@/app/api/settings/email-log/route";
 import { GET as TEXT } from "@/app/api/settings/email-log/[id]/text/route";
+import { ALLE_ZEILEN } from "@/lib/mail-text-dienst";
 
 const ADMIN = { userId: "u1", email: "a@example.org", role: "HR_LEITUNG", firstName: "A", lastName: "B" };
 
@@ -102,5 +103,41 @@ describe("GET /api/settings/email-log/[id]/text", () => {
     expect((await text()).status).toBe(404);
     mockPrisma.emailLog.findFirst.mockResolvedValue({ ...BASIS, event: "x", status: "SKIPPED", text: null });
     expect((await text()).status).toBe(404);
+  });
+});
+
+describe("Zusaetze der Durchsicht vom 15.10.2026", () => {
+  it("nennt fuer eine FAILED-Zeile ohne Betreff den Grund „vor dem Versand“", async () => {
+    mockPrisma.emailLog.findMany.mockResolvedValue([
+      { ...BASIS, id: "l9", event: "onboarding-created", status: "FAILED", subject: "", recipient: "", text: null },
+      { ...BASIS, id: "l10", event: "onboarding-created", status: "FAILED", subject: "Willkommen", text: null },
+    ]);
+    const json = await (await liste()).json();
+    expect(json.data.logs[0].textHinweis).toMatch(/Fehler vor dem Versand/);
+    expect(json.data.logs[1].textHinweis).toMatch(/Kein Text gespeichert/);
+  });
+
+  it("fragt den Text einer Zeile ausdruecklich ueber alle Zeilen ab (ALLE_ZEILEN, nie still)", async () => {
+    mockPrisma.emailLog.findFirst.mockResolvedValue({
+      ...BASIS,
+      event: "onboarding-created",
+      status: "SENT",
+      text: { bodyHtml: "<p>Hallo</p>", gekuerzt: false },
+    });
+    await text("log-7");
+    expect(mockPrisma.emailLog.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "log-7", ...ALLE_ZEILEN } }),
+    );
+    expect(Object.keys(ALLE_ZEILEN)).toEqual([]);
+  });
+
+  it("ohne ersetzten Link gibt es keinen Link-Hinweis", async () => {
+    mockPrisma.emailLog.findFirst.mockResolvedValue({
+      ...BASIS,
+      event: "onboarding-created",
+      status: "SENT",
+      text: { bodyHtml: "<p>Hallo</p>", gekuerzt: false },
+    });
+    expect((await (await text()).json()).linkHinweis).toBeNull();
   });
 });

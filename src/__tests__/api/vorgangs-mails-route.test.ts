@@ -97,3 +97,21 @@ it("liefert fertige Zeilen mit Grund", async () => {
   );
   expect(json.hinweis).toMatch(/90 Tagen/);
 });
+
+it.each(["__proto__", "constructor", "toString", "valueOf", "hasOwnProperty"])(
+  "der Modulname %s ist kein Modul: 404, ohne Abfrage des Protokolls",
+  async (modul) => {
+    const res = await aufruf(modul);
+    expect(res.status).toBe(404);
+    expect(mockPrisma.emailLog.findMany).not.toHaveBeenCalled();
+  },
+);
+
+it("liest nur, OB es einen Text gibt — nie den Text", async () => {
+  await aufruf("onboarding");
+  expect(mockPrisma.emailLog.findMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      select: expect.objectContaining({ text: { select: { emailLogId: true } } }),
+    }),
+  );
+});

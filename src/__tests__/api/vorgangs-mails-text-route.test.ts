@@ -138,3 +138,36 @@ it("gibt auch bei alten Skripten im gespeicherten HTML nichts Aktives aus", asyn
   const json = await (await aufruf("onboarding")).json();
   expect(json.html).not.toMatch(/<script|onclick|href=/i);
 });
+
+it.each(["__proto__", "constructor", "toString", "valueOf", "hasOwnProperty"])(
+  "der Modulname %s ist kein Modul: 404, ohne den Vorgang oder das Protokoll anzufassen",
+  async (modul) => {
+    const res = await aufruf(modul);
+    expect(res.status).toBe(404);
+    for (const m of Object.values(mockPrisma)) {
+      if ("findUnique" in m) expect(m.findUnique).not.toHaveBeenCalled();
+    }
+    expect(mockPrisma.emailLog.findFirst).not.toHaveBeenCalled();
+  },
+);
+
+it("liefert keinen Hinweis auf ersetzte Links, wenn im Text nichts ersetzt wurde", async () => {
+  mockPrisma.emailLog.findFirst.mockResolvedValue({
+    ...ZEILE,
+    text: { bodyHtml: '<p>Bitte pruefen: <a href="https://hr.fes-credo.de/vorgaenge/onboarding/abc">Vorgang</a></p>', gekuerzt: false },
+  });
+  const json = await (await aufruf("onboarding")).json();
+  expect(json.linkHinweis).toBeNull();
+  // die Adresse des behaltenen Links steht in Ansicht und Text
+  expect(json.text).toBe("Bitte pruefen: Vorgang (https://hr.fes-credo.de/vorgaenge/onboarding/abc)");
+  expect(json.html).toContain("(https://hr.fes-credo.de/vorgaenge/onboarding/abc)");
+});
+
+it("meldet den Hinweis, wenn ein Link ersetzt wurde", async () => {
+  mockPrisma.emailLog.findFirst.mockResolvedValue({
+    ...ZEILE,
+    text: { bodyHtml: '<a href="#">Fragebogen</a> [Persönlicher Link – aus Sicherheitsgründen nicht gespeichert]', gekuerzt: false },
+  });
+  const json = await (await aufruf("onboarding")).json();
+  expect(json.linkHinweis).toMatch(/Platzhalter/);
+});

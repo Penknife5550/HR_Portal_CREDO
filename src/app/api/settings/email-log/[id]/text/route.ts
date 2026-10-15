@@ -12,11 +12,11 @@
 
 import { NextResponse } from "next/server";
 import { adminHandler } from "@/lib/api-handler";
-import { mailTextLaden } from "@/lib/mail-text-dienst";
+import { ALLE_ZEILEN, mailTextLaden } from "@/lib/mail-text-dienst";
 
 export const GET = adminHandler(
   async ({ params }) => {
-    const text = await mailTextLaden(params.id);
+    const text = await mailTextLaden(params.id, ALLE_ZEILEN);
     if (!text) {
       return NextResponse.json({ error: "E-Mail nicht gefunden" }, { status: 404, headers: { "Cache-Control": "no-store" } });
     }

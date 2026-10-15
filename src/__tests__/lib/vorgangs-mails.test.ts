@@ -10,6 +10,7 @@ import {
   VORGANGS_MODULE,
   bezugAusModul,
   mailZeileBauen,
+  vorgangTypAusModul,
   vorgangBezugAusPayload,
 } from "@/lib/vorgangs-mails";
 
@@ -134,5 +135,36 @@ describe("mailZeileBauen", () => {
       expect(mailZeileBauen({ ...basis, status: "SKIPPED", detail: "x" }).textHinweis).toMatch(/nicht erzeugt/);
       expect(mailZeileBauen({ ...basis, event: "bem-frist-erinnerung", status: "SENT", detail: null }).textHinweis).toMatch(/BEM/);
     });
+  });
+});
+
+describe("vorgangTypAusModul", () => {
+  it("kennt die sechs Module", () => {
+    expect(vorgangTypAusModul("onboarding")).toBe("ONBOARDING");
+    expect(vorgangTypAusModul("contract-end")).toBe("CONTRACT_END");
+    expect(vorgangTypAusModul("mutterschutz")).toBe("MUTTERSCHUTZ");
+  });
+
+  it("kennt keine Prototyp-Schluessel und nichts Fremdes", () => {
+    for (const modul of ["__proto__", "constructor", "toString", "valueOf", "hasOwnProperty", "bem", "", "ONBOARDING"]) {
+      expect(vorgangTypAusModul(modul)).toBeUndefined();
+    }
+  });
+});
+
+describe("mailZeileBauen: FAILED ohne Betreff", () => {
+  it("nennt den Grund „vor dem Versand“, wenn die Zeile keinen Betreff hat", () => {
+    const z = mailZeileBauen({
+      id: "l2",
+      createdAt: new Date("2026-10-14T06:00:00Z"),
+      event: "employee-reminder",
+      subject: "",
+      recipient: "",
+      cc: null,
+      bcc: null,
+      status: "FAILED",
+      detail: "Boom",
+    });
+    expect(z.textHinweis).toMatch(/Fehler vor dem Versand/);
   });
 });

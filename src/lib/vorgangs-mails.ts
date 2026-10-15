@@ -113,6 +113,16 @@ export const VORGANGS_MODULE: Readonly<Record<string, VorgangTyp>> = {
   mutterschutz: "MUTTERSCHUTZ",
 };
 
+/**
+ * Vorgangsart zu einem Modulnamen aus der Adresse — `undefined`, wenn es das
+ * Modul nicht gibt. NUR eigene Schluessel zaehlen: `VORGANGS_MODULE["__proto__"]`
+ * oder `["constructor"]` liefert sonst einen Wert, und der Filter der
+ * Abfrage bekaeme ein Objekt statt einer Vorgangsart.
+ */
+export function vorgangTypAusModul(modul: string): VorgangTyp | undefined {
+  return Object.prototype.hasOwnProperty.call(VORGANGS_MODULE, modul) ? VORGANGS_MODULE[modul] : undefined;
+}
+
 // ---------------------------------------------
 // Zeilen fuer den Reiter
 // ---------------------------------------------
@@ -185,6 +195,6 @@ export function mailZeileBauen(log: {
     anhang: gesendet ? log.detail || null : null,
     textVorhanden: hatText,
     // Der Reiter liest nie Test-Versand (isTest: false in der Abfrage).
-    textHinweis: textHinweis({ event: log.event, status: log.status, hatText }),
+    textHinweis: textHinweis({ event: log.event, status: log.status, hatText, ohneBetreff: !log.subject }),
   };
 }

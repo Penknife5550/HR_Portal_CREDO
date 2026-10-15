@@ -22,8 +22,8 @@ import { mandantDesVorgangs } from "@/lib/vorgangs-mails-dienst";
 import {
   VORGANGS_MAIL_HINWEIS,
   VORGANGS_MAIL_LIMIT,
-  VORGANGS_MODULE,
   mailZeileBauen,
+  vorgangTypAusModul,
 } from "@/lib/vorgangs-mails";
 
 const NICHT_GEFUNDEN = "Vorgang nicht gefunden";
@@ -31,7 +31,7 @@ const NICHT_GEFUNDEN = "Vorgang nicht gefunden";
 export const GET = apiHandler(
   { roles: HR_EDIT_ROLES, logLabel: "Vorgang/E-Mails" },
   async ({ params, session }) => {
-    const typ = VORGANGS_MODULE[params.modul];
+    const typ = vorgangTypAusModul(params.modul);
     if (!typ) return NextResponse.json({ error: NICHT_GEFUNDEN }, { status: 404 });
 
     const mandant = await mandantDesVorgangs(typ, params.id);
