@@ -1664,7 +1664,7 @@ Blickwinkel; Skripte und Server der Prüfer wurden anschließend geprüft und si
   Plan, CLAUDE.md. Bilder entstanden mit Puppeteer gegen die Entwicklungsdatenbank (Beispieldaten
   `beispiel.invalid`, danach gelöscht).
 - **Geprüft:** komplette Suite 210 Suites / 5782 Tests, `tsc`, `next lint` für die geänderten
-  Dateien. Nicht gepusht, nicht deployt.
+  Dateien. Am 15.10.2026 nach ausdrücklicher Freigabe gepusht (`ux-umbau` `e8e4571..7e815f0`, darunter die zuvor lokal gebliebenen Commits `7ebb336` und `150b2b1`); nicht deployt.
 - **Offen:** DSB-Mitteilung abstimmen (Fragen a bis e); ob `466662b` und `e68d692` früh nach `main`
   sollen, damit schon Texte entstehen (Schema +1 Tabelle).
 
@@ -1730,3 +1730,5 @@ enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
 
 Gepusht nach Freigabe: am 01.10.2026 `main` bis `b6e1c8a` und `ux-umbau` bis `7511540`; am 02.10.2026 `ux-umbau` bis `9f9ceac` (U0 Tag 3 bis 6, U1 vollständig, vier Durchsichten). Nicht deployt; ein Deploy von `main` bringt neben der Checklisten-Änderung auch Paket 3 mit (zwei neue Tabellen). Am 05.10.2026 gepusht: `ux-umbau` bis einschließlich des Logbuch-Commits vom 05.10.2026 (Feinplan des Pilots `f87fb38`, Pilot Tag 1 `9d6baf4`, fünfte Durchsicht `5975909`, Pilot Tag 2 `61b817f`). Am 06.10.2026 gepusht: `main` bis `aea163a` (Token-Fix Vertragsende, `tageZwischen`) und `ux-umbau` bis einschließlich des Commits „Pilot Tag 3, erster Teil“ (beide Merges von `main` darin). Am 07.10.2026 gepusht: `ux-umbau` bis einschließlich des Commits „Pilot Tag 3 Rest bis 5“ (`fc33b53`) und danach der Commit „Prototyp-Tag vorbereitet“. Am 08.10.2026 gepusht (Auftrag „so machen wie im Plan“): der Merge `2325435` und der Commit „Versandergebnis angeschlossen“ (`5dd1f16`), danach die Befunde des Codereviews (`a56e4a1`) und die Übergabe vor dem Neustart. Uncommittet bleiben der LOGA-Abschnitt in `docs/README.md` und
 `docs/module/loga/` (eigener Strang).
+
+Am 15.10.2026 gepusht: `ux-umbau` bis `7e815f0` (Mailtext im Versandprotokoll samt zwei Durchsichten, Handbuch, DSB-Papier; vorher `e8e4571`). Nicht deployt. Uncommittet blieben `docs/README.md` und `docs/module/loga/` (LOGA-Strang).
