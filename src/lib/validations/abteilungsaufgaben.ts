@@ -2,10 +2,14 @@
  * Validierung: Abteilungsaufgaben (Paket 1b, erweitert in Paket 5)
  *
  *   - abteilungsAktionSchema        POST  /api/offboarding/[id]/department-links
- *                                   POST  /api/onboarding/[id]/abteilungen (Paket 5, dieselbe Form)
+ *   - onboardingAbteilungsAktionSchema POST /api/onboarding/[id]/abteilungen (Paket 5, dieselbe
+ *                                   Form; seit Paket A3 zusaetzlich `nachtrag` und `absage`)
  *   - aufgabeLinkPatchSchema        PATCH /api/offboarding-tasks/[token]/[itemId]  (oeffentlich)
  *                                   PATCH /api/onboarding-tasks/[token]/[itemId]   (oeffentlich, Paket 5)
- *   - portalAufgabePatchSchema      PATCH /api/offboarding/[id]/checklist/[itemId]
+ *   - offboardingAufgabeLinkPatchSchema  dieselben Felder plus `zustand` (A4, G15) — loest
+ *                                   aufgabeLinkPatchSchema fuer den Offboarding-Link ab, sobald
+ *                                   `oeffentlichAendern` das Schema nach Modul waehlt (S30)
+ *   - portalAufgabePatchSchema      PATCH /api/offboarding/[id]/checklist/[itemId] (seit A4 mit `zustand`)
  *   - onboardingPortalAufgabePatchSchema  PATCH /api/onboarding/[id]/checklist/[itemId] (Paket 5)
  *   - abteilungConfigSchema         POST  /api/settings/departments
  *   - abteilungConfigUpdateSchema   PATCH /api/settings/departments/[id]
@@ -14,6 +18,8 @@
  *   - checklistenPunktSchema,
  *     checklistenVorlageSchema,
  *     checklistenFehlerMeldung      Checklisten-Vorlagen (/api/checklisten…, Paket 5)
+ *   - schluesselFeld                Form eines Abteilungsschluessels (auch Katalog
+ *                                   „Ausstattung & Zugänge", validations/ausstattung.ts)
  *
  * Alle Meldungen deutsch; die Routen geben `error.errors[0].message` als
  * `{ error }` mit 400 zurueck (Muster der uebrigen Routen).
@@ -22,6 +28,7 @@
 import { z } from "zod";
 import { RESERVIERTE_ABTEILUNGSSCHLUESSEL, PORTAL_ZUSTAENDIGE } from "@/lib/constants";
 import { ABTEILUNGS_SCHLUESSEL_MUSTER, KOMMENTAR_MAX, MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { MELDUNGEN_AUSGABEN, RUECKGABE_ZUSTAENDE, RUECKGABE_ZUSTAENDE_STELLE } from "@/lib/ausgaben";
 
 /** RFC 5321: Eine Adresse ist hoechstens 254 Zeichen lang. */
 const MAX_EMAIL_LAENGE = 254;
@@ -30,8 +37,10 @@ const MAX_EMAIL_LAENGE = 254;
  * Keine spitzen Klammern und keine Steuerzeichen (auch CR/LF) — dieselbe Regel
  * wie fuer Namen in validations/onboarding.ts. Abteilungs- und
  * Fuehrungskraft-Namen landen in Mails, im HTML-Teil ohne Maskierung.
+ * Exportiert seit A4 fuer die Kennung einer Ausgabe (validations/ausgaben.ts),
+ * damit es keine zweite Fassung der Regel gibt.
  */
-const OHNE_KLAMMERN_STEUERZEICHEN = /^[^<>\p{Cc}]*$/u;
+export const OHNE_KLAMMERN_STEUERZEICHEN = /^[^<>\p{Cc}]*$/u;
 
 /**
  * Kein JSON-Objekt (leerer oder kaputter Body, den die Route als `undefined`
@@ -61,7 +70,13 @@ export function meldungReservierterSchluessel(schluessel: string): string {
   return `Der Schlüssel „${schluessel}“ ist reserviert: ${RESERVIERT_BEGRUENDUNG[schluessel] ?? "Er kann nicht angelegt werden."}`;
 }
 
-const schluesselFeld = z
+/**
+ * Abteilungsschluessel: getrimmt, Pflicht, Form nach ABTEILUNGS_SCHLUESSEL_MUSTER.
+ * Ob er bekannt oder reserviert ist, pruefen die Aufrufer selbst. Exportiert
+ * fuer den Katalog „Ausstattung & Zugänge" (validations/ausstattung.ts), damit
+ * es fuer die Stelle einer Position keine zweite Fassung der Regel gibt.
+ */
+export const schluesselFeld = z
   .string({ required_error: "Bitte einen Schlüssel angeben.", invalid_type_error: "Bitte einen Schlüssel angeben." })
   .trim()
   .min(1, "Bitte einen Schlüssel angeben.")
@@ -78,38 +93,69 @@ const linkSchluesselFeld = schluesselFeld.refine(
 );
 
 /**
- * Aktion der Versandroute.
- *
- * Leerer Body (oder `{}`) heisst "informieren". Der alte Aufruf
- * `{ action: "remind", departmentKey }` bleibt gueltig und heisst "erinnern".
- * Die Vorverarbeitung macht aus beidem die neue Form `{ aktion, departmentKey }`.
+ * Vorverarbeitung beider Aktions-Schemata: Leerer Body (oder `{}`) heisst
+ * "informieren". Der alte Aufruf `{ action: "remind", departmentKey }` bleibt
+ * gueltig und heisst "erinnern". Daraus wird die Form `{ aktion, departmentKey }`.
+ */
+function aktionVorverarbeiten(roh: unknown): unknown {
+  if (roh === undefined || roh === null) return { aktion: "informieren" };
+  if (typeof roh !== "object" || Array.isArray(roh)) return roh;
+  const r = roh as Record<string, unknown>;
+  if (r.aktion === undefined && r.action === "remind") {
+    return { aktion: "erinnern", departmentKey: r.departmentKey };
+  }
+  if (r.aktion === undefined && r.action === undefined) {
+    return { ...r, aktion: "informieren" };
+  }
+  return r;
+}
+
+const UNBEKANNTE_AKTION = { errorMap: () => ({ message: "Unbekannte Aktion." }) };
+
+const INFORMIEREN = z.object({ aktion: z.literal("informieren") });
+const ERNEUT_SENDEN = z.object({ aktion: z.literal("erneut-senden"), departmentKey: linkSchluesselFeld });
+const ERINNERN = z.object({ aktion: z.literal("erinnern"), departmentKey: linkSchluesselFeld });
+const LINK_ERNEUERN = z.object({ aktion: z.literal("link-erneuern"), departmentKey: linkSchluesselFeld });
+/** Ausstattung & Zugaenge (Regel 10): nur im Onboarding. */
+const NACHTRAG = z.object({ aktion: z.literal("nachtrag"), departmentKey: linkSchluesselFeld });
+/**
+ * Ausstattung & Zugaenge (E-A20): Absage an ALLE informierten Stellen, nur im
+ * Onboarding und nur bei EXPIRED (das prueft der Adapter, 409 `NICHT_ABGESAGT`).
+ * Ohne `departmentKey` — ein mitgeschickter wird verworfen.
+ */
+const ABSAGE = z.object({ aktion: z.literal("absage") });
+
+/**
+ * Aktion der Versandroute im OFFBOARDING (POST …/department-links) —
+ * unveraendert seit Paket 1b. `nachtrag` und `absage` kennt es nicht: 400
+ * „Unbekannte Aktion.“ (Feinplan 1.4).
  */
 export const abteilungsAktionSchema = z.preprocess(
-  (roh) => {
-    if (roh === undefined || roh === null) return { aktion: "informieren" };
-    if (typeof roh !== "object" || Array.isArray(roh)) return roh;
-    const r = roh as Record<string, unknown>;
-    if (r.aktion === undefined && r.action === "remind") {
-      return { aktion: "erinnern", departmentKey: r.departmentKey };
-    }
-    if (r.aktion === undefined && r.action === undefined) {
-      return { ...r, aktion: "informieren" };
-    }
-    return r;
-  },
+  aktionVorverarbeiten,
+  z.discriminatedUnion("aktion", [INFORMIEREN, ERNEUT_SENDEN, ERINNERN, LINK_ERNEUERN], UNBEKANNTE_AKTION),
+);
+
+/**
+ * Aktion der Versandroute im ONBOARDING (POST /api/onboarding/[id]/abteilungen):
+ * dieselben Aktionen plus `{ aktion: "nachtrag", departmentKey }` (Ausstattung
+ * & Zugaenge, Regel 10 — die Aenderungen nach der Information an die Stelle)
+ * und `{ aktion: "absage" }` (E-A20 — nach EXPIRED an alle informierten Stellen).
+ */
+export const onboardingAbteilungsAktionSchema = z.preprocess(
+  aktionVorverarbeiten,
   z.discriminatedUnion(
     "aktion",
-    [
-      z.object({ aktion: z.literal("informieren") }),
-      z.object({ aktion: z.literal("erneut-senden"), departmentKey: linkSchluesselFeld }),
-      z.object({ aktion: z.literal("erinnern"), departmentKey: linkSchluesselFeld }),
-      z.object({ aktion: z.literal("link-erneuern"), departmentKey: linkSchluesselFeld }),
-    ],
-    { errorMap: () => ({ message: "Unbekannte Aktion." }) },
+    [INFORMIEREN, ERNEUT_SENDEN, ERINNERN, LINK_ERNEUERN, NACHTRAG, ABSAGE],
+    UNBEKANNTE_AKTION,
   ),
 );
 
-export type AbteilungsAktionInput = z.infer<typeof abteilungsAktionSchema>;
+/**
+ * Eine gepruefte Aktion — die BREITERE Form beider Schemata (mit `nachtrag` und `absage`).
+ * Der Versandkern nimmt sie fuer beide Module; das Offboarding-Schema liefert
+ * nur eine Teilmenge davon.
+ */
+export type AbteilungsAktionInput = z.infer<typeof onboardingAbteilungsAktionSchema>;
 
 // =============================================
 // PATCH /api/offboarding-tasks/[token]/[itemId] (oeffentlich)
@@ -125,24 +171,57 @@ export type AbteilungsAktionInput = z.infer<typeof abteilungsAktionSchema>;
  * Mindestens eins von beidem muss eine Aenderung tragen. `notes` (die interne
  * HR-Notiz) nimmt das Schema gar nicht erst an — zod wirft unbekannte Felder weg.
  */
+const aufgabeLinkFelder = {
+  isCompleted: z.boolean({ invalid_type_error: "isCompleted muss wahr oder falsch sein." }).optional(),
+  comment: z
+    .string({ invalid_type_error: "Der Kommentar muss ein Text sein." })
+    .trim()
+    .max(KOMMENTAR_MAX, `Der Kommentar darf höchstens ${KOMMENTAR_MAX} Zeichen lang sein.`)
+    .nullable()
+    .optional(),
+};
+
+const STATUS_ODER_KOMMENTAR = {
+  pruefen: (d: { isCompleted?: boolean; comment?: string | null }) =>
+    d.isCompleted !== undefined || (d.comment !== undefined && d.comment !== null),
+  meldung: { message: "Bitte Status oder Kommentar angeben." },
+};
+
+/**
+ * Bleibt fuer den ONBOARDING-Link unveraendert (ein mitgeschickter `zustand`
+ * faellt still weg). Der Offboarding-Link bekommt mit A4
+ * `offboardingAufgabeLinkPatchSchema` (`oeffentlichAendern` waehlt nach Modul).
+ */
 export const aufgabeLinkPatchSchema = z
+  .object(aufgabeLinkFelder, KEIN_OBJEKT)
+  .refine(STATUS_ODER_KOMMENTAR.pruefen, STATUS_ODER_KOMMENTAR.meldung);
+
+export type AufgabeLinkPatchInput = z.infer<typeof aufgabeLinkPatchSchema>;
+
+/**
+ * Link der Stelle im OFFBOARDING (Ausstattung & Zugaenge, A4, G15): dieselben
+ * Felder plus `zustand` (ZURUECK, BESCHAEDIGT, FEHLT – mehr waehlt die Stelle
+ * nicht, 1.2). Ein Zustand heisst „erledigt“ und kommt deshalb nur mit
+ * `isCompleted: true`. `isCompleted: true` OHNE Zustand bleibt gueltig: An
+ * einer Ruecknahmeaufgabe heisst das ZURUECK (Dienst, G15); ob ein Zustand an
+ * der Aufgabe ueberhaupt passt, prueft ebenfalls der Dienst (400).
+ */
+export const offboardingAufgabeLinkPatchSchema = z
   .object(
     {
-      isCompleted: z.boolean({ invalid_type_error: "isCompleted muss wahr oder falsch sein." }).optional(),
-      comment: z
-        .string({ invalid_type_error: "Der Kommentar muss ein Text sein." })
-        .trim()
-        .max(KOMMENTAR_MAX, `Der Kommentar darf höchstens ${KOMMENTAR_MAX} Zeichen lang sein.`)
-        .nullable()
+      ...aufgabeLinkFelder,
+      zustand: z
+        .enum(RUECKGABE_ZUSTAENDE_STELLE, { errorMap: () => ({ message: MELDUNGEN_AUSGABEN.ZUSTAND_UNBEKANNT }) })
         .optional(),
     },
     KEIN_OBJEKT,
   )
-  .refine((d) => d.isCompleted !== undefined || (d.comment !== undefined && d.comment !== null), {
-    message: "Bitte Status oder Kommentar angeben.",
+  .refine(STATUS_ODER_KOMMENTAR.pruefen, STATUS_ODER_KOMMENTAR.meldung)
+  .refine((d) => d.zustand === undefined || d.isCompleted === true, {
+    message: MELDUNGEN_AUSGABEN.ZUSTAND_NUR_ERLEDIGT,
   });
 
-export type AufgabeLinkPatchInput = z.infer<typeof aufgabeLinkPatchSchema>;
+export type OffboardingAufgabeLinkPatchInput = z.infer<typeof offboardingAufgabeLinkPatchSchema>;
 
 // =============================================
 // PATCH /api/offboarding/[id]/checklist/[itemId] (Portal)
@@ -156,11 +235,19 @@ export type AufgabeLinkPatchInput = z.infer<typeof aufgabeLinkPatchSchema>;
  *   assigneeDepartment  Schluessel (Form wie oben) oder null = keine Zustaendigkeit.
  *                       Ob der Schluessel BEKANNT ist, prueft der Dienst
  *                       (Konstanten + Einstellungen → Abteilungen).
+ *   zustand             seit A4 (G15): Rueckgabezustand einer Ruecknahmeaufgabe,
+ *                       alle fuenf (HR). Allein gueltig (Zustandswechsel an einer
+ *                       schon erledigten Aufgabe, etwa ZURUECK → FEHLT), aber nie
+ *                       zusammen mit `isCompleted: false` – ein Zustand heisst
+ *                       „erledigt“. Ob er an der Aufgabe passt, prueft der Dienst.
  */
 export const portalAufgabePatchSchema = z
   .object(
     {
       isCompleted: z.boolean({ invalid_type_error: "isCompleted muss wahr oder falsch sein." }).optional(),
+      zustand: z
+        .enum(RUECKGABE_ZUSTAENDE, { errorMap: () => ({ message: MELDUNGEN_AUSGABEN.ZUSTAND_UNBEKANNT }) })
+        .optional(),
       notes: z
         .string({ invalid_type_error: "Die Notiz muss ein Text sein." })
         .max(2000, "Die Notiz darf höchstens 2000 Zeichen lang sein.")
@@ -180,9 +267,16 @@ export const portalAufgabePatchSchema = z
     KEIN_OBJEKT,
   )
   .refine(
-    (d) => d.isCompleted !== undefined || d.notes !== undefined || d.assigneeDepartment !== undefined,
+    (d) =>
+      d.isCompleted !== undefined ||
+      d.notes !== undefined ||
+      d.assigneeDepartment !== undefined ||
+      d.zustand !== undefined,
     { message: "Mindestens ein Feld erforderlich." },
-  );
+  )
+  .refine((d) => d.zustand === undefined || d.isCompleted !== false, {
+    message: MELDUNGEN_AUSGABEN.ZUSTAND_NUR_ERLEDIGT,
+  });
 
 export type PortalAufgabePatchInput = z.infer<typeof portalAufgabePatchSchema>;
 
@@ -296,9 +390,13 @@ export const fuehrungskraftAenderungFelder = {
 // PATCH /api/onboarding/[id]/checklist/[itemId] (Portal, Paket 5)
 // =============================================
 
-/** Datum als YYYY-MM-DD mit Rueckprobe (kein 31.02.). */
+/**
+ * Datum als YYYY-MM-DD mit Rueckprobe (kein 31.02.). Exportiert fuer die Karte
+ * „Ausstattung & Zugänge" (validations/ausstattung.ts) — dieselbe Regel fuer
+ * die Faelligkeit dort wie im Portal-PATCH.
+ */
 const TAGESDATUM = /^\d{4}-\d{2}-\d{2}$/;
-function tagesdatumGueltig(text: string): boolean {
+export function tagesdatumGueltig(text: string): boolean {
   if (!TAGESDATUM.test(text)) return false;
   const d = new Date(`${text}T00:00:00.000Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === text;

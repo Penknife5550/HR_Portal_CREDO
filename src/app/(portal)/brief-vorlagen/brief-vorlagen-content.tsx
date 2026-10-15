@@ -2,7 +2,12 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { VariablenKatalog } from "@/components/variablen-katalog";
-import { AVAILABLE_MODULES, moduleLabel } from "@/lib/placeholder-catalog";
+import {
+  AVAILABLE_MODULES,
+  eingabePlatzhalter,
+  moduleLabel,
+  vorlagenListen,
+} from "@/lib/placeholder-catalog";
 import { formatBytes } from "@/lib/format";
 import {
   filterVorlagen,
@@ -11,6 +16,7 @@ import {
   GELTUNG_GLOBAL,
   GELTUNG_MANDANT,
   MODUL_ALLE,
+  SYSTEM_VORLAGE_MODUL_FEST,
 } from "@/lib/brief-vorlagen-filter";
 
 interface User {
@@ -39,6 +45,8 @@ interface Template {
   platzhalter: string[];
   organizationId: string | null;
   isActive: boolean;
+  /** System-Vorlage (Seed-Check): Das Modul ist fest. */
+  isSystem?: boolean;
   createdAt: string;
   updatedAt: string;
   organization: { name: string; mandantNumber: string } | null;
@@ -582,6 +590,10 @@ function EditModal({
   );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  // Das Modul einer System-Vorlage ist fest (Review A4d, G19): Das Feld ist
+  // gesperrt und wird gar nicht erst geschickt; die Route weist eine
+  // Aenderung ohnehin mit 409 ab.
+  const modulFest = template.isSystem === true;
 
   async function handleSubmit() {
     setErr("");
@@ -593,7 +605,7 @@ function EditModal({
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          modul,
+          ...(modulFest ? {} : { modul }),
           organizationId: organizationId || null,
         }),
       });
@@ -636,10 +648,15 @@ function EditModal({
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium">Modul</label>
+            <label htmlFor="vorlage-modul" className="text-sm font-medium">
+              Modul
+            </label>
             <select
+              id="vorlage-modul"
               value={modul}
               onChange={(e) => setModul(e.target.value)}
+              disabled={modulFest}
+              aria-describedby={modulFest ? "vorlage-modul-fest" : undefined}
               className={INPUT_CLASS}
             >
               {AVAILABLE_MODULES.map((m) => (
@@ -648,6 +665,11 @@ function EditModal({
                 </option>
               ))}
             </select>
+            {modulFest && (
+              <p id="vorlage-modul-fest" className="mt-1 text-xs text-muted-foreground">
+                {SYSTEM_VORLAGE_MODUL_FEST}
+              </p>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium">Mandant</label>
@@ -708,6 +730,14 @@ function GenerateModal({
   const [mailMessage, setMailMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+
+  // Eingabefelder nur fuer einfache Platzhalter — Listen und ihre inneren
+  // Namen (z.B. {ausgabe_kennung}) fuellt der Resolver (A4, S33).
+  const eingabeFelder = useMemo(() => eingabePlatzhalter(template.platzhalter), [template.platzhalter]);
+  const listen = useMemo(
+    () => vorlagenListen(template.platzhalter, template.modul),
+    [template.platzhalter, template.modul],
+  );
 
   function setVal(key: string, v: string) {
     setValues((prev) => ({ ...prev, [key]: v }));
@@ -861,7 +891,7 @@ function GenerateModal({
           </div>
         </div>
 
-        {template.platzhalter.length > 0 && (
+        {eingabeFelder.length > 0 && (
           <div>
             <label className="mb-1 block text-sm font-medium">
               Platzhalter befuellen
@@ -871,10 +901,13 @@ function GenerateModal({
               „___“ markiert.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              {template.platzhalter.map((p) => (
+              {eingabeFelder.map((p) => (
                 <div key={p}>
-                  <label className="text-xs text-muted-foreground">{p}</label>
+                  <label htmlFor={`platzhalter-${p}`} className="text-xs text-muted-foreground">
+                    {p}
+                  </label>
                   <input
+                    id={`platzhalter-${p}`}
                     value={values[p] || ""}
                     onChange={(e) => setVal(p, e.target.value)}
                     className={INPUT_CLASS}
@@ -882,6 +915,18 @@ function GenerateModal({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Listen (A4, S33) fuellt der Resolver aus dem Vorgang; ihre inneren
+            Namen sind keine Eingabefelder, und ein Handwert ersetzte sie nie. */}
+        {listen.length > 0 && (
+          <div className="rounded-lg border border-border p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">Listen aus dem Vorgang</p>
+            <p className="mt-1">
+              {listen.map((l) => l.label).join(" · ")} — werden mit der Bezug-/Ref-ID
+              aus dem Vorgang gefüllt und lassen sich hier nicht von Hand eintragen.
+            </p>
           </div>
         )}
 

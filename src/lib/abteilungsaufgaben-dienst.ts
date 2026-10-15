@@ -17,6 +17,16 @@
  *                                                 fuehrungskraftAdresseFreigegeben
  *   POST /api/offboarding                       → fuehrungskraftAdresseFreigegeben
  *   POST /api/cron/offboarding-reminders        → erinnerungenSenden
+ *   POST /api/offboarding/[id]/einstellung      → versandSperreNehmen(offboardingVersandBereich)
+ *                                                 (A4, G26; src/lib/offboarding-ausgaben.ts)
+ *
+ * Empfaenger im Offboarding (seit A4, G12): der Arbeitsort am Austritt, sonst
+ * die Einrichtung (`empfaengerEinrichtung`) — in Versand, Erinnerung,
+ * Uebersicht und Karte; Mandant und Mailfeld `einrichtung` bleiben
+ * `organizationId`. Seit S29 (G14) nennt die Uebersicht je Stelle die
+ * Aufgaben, die nach der Information dazukamen (`nachInfoNeuZaehlen`:
+ * Ruecknahme- und Sperraufgaben aus „Einstellung zuordnen …“) — einen
+ * Nachtrag gibt es im Offboarding nicht, „Erneut senden“ nimmt sie mit.
  *
  * MODULKERN (Paket 5). Was je Modul verschieden ist, steckt in einem
  * `VersandModul` (Vorgang, Fuehrungskraft, gemeinsame Mailfelder, Zusatzfelder
@@ -26,7 +36,17 @@
  * fuer beide Module in derselben Tabelle (offboardingId ODER onboardingId,
  * `LinkBereich` in -uebergaenge.ts). Der eigentliche Versand (informieren,
  * erneut senden, erinnern, Link erneuern, taeglicher Lauf) ist EIN Code fuer
- * beide Module.
+ * beide Module. Nur im Onboarding (Ausstattung & Zugaenge, Paket A3) kommt
+ * „Nachtrag senden“ dazu (Regel 10): eine Zuweisungsmail im Modus NACHTRAG
+ * mit gleichem Token; die offene Aenderungsliste der Stelle
+ * (`VersandModul.nachtraegeLaden`) geht in JEDE Zuweisungsmail mit und wird
+ * bei SENT als gesendet markiert (F7). Im Offboarding fehlen Lader, Felder
+ * und Aktion ganz. Ebenso nur im Onboarding: die Absage nach EXPIRED (E-A20,
+ * `absage`) — eine Mail ohne Link an jede informierte Stelle (an die Adresse,
+ * die informiert wurde, F16: `absageEmpfaenger`) mit ihren erledigten
+ * Aufgaben (F17) und — seit A4 (G10) — den Stuecken, die sie laut Portal
+ * noch ausgegeben hat (`VersandModul.absageAusgabenLaden`), einmal je Stelle
+ * (`abgesagtAm`, F13, nur bei SENT).
  *
  * Ablauf eines Versands je Abteilung (Nachweis nur nach echtem Versand):
  *   1. Link anlegen bzw. anpassen (Token nur beim Anlegen oder bei
@@ -34,7 +54,8 @@
  *   2. Mail ueber triggerWebhooks — NACH dem Schreiben des Links, damit die
  *      Mail nie einen Token enthaelt, den es nicht gibt.
  *   3. Ergebnis am Link festhalten: SENT/WEBHOOK setzen sentAt (einmal) und
- *      lastSentAt, FAILED/SKIPPED nur lastSendStatus/-Detail — mit NEUEM Token
+ *      lastSentAt (WEBHOOK nur im Offboarding, siehe webhookAktiv),
+ *      FAILED/SKIPPED nur lastSendStatus/-Detail — mit NEUEM Token
  *      zusaetzlich sentAt = null (der neue Link ist nie angekommen). Laeuft die
  *      Anfrage in einen Proxy-Timeout, steht der Stand trotzdem je Link in der
  *      Datenbank und die Karte zeigt ihn beim naechsten Laden.
@@ -50,6 +71,7 @@ import crypto from "crypto";
 import type { OffboardingDepartmentLink, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { triggerWebhooks } from "@/lib/webhooks";
+import { webhooksGesperrt } from "@/lib/ereignis-liste";
 import { abteilungsAufgabenLink, offboardingMailFelder } from "@/lib/offboarding-mail";
 import { onboardingAufgabenLink } from "@/lib/onboarding-abteilung-mail";
 import { canAccessProcess, HR_EDIT_ROLES, type SessionPayload } from "@/lib/permissions";
@@ -57,14 +79,20 @@ import { ladeErlaubteDomains, empfaengerFreigegeben } from "@/lib/empfaenger-all
 import {
   ABTEILUNGS_AUDIT,
   MELDUNGEN,
+  absageEmpfaenger,
+  absageInformiert,
+  absageOffen,
   abteilungsReihenfolge,
   abteilungsZeilenBauen,
   adresseGleich,
   aufgabenlisteMailFelder,
   berichtMeldung,
+  eiltDeckeln,
   empfaengerAufloesen,
+  empfaengerEinrichtung,
   erinnerungsMerkerSetzen,
   erinnerungsStufe,
+  erledigteListeMailFelder,
   erledigtVonBestimmen,
   faelligkeitVerschoben,
   grundText,
@@ -74,6 +102,8 @@ import {
   istLinkAbteilung,
   linkAnzeige,
   meldungNachweisFehlt,
+  nachInfoNeuZaehlen,
+  nachtragAnzahl,
   sperrzeitBis,
   stufeBerechnen,
   stufenMailFelder,
@@ -100,12 +130,26 @@ import {
 } from "@/lib/abteilungsaufgaben";
 import { abteilungsAktionSchema, type AbteilungsAktionInput } from "@/lib/validations/abteilungsaufgaben";
 import {
+  KEINE_ANGABEN,
+  LEERER_NACHTRAG,
+  angabenMailFelder,
+  nachtragMailFelder,
+  type AngabenFuerStelle,
+} from "@/lib/ausstattung";
+import {
+  ausstattungZuAufgabenLaden,
+  bemerkungFuerStelle,
+  type AusstattungZuAufgabe,
+  type OffeneAenderungen,
+} from "@/lib/ausstattung-daten";
+import {
   auditBezug,
   linkBereichWhere,
   linkEindeutig,
   linksSperren,
   type LinkBereich,
 } from "@/lib/abteilungsaufgaben-uebergaenge";
+import { ausgabenListeMailFelder, type MailStueck } from "@/lib/ausgaben";
 
 // =============================================
 // Konstanten
@@ -118,9 +162,20 @@ export function vorgangBeendet(status: string): boolean {
   return (OFFBOARDING_ENDSTATUS as readonly string[]).includes(status);
 }
 
+/**
+ * Absage an die informierten Stellen (Onboarding, E-A20). Laeuft ueber
+ * triggerWebhooks, steht aber in EVENTS_OHNE_WEBHOOK (F18): nur Mail, nie ein
+ * Webhook — die Payload nennt erledigte Aufgaben und die Person.
+ */
+export const ONBOARDING_ABSAGE_EVENT = "onboarding-department-abgesagt";
+
 /** Was je Modul fest ist (Ereignisse, Link-Adresse, Protokoll, Log). */
 interface ModulKonfig {
-  events: { zugewiesen: string; erinnerung: string };
+  /**
+   * `abgesagt` nur im Onboarding (Absage nach EXPIRED, E-A20); im Offboarding
+   * `null` — dort gibt es die Aktion nicht (das Schema kennt sie nicht).
+   */
+  events: { zugewiesen: string; erinnerung: string; abgesagt: string | null };
   linkUrl: (token: string) => string;
   /**
    * `token` im Payload von *-department-assigned: Im Offboarding lesen
@@ -134,14 +189,18 @@ interface ModulKonfig {
 
 const MODUL_KONFIG: Record<AbteilungsModul, ModulKonfig> = {
   OFFBOARDING: {
-    events: { zugewiesen: "offboarding-department-assigned", erinnerung: "offboarding-reminder" },
+    events: { zugewiesen: "offboarding-department-assigned", erinnerung: "offboarding-reminder", abgesagt: null },
     linkUrl: abteilungsAufgabenLink,
     tokenImPayload: true,
     auditErinnertCron: ABTEILUNGS_AUDIT.ERINNERT_CRON,
     logPraefix: "[Offboarding-Reminders]",
   },
   ONBOARDING: {
-    events: { zugewiesen: "onboarding-department-assigned", erinnerung: "onboarding-department-reminder" },
+    events: {
+      zugewiesen: "onboarding-department-assigned",
+      erinnerung: "onboarding-department-reminder",
+      abgesagt: ONBOARDING_ABSAGE_EVENT,
+    },
     linkUrl: onboardingAufgabenLink,
     tokenImPayload: false,
     auditErinnertCron: ABTEILUNGS_AUDIT.ERINNERT_CRON_ONBOARDING,
@@ -154,11 +213,17 @@ export function modulLinkUrl(modul: AbteilungsModul, token: string): string {
   return MODUL_KONFIG[modul].linkUrl(token);
 }
 
-/** Felder des Vorgangs, die Versand und Mails brauchen. */
+/**
+ * Felder des Vorgangs, die Versand und Mails brauchen. `arbeitsortId` (A4,
+ * G12): Empfaenger der Aufgaben ist der Arbeitsort am Austritt, sonst die
+ * Einrichtung (`empfaengerEinrichtung`); das Mailfeld `einrichtung` und der
+ * Mandant bleiben `organizationId`.
+ */
 const VORGANG_AUSWAHL = {
   id: true,
   displayId: true,
   organizationId: true,
+  arbeitsortId: true,
   status: true,
   employeeFirstName: true,
   employeeLastName: true,
@@ -192,6 +257,11 @@ const ONBOARDING_AUFGABEN_AUSWAHL = {
   isCompleted: true,
   assignee: true,
   description: true,
+  // Ausstattung & Zugaenge (Paket A3): Herkunft, „Eilt“ (Regel 14) und
+  // „entfällt“ (F2) — die Spalten gibt es nur im Onboarding.
+  herkunft: true,
+  eilt: true,
+  entfaelltAm: true,
 } satisfies Prisma.ChecklistItemSelect;
 
 /** Eine Aufgabe fuer den Versand — Zustaendigkeit in beiden Modulen als `assigneeDepartment`. */
@@ -204,6 +274,17 @@ export interface AufgabeFuerVersand {
   isCompleted: boolean;
   assigneeDepartment: string | null;
   description: string | null;
+  /**
+   * Nur im Onboarding (Paket A3): `null` = Vorlage, sonst "AUSSTATTUNG" oder
+   * "HINWEIS". Im Offboarding fehlen die vier Felder ganz.
+   */
+  herkunft?: string | null;
+  /** Frist auf heute angehoben (Regel 14): „(eilt)“ in der Liste, `eiltDeckeln`. */
+  eilt?: boolean;
+  /** Gestrichen bzw. abgewaehlt (F2) — zaehlt als erledigt, steht in keiner Liste. */
+  entfaellt?: boolean;
+  /** Bemerkung zur Position mit Beschriftung nach Herkunft (Regel 8). */
+  bemerkung?: { text: string; label: string } | null;
 }
 
 /**
@@ -211,6 +292,11 @@ export interface AufgabeFuerVersand {
  * Onboarding heisst die Spalte `assignee` — sie wird hier auf
  * `assigneeDepartment` abgebildet, damit Versand und Regeln nur einen Namen
  * kennen.
+ *
+ * Im Onboarding dazu Herkunft, „Eilt“ und „entfällt“ und — nur, wenn
+ * Aufgaben aus „Ausstattung & Zugänge“ dabei sind — die Bemerkungen ueber
+ * `ausstattungZuAufgabenLaden`. Ohne solche Aufgaben fragt sie die
+ * Ausstattungstabellen nicht ab.
  */
 export async function aufgabenLaden(
   modul: AbteilungsModul,
@@ -231,7 +317,21 @@ export async function aufgabenLaden(
     select: ONBOARDING_AUFGABEN_AUSWAHL,
     orderBy,
   });
-  return zeilen.map(({ assignee, ...rest }) => ({ ...rest, assigneeDepartment: assignee }));
+  const ausAusstattung = zeilen.filter((z) => z.herkunft != null).map((z) => z.id);
+  const zuordnung =
+    ausAusstattung.length > 0
+      ? await ausstattungZuAufgabenLaden(prisma, ausAusstattung)
+      : new Map<string, AusstattungZuAufgabe>();
+  return zeilen.map(({ assignee, herkunft, eilt, entfaelltAm, ...rest }) => ({
+    ...rest,
+    assigneeDepartment: assignee,
+    herkunft: herkunft ?? null,
+    eilt: eilt === true,
+    entfaellt: entfaelltAm != null,
+    // Nur fuer die Stelle der Zeile (Regel 8) — eine nach einem Stellenwechsel
+    // zurueckgebliebene entfallene Aufgabe traegt sie nicht weiter.
+    bemerkung: bemerkungFuerStelle(zuordnung.get(rest.id), assignee),
+  }));
 }
 
 // =============================================
@@ -277,8 +377,10 @@ export function fuehrungskraftErmitteln(v: FuehrungskraftQuellen): Fuehrungskraf
  * Bewertung, Vertragsende), sind immer erlaubt — die Pruefung gilt der FREI
  * EINGETIPPTEN Adresse. Aufrufer: POST /api/offboarding und PATCH
  * /api/offboarding/[id], seit der Durchsicht 09/2026 auch POST /api/onboarding
- * (Anlage mit Fuehrungskraft) und POST /api/onboarding/[id]/supervisor-link —
- * jeweils VOR dem Speichern und vor jeder Mail; nein = 409 mit
+ * (Anlage mit Fuehrungskraft) und POST /api/onboarding/[id]/supervisor-link,
+ * seit 10/2026 POST /api/offboarding/[id]/zeugnis-bewertung (deren Adresse
+ * ist Quelle „ZEUGNIS" in `fuehrungskraftErmitteln`) — jeweils VOR dem
+ * Speichern und vor jeder Mail; nein = 409 mit
  * MELDUNGEN.FUEHRUNGSKRAFT_NICHT_FREIGEGEBEN.
  */
 export async function fuehrungskraftAdresseFreigegeben(
@@ -294,7 +396,21 @@ export async function fuehrungskraftAdresseFreigegeben(
 // Kleine Helfer
 // =============================================
 
+/**
+ * Ist fuer das Ereignis ein aktiver Webhook eingetragen? Grundlage der
+ * WEBHOOK-Regel (`versandStatusAusErgebnis`): SKIPPED wegen deaktivierter
+ * Portal-Vorlage zaehlt dann als zugestellt.
+ *
+ * Ereignisse aus EVENTS_OHNE_WEBHOOK liefern sofort `false`, ohne Abfrage
+ * (E-A16, Feinplan F1): triggerWebhooks ruft fuer sie keinen Webhook auf, ein
+ * dort eingetragener Webhook uebernimmt also nichts. Das betrifft die
+ * Onboarding-Ereignisse — die WEBHOOK-Regel gilt damit nur noch im
+ * Offboarding, und im Onboarding bleibt ein SKIPPED wegen deaktivierter
+ * Vorlage sichtbar „nicht versendet" (`sentAt` bleibt null, keine Erinnerung
+ * an einen Link, den nie jemand bekommen hat).
+ */
 async function webhookAktiv(event: string): Promise<boolean> {
+  if (webhooksGesperrt(event)) return false;
   try {
     return (await prisma.webhookConfig.count({ where: { event, isActive: true } })) > 0;
   } catch {
@@ -345,6 +461,15 @@ async function protokollieren(
  */
 export interface VersandModul extends LinkBereich {
   displayId: string;
+  /**
+   * Einrichtung, an der die Empfaenger aufgeloest werden (empfaengerFuer):
+   * in BEIDEN Modulen der Arbeitsort, sonst die Einrichtung des Vorgangs
+   * (`empfaengerEinrichtung`; Onboarding E-A10, Offboarding seit A4 G12 —
+   * dort setzt ihn nur die Zuordnung einer Einstellung derselben Einrichtung,
+   * solange keine Stelle informiert ist). NIE fuer eine Zugriffspruefung —
+   * der Mandant ist immer die Einrichtung des Vorgangs (canAccessProcess mit
+   * dessen organizationId).
+   */
   organizationId: string;
   fuehrungskraft: FuehrungskraftDaten;
   /** Gemeinsamer Teil JEDES Payloads (offboardingMailFelder bzw. onboardingAbteilungsMailFelder). */
@@ -354,14 +479,54 @@ export interface VersandModul extends LinkBereich {
    * Onboarding: zusatzWerte (Datensparsamkeit; nicht erlaubte Felder fehlen ganz).
    */
   zusatzFelder: (departmentKey: string) => Record<string, unknown>;
+  /**
+   * Nur Onboarding (Ausstattung & Zugaenge, Regel 7): laedt Angaben und
+   * Hinweis je Stelle (`angabenJeStelleLaden`) fuer den Infokasten der
+   * Zuweisungsmail. Fehlt der Lader (Offboarding), fehlen `angaben` und
+   * `angaben_html` im Payload GANZ — die Offboarding-Payload bleibt Byte fuer
+   * Byte gleich. Im Onboarding stehen beide immer da ("" ohne Angaben).
+   */
+  angabenLaden?: () => Promise<ReadonlyMap<string, AngabenFuerStelle>>;
+  /**
+   * Nur Onboarding (Ausstattung & Zugaenge, Regel 10): laedt die offene
+   * Aenderungsliste je Stelle (`offeneAenderungenLaden`). Fehlt der Lader
+   * (Offboarding), fehlen `nachtrag*` und `hat_offene_aufgaben` im Payload
+   * GANZ, und die Aktion `nachtrag` gibt es nicht. Im Onboarding nimmt JEDE
+   * Zuweisungsmail die offenen Eintraege ihrer Stelle mit (F7).
+   */
+  nachtraegeLaden?: () => Promise<ReadonlyMap<string, OffeneAenderungen>>;
+  /**
+   * Nur Onboarding (Ausstattung & Zugaenge, Stufe 2 – A4, G10): laedt die noch
+   * ausgegebenen Stuecke (AUSGEGEBEN, VERBLEIBT) je ausgebender Stelle
+   * (`aktiveAusgabenJeStelleLaden`) fuer die Absage-Mail. Gelesen nur von der
+   * Aktion `absage` und nur, wenn eine Stelle noch eine Absage bekommt. Die
+   * Felder `ausgaben_liste*`/`hat_ausgaben` stehen in der Absage immer (ohne
+   * Stueck bzw. ohne Lader ""); die Absage gibt es nur im Onboarding.
+   */
+  absageAusgabenLaden?: () => Promise<ReadonlyMap<string, ReadonlyArray<AbsageStueck>>>;
+}
+
+/** Ein Stueck der Absage-Liste (`ausgabenListeMailFelder`). */
+export type AbsageStueck = MailStueck & { bezeichnung: string };
+
+/**
+ * Der Bereich eines Austritts fuer Link-Tabelle und Versandsperre
+ * (`versandSperreNehmen`). Die schreibenden Aktionen am Austritt aus
+ * src/lib/offboarding-ausgaben.ts (Einstellung zuordnen, loesen …) nehmen
+ * damit DIESELBE Sperre wie „Abteilungen informieren“ und der taegliche Lauf
+ * (A4, G26) — sonst pruefte die Zuordnung „keine Stelle informiert“, waehrend
+ * gerade an die Stellen der alten Einrichtung geschrieben wird.
+ */
+export function offboardingVersandBereich(offboardingId: string): LinkBereich {
+  return { modul: "OFFBOARDING", vorgangId: offboardingId };
 }
 
 function offboardingVersandModul(vorgang: VorgangFuerVersand): VersandModul {
   return {
-    modul: "OFFBOARDING",
-    vorgangId: vorgang.id,
+    ...offboardingVersandBereich(vorgang.id),
     displayId: vorgang.displayId,
-    organizationId: vorgang.organizationId,
+    // A4 (G12): Arbeitsort am Austritt, sonst die Einrichtung.
+    organizationId: empfaengerEinrichtung(vorgang),
     fuehrungskraft: fuehrungskraftErmitteln(vorgang),
     mailFelder: offboardingMailFelder(vorgang),
     zusatzFelder: () => ({}),
@@ -382,17 +547,31 @@ export interface VersandKontext {
    * lauter Warnung statt 500, das zum Doppelversand verleitete).
    */
   warnungen: string[];
+  /**
+   * Angaben und Hinweis je Stelle fuer die Zuweisungsmail (nur Onboarding,
+   * `VersandModul.angabenLaden`). Fehlt im Offboarding und im taeglichen
+   * Lauf (der verschickt nur Erinnerungen, und die tragen keine Angaben).
+   */
+  angaben?: ReadonlyMap<string, AngabenFuerStelle>;
+  /**
+   * Offene Aenderungsliste je Stelle (nur Onboarding, `VersandModul.nachtraegeLaden`),
+   * gelesen beim Laden des Kontexts — unter der Versandsperre, die auch die
+   * HR-Karte nimmt (F6). Fehlt im Offboarding und im taeglichen Lauf.
+   */
+  nachtraege?: ReadonlyMap<string, OffeneAenderungen>;
 }
 
 /** Aufgaben, Links, Einstellungen und Webhook-Stand eines Vorgangs laden. */
 export async function versandKontextLaden(modul: VersandModul, jetzt: Date): Promise<VersandKontext> {
   const events = MODUL_KONFIG[modul.modul].events;
-  const [aufgaben, links, konfigs, zugewiesen, erinnerung] = await Promise.all([
+  const [aufgaben, links, konfigs, zugewiesen, erinnerung, angaben, nachtraege] = await Promise.all([
     aufgabenLaden(modul.modul, modul.vorgangId),
     prisma.offboardingDepartmentLink.findMany({ where: linkBereichWhere(modul) }),
     konfigsLaden(),
     webhookAktiv(events.zugewiesen),
     webhookAktiv(events.erinnerung),
+    modul.angabenLaden ? modul.angabenLaden() : Promise.resolve(undefined),
+    modul.nachtraegeLaden ? modul.nachtraegeLaden() : Promise.resolve(undefined),
   ]);
   return {
     modul,
@@ -402,6 +581,8 @@ export async function versandKontextLaden(modul: VersandModul, jetzt: Date): Pro
     webhook: { zugewiesen, erinnerung },
     jetzt,
     warnungen: [],
+    ...(angaben ? { angaben } : {}),
+    ...(nachtraege ? { nachtraege } : {}),
   };
 }
 
@@ -494,23 +675,44 @@ async function ergebnisSpeichern(
 // Mail "Aufgaben zugewiesen" (Erstmail, Erneut, neuer Link)
 // =============================================
 
-type ZuweisungsModus = "ERSTMAIL" | "ERNEUT" | "NEUER_LINK";
+/**
+ * Art der Zuweisungsmail:
+ *   ERSTMAIL    erster Versand an die Stelle (auch nach einem nie zugestellten Link)
+ *   ERNEUT      „Erneut senden“, gleicher Link
+ *   NEUER_LINK  neuer Token (Link erneuern, Adresswechsel)
+ *   NACHTRAG    „Nachtrag senden“ (nur Onboarding, Regel 10): gleicher Token,
+ *               Gueltigkeit ggf. verlaengert, `lastSentAt` neu, `sentAt` bleibt;
+ *               die Liste nennt NUR die offenen Aufgaben — ohne offene keine
+ *               (auch „nur Entfällt“ geht hinaus)
+ */
+type ZuweisungsModus = "ERSTMAIL" | "ERNEUT" | "NEUER_LINK" | "NACHTRAG";
 
 /**
  * Payload von *-department-assigned. Alle bisherigen Offboarding-Felder bleiben
  * (Webhook-Abnehmer lesen sie, offboarding-mail.ts), neu sind Aufgabenliste,
  * link, erneut_gesendet, neuer_link und ist_fuehrungskraft; im Onboarding
  * dazu die erlaubten Zusatzfelder des Schluessels und KEIN `token`.
- * `taskCount` = Anzahl der Aufgaben in der Liste (offene; ohne offene alle).
+ * `taskCount` = Anzahl der Aufgaben in der Liste (offene; ohne offene alle
+ * nicht entfallenen, beim Nachtrag dann 0).
  * `neuer_link` = "ja", wenn ein frueher zugestellter Link nicht mehr gilt
  * (siehe `alterLinkUngueltig` in zuweisungSenden).
+ *
+ * Ausstattung & Zugaenge (Paket A3): Bemerkung und „(eilt)“ kommen ueber die
+ * Aufgabenliste (AufgabeFuerVersand traegt sie im Onboarding). `angaben` und
+ * `angaben_html` (Regel 7) NUR, wenn der Kontext sie geladen hat
+ * (`ctx.angaben`, Onboarding) — dann immer, notfalls als "". Ebenso
+ * `nachtrag`, `nachtrag_liste`, `nachtrag_liste_html` (Regel 10, F7) und der
+ * Merker `hat_offene_aufgaben` NUR mit `ctx.nachtraege` (Onboarding). Im
+ * Offboarding fehlen alle diese Schluessel ganz (offboarding-mails.test.ts:
+ * echte Payload = Katalogbeispiel).
  */
 function zuweisungsPayload(
   ctx: VersandKontext,
   link: OffboardingDepartmentLink,
-  liste: ReadonlyArray<{ title: string; dueDate: Date | null; description?: string | null }>,
+  liste: ReadonlyArray<AufgabeFuerVersand>,
   modus: ZuweisungsModus,
   alterLinkUngueltig: boolean,
+  hatOffene: boolean,
 ): Record<string, unknown> {
   const konfig = MODUL_KONFIG[ctx.modul.modul];
   const url = konfig.linkUrl(link.token);
@@ -530,7 +732,40 @@ function zuweisungsPayload(
     neuer_link: alterLinkUngueltig ? "ja" : "",
     ist_fuehrungskraft: istFuehrungskraft(link.departmentKey) ? "ja" : "",
     ...ctx.modul.zusatzFelder(link.departmentKey),
+    ...(ctx.angaben ? angabenMailFelder(ctx.angaben.get(link.departmentKey) ?? KEINE_ANGABEN) : {}),
+    ...(ctx.nachtraege
+      ? {
+          ...nachtragMailFelder(ctx.nachtraege.get(link.departmentKey)?.liste ?? LEERER_NACHTRAG),
+          hat_offene_aufgaben: hatOffene ? "ja" : "",
+        }
+      : {}),
   };
+}
+
+/**
+ * F7: Nach SENT einer Zuweisungsmail die Eintraege der Aenderungsliste als
+ * gesendet markieren, die die Mail trug — genau die beim Laden des Kontexts
+ * gelesenen IDs (`ctx.nachtraege`), bedingt auf `gesendetAm: null`. Ein
+ * spaeter geschriebener Eintrag bleibt offen. Die Mail ist dann schon
+ * hinaus: Scheitert die Datenbank, gibt es eine Warnung (wie
+ * `ergebnisSpeichern`), nie eine 500 — die Karte boete sonst denselben
+ * Nachtrag noch einmal an, und HR klickte erneut.
+ */
+async function nachtragAlsGesendetMarkieren(ctx: VersandKontext, link: OffboardingDepartmentLink): Promise<void> {
+  const ids = ctx.nachtraege?.get(link.departmentKey)?.ids ?? [];
+  if (ids.length === 0) return;
+  try {
+    await prisma.onboardingAusstattungAenderung.updateMany({
+      where: { id: { in: ids }, gesendetAm: null },
+      data: { gesendetAm: ctx.jetzt },
+    });
+  } catch (err) {
+    console.error(
+      `[Abteilungsaufgaben] Nachtrag an ${link.departmentName} (${ctx.modul.displayId}) ist versendet, die Änderungsliste konnte aber nicht als gesendet markiert werden:`,
+      err instanceof Error ? err.message : err,
+    );
+    if (!ctx.warnungen.includes(link.departmentName)) ctx.warnungen.push(link.departmentName);
+  }
 }
 
 async function zuweisungSenden(
@@ -540,7 +775,15 @@ async function zuweisungSenden(
   modus: ZuweisungsModus,
 ): Promise<{ eintrag: BerichtEintrag; v: LinkVersandErgebnis; link: OffboardingDepartmentLink }> {
   const offene = offeneVon(ctx, key);
-  const liste = offene.length > 0 ? offene : aufgabenVon(ctx, key);
+  // Rueckfall ohne offene Aufgaben (z. B. „Link erneuern“ einer fast fertigen
+  // Stelle): alle Aufgaben der Stelle — aber nie entfallene (F2): Sie sind nur
+  // formal „erledigt“, die Stelle soll sie nicht als Aufgabe lesen. Beim
+  // Nachtrag nie: Er nennt nur, was offen ist, und ohne offene Aufgaben nur
+  // die Aenderungen („Entfällt: …“).
+  const liste =
+    offene.length > 0 || modus === "NACHTRAG"
+      ? offene
+      : aufgabenVon(ctx, key).filter((a) => a.entfaellt !== true);
   const bis = gueltigBis(ctx.jetzt, offene.map((a) => a.dueDate));
   const vorhanden = ctx.links.get(key) ?? null;
   // Gilt ein frueher zugestellter Link nicht mehr? Bei NEUER_LINK sowieso.
@@ -588,6 +831,8 @@ async function zuweisungSenden(
       },
     });
   } else {
+    // ERSTMAIL an einen vorhandenen (nie zugestellten) Link, ERNEUT und
+    // NACHTRAG: gleicher Token, Gueltigkeit nur verlaengern.
     link = await prisma.offboardingDepartmentLink.update({
       where: { id: vorhanden.id },
       data: {
@@ -600,7 +845,7 @@ async function zuweisungSenden(
 
   const ergebnis = await triggerWebhooks(
     MODUL_KONFIG[ctx.modul.modul].events.zugewiesen,
-    zuweisungsPayload(ctx, link, liste, modus, alterLinkUngueltig),
+    zuweisungsPayload(ctx, link, liste, modus, alterLinkUngueltig, offene.length > 0),
   );
   const v = versandStatusAusErgebnis(ergebnis, ctx.webhook.zugewiesen);
 
@@ -618,6 +863,9 @@ async function zuweisungSenden(
       zugestelltAn: v.zugestelltAn,
     };
     link = await ergebnisSpeichern(ctx, link, erfolg, { ...link, ...erfolg });
+    // F7: Die Mail trug die offenen Aenderungen der Stelle — genau diese sind
+    // jetzt gesendet (nur Onboarding; ohne `ctx.nachtraege` nichts zu tun).
+    await nachtragAlsGesendetMarkieren(ctx, link);
   } else {
     // Nichts ist hinausgegangen: Ein Fehler hier darf die Anfrage abbrechen
     // (500) — ein zweiter Versuch schickt keine Mail doppelt.
@@ -643,10 +891,15 @@ async function zuweisungSenden(
 // Mail "Erinnerung"
 // =============================================
 
+/**
+ * Payload von *-department-reminder (Knopf und Lauf gleich). Bemerkung und
+ * „(eilt)“ stehen im Onboarding automatisch in der Aufgabenliste; Angaben
+ * bewusst nicht (nur die Zuweisungsmail traegt sie).
+ */
 function erinnerungsPayload(
   ctx: VersandKontext,
   link: OffboardingDepartmentLink,
-  offene: ReadonlyArray<{ title: string; dueDate: Date | null; description?: string | null }>,
+  offene: ReadonlyArray<AufgabeFuerVersand>,
   stufe: StufenBerechnung,
   level: ErinnerungsStufe,
 ): Record<string, unknown> {
@@ -879,8 +1132,11 @@ async function erinnern(ctx: VersandKontext, key: string, userId: string): Promi
 
   // Der Knopf ist eine ausdrueckliche HR-Aktion: Stufe wie im Cron berechnet,
   // aber ohne Mindestabstand und ohne 30-Tage-Ende (nur die Sperrzeit gilt).
-  const stufe = stufeBerechnen(offeneVon(ctx, key), ctx.jetzt);
-  const level: ErinnerungsStufe = stufe.level ?? "INFO";
+  // Wie im Cron: die erste Erinnerung mit einer eilenden Ausstattungsaufgabe
+  // ist hoechstens WARNING (Regel 14, eiltDeckeln).
+  const offene = offeneVon(ctx, key);
+  const stufe = stufeBerechnen(offene, ctx.jetzt);
+  const level: ErinnerungsStufe = eiltDeckeln(stufe.level, offene, link.reminderCount) ?? "INFO";
   const { eintrag, v, link: aktuell } = await erinnerungSenden(ctx, link, stufe, level);
   (eintrag.status ? bericht.versendet : bericht.uebersprungen).push(eintrag);
   await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.ERINNERT_KNOPF, {
@@ -916,6 +1172,228 @@ async function linkErneuern(ctx: VersandKontext, key: string, userId: string): P
 }
 
 /**
+ * Vorpruefung „Nachtrag senden“ (Regel 10, nur Onboarding), in dieser
+ * Reihenfolge:
+ *   - kein Link oder kein `sentAt`  → NICHT_INFORMIERT (HR nimmt dann
+ *     „Erneut senden“, das die Eintraege nach F7 mitnimmt)
+ *   - leere (zusammengefasste) Liste → KEIN_NACHTRAG
+ *   - Sperrzeit (10 Minuten)        → SPERRZEIT
+ *   - kein Empfaenger               → dessen Grund
+ * Offene Aufgaben sind NICHT noetig: Auch „nur Entfällt“ und eine schon
+ * fertige Stelle bekommen den Nachtrag. Dieselbe Bedingung zeigt die Karte
+ * (`abteilungsZeilenBauen`, Aktion `nachtrag`).
+ */
+function nachtragPruefung(
+  ctx: VersandKontext,
+  key: string,
+): { link: OffboardingDepartmentLink; empfaenger: Extract<Empfaenger, { ok: true }> } | BerichtEintrag {
+  const link = ctx.links.get(key) ?? null;
+  const empfaenger = empfaengerFuer(ctx, key);
+  const name = link?.departmentName || empfaenger.departmentName;
+  const email = link?.email ?? (empfaenger.ok ? empfaenger.email : null);
+
+  if (!link || !link.sentAt) return uebersprungen(key, name, email, "NICHT_INFORMIERT");
+  if (nachtragAnzahl(ctx.nachtraege?.get(key)?.liste) === 0) return uebersprungen(key, name, email, "KEIN_NACHTRAG");
+  if (sperrzeitBis(link, ctx.jetzt)) return uebersprungen(key, name, email, "SPERRZEIT");
+  if (!empfaenger.ok) return uebersprungen(key, name, email, empfaenger.grund);
+  return { link, empfaenger };
+}
+
+/**
+ * „Nachtrag senden“ (Regel 10, E-A7): eine Zuweisungsmail im Modus NACHTRAG an
+ * EINE Stelle — gleicher Token, die offenen Aufgaben und die Aenderungen seit
+ * der letzten Mail. Hat sich die Adresse der Stelle seitdem geaendert, geht
+ * sie wie bei „Erneut senden“ mit NEUEM Link an die neue Adresse (der Inhalt
+ * ist derselbe). Bei SENT werden genau die gelesenen Eintraege als gesendet
+ * markiert (`nachtragAlsGesendetMarkieren`, F7).
+ *
+ * Protokoll DEPARTMENT_NACHTRAG_SENT nur mit Anzahlen je Art, nie Titeln (dazu
+ * bei neuer Adresse DEPARTMENT_LINK_RENEWED wie bei „Erneut senden“).
+ */
+async function nachtrag(ctx: VersandKontext, key: string, userId: string): Promise<VersandBericht> {
+  const bericht: VersandBericht = { aktion: "nachtrag", versendet: [], uebersprungen: [] };
+  const pruefung = nachtragPruefung(ctx, key);
+  if (!("link" in pruefung)) {
+    bericht.uebersprungen.push(pruefung);
+    return bericht;
+  }
+  const { link, empfaenger } = pruefung;
+  const liste = ctx.nachtraege?.get(key)?.liste ?? LEERER_NACHTRAG;
+  const adresseNeu = !adresseGleich(link.email, empfaenger.email);
+  const alteAdresse = link.email;
+  const { eintrag, v } = await zuweisungSenden(ctx, key, empfaenger, adresseNeu ? "NEUER_LINK" : "NACHTRAG");
+  (eintrag.status ? bericht.versendet : bericht.uebersprungen).push(eintrag);
+
+  if (adresseNeu) {
+    await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.LINK_ERNEUERT, {
+      departmentKey: key,
+      grund: "ADRESSE_GEAENDERT",
+      ausloeser: "nachtrag",
+      emailAlt: alteAdresse,
+      emailNeu: empfaenger.email,
+      status: v.status,
+    });
+  }
+  await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.NACHTRAG_GESENDET, {
+    departmentKey: key,
+    email: empfaenger.email,
+    status: v.status,
+    neuerLink: adresseNeu,
+    neu: liste.neu.length,
+    geaendert: liste.geaendert.length,
+    entfaellt: liste.entfaellt.length,
+  });
+  return bericht;
+}
+
+/**
+ * Payload von onboarding-department-abgesagt (E-A20): gemeinsame Mailfelder
+ * des Vorgangs, die Stelle (wie am Link), die Adresse, an die informiert wurde
+ * (F16, `absageEmpfaenger`), und ihre schon erledigten Aufgaben (F17). BEWUSST
+ * OHNE Link-Felder (`link`, `magicLink`, `token`, `expiresAt`): Der Vorgang
+ * ist abgelaufen, der Link antwortet ohnehin 410 — und eine Absage braucht
+ * keinen Zugang.
+ *
+ * Seit A4 (G10) dazu die noch ausgegebenen Stuecke DIESER Stelle
+ * (`ausgaben_liste` roh fuer den Textteil, `ausgaben_liste_html` maskiert,
+ * Merker `hat_ausgaben` "ja"/"") samt Kennung — damit die Stelle weiss, was
+ * zurueckzunehmen bzw. zu sperren ist. Neue Aufgaben gibt es dafuer nicht:
+ * Der Link antwortet 410, die Ruecknahme vermerkt HR in der Karte. Das
+ * Ereignis ist webhookfrei (EVENTS_OHNE_WEBHOOK), die Listen stehen nie im
+ * Betreff (`betreffOhne`).
+ */
+function absagePayload(
+  ctx: VersandKontext,
+  link: OffboardingDepartmentLink,
+  erledigte: ReadonlyArray<AufgabeFuerVersand>,
+  email: string,
+  ausgaben: ReadonlyArray<AbsageStueck>,
+): Record<string, unknown> {
+  return {
+    ...ctx.modul.mailFelder,
+    departmentKey: link.departmentKey,
+    departmentName: link.departmentName,
+    abteilung: link.departmentName,
+    email,
+    ...erledigteListeMailFelder(erledigte),
+    ...ausgabenListeMailFelder(ausgaben),
+    ist_fuehrungskraft: istFuehrungskraft(link.departmentKey) ? "ja" : "",
+  };
+}
+
+/**
+ * „Stellen über die Absage informieren…“ (E-A20, nur Onboarding, nur bei
+ * EXPIRED — das prueft der Adapter vorher): eine Mail an JEDE Stelle, die je
+ * eine Aufgaben-Mail bekommen hat (`sentAt ?? lastSentAt`) und noch keine
+ * Absage (`abgesagtAm`, F13).
+ *   - Empfaenger ist die Adresse, die informiert wurde (F16,
+ *     `absageEmpfaenger`): `link.email`, solange die letzte zugestellte Mail
+ *     an sie ging, sonst `zugestelltAn` — nach einem Adresswechsel mit
+ *     gescheiterter Mail steht in `link.email` eine Adresse, die nie etwas
+ *     bekam. Nie die heute in Einstellungen → Abteilungen aufgeloeste. Bericht
+ *     und Protokoll nennen dieselbe Adresse.
+ *   - Die Mail nennt alle erledigten, nicht entfallenen Aufgaben der Stelle,
+ *     aus der Vorlage wie aus der Ausstattung (F17) — zum Zurueckbauen —,
+ *     seit A4 (G10) dazu die noch ausgegebenen Stuecke der Stelle samt
+ *     Kennung (`VersandModul.absageAusgabenLaden`, EINE Abfrage, nur wenn
+ *     eine Stelle noch eine Absage bekommt).
+ *   - `abgesagtAm` NUR bei SENT (`ergebnisSpeichern`: scheitert die Datenbank
+ *     danach, Warnung statt 500). FAILED und SKIPPED lassen einen neuen Versuch
+ *     zu; eine WEBHOOK-Zustellung gibt es nicht (EVENTS_OHNE_WEBHOOK).
+ *   - Eine Stelle mit Absage steht als BEREITS_ABGESAGT im Bericht: Der zweite
+ *     Klick schickt nichts (409).
+ *   - Token, Link und Erinnerungsstand bleiben unberuehrt.
+ * Protokoll DEPARTMENT_ABSAGE_SENT nur, wenn eine Mail versucht wurde — mit
+ * Schluessel, Adresse, Status und Anzahl der erledigten Aufgaben, nie Titeln.
+ */
+async function absage(ctx: VersandKontext, userId: string): Promise<VersandBericht> {
+  const event = MODUL_KONFIG[ctx.modul.modul].events.abgesagt;
+  if (!event) throw new Error("Die Absage an die Stellen gibt es nur im Onboarding.");
+  const bericht: VersandBericht = { aktion: "absage", versendet: [], uebersprungen: [] };
+  const informiert = [...ctx.links.values()].filter(absageInformiert);
+  const reihenfolge = abteilungsReihenfolge(informiert.map((l) => l.departmentKey));
+  const rang = (key: string) => {
+    const i = reihenfolge.indexOf(key);
+    return i < 0 ? reihenfolge.length : i;
+  };
+  const erledigtJeStelle = new Map<string, number>();
+  let versucht = false;
+  // A4 (G10): die noch ausgegebenen Stuecke je Stelle — nur, wenn noch eine
+  // Stelle eine Absage bekommt (der zweite Klick fragt nichts ab).
+  const ausgabenJeStelle =
+    ctx.modul.absageAusgabenLaden && informiert.some(absageOffen)
+      ? await ctx.modul.absageAusgabenLaden()
+      : new Map<string, ReadonlyArray<AbsageStueck>>();
+
+  for (const link of informiert.sort((a, b) => rang(a.departmentKey) - rang(b.departmentKey))) {
+    const key = link.departmentKey;
+    const empfaenger = absageEmpfaenger(link);
+    if (!absageOffen(link)) {
+      bericht.uebersprungen.push(uebersprungen(key, link.departmentName, empfaenger, "BEREITS_ABGESAGT"));
+      continue;
+    }
+    const erledigte = aufgabenVon(ctx, key).filter((a) => a.isCompleted && a.entfaellt !== true);
+    erledigtJeStelle.set(key, erledigte.length);
+    const ergebnis = await triggerWebhooks(
+      event,
+      absagePayload(ctx, link, erledigte, empfaenger, ausgabenJeStelle.get(key) ?? []),
+    );
+    // Kein Webhook kann zustellen (EVENTS_OHNE_WEBHOOK): SKIPPED bleibt SKIPPED.
+    const v = versandStatusAusErgebnis(ergebnis, false);
+    versucht = true;
+    let aktuell = link;
+    if (v.erfolgreich) {
+      aktuell = await ergebnisSpeichern(ctx, link, { abgesagtAm: ctx.jetzt }, { ...link, abgesagtAm: ctx.jetzt });
+      ctx.links.set(key, aktuell);
+    }
+    // Bericht und Protokoll mit der Adresse, an die die Absage ging (nur hier, nie am Link gespeichert).
+    const eintrag = eintragAusErgebnis({ ...aktuell, email: empfaenger }, v, false);
+    (eintrag.status ? bericht.versendet : bericht.uebersprungen).push(eintrag);
+  }
+
+  if (versucht) {
+    await protokollieren(ctx.modul, userId, ABTEILUNGS_AUDIT.ABSAGE_GESENDET, {
+      versendet: bericht.versendet.map((e) => ({
+        departmentKey: e.departmentKey,
+        email: e.email,
+        status: e.status,
+        erledigt: erledigtJeStelle.get(e.departmentKey) ?? 0,
+      })),
+      uebersprungen: bericht.uebersprungen.map((e) => ({ departmentKey: e.departmentKey, grund: e.grund })),
+    });
+  }
+  return bericht;
+}
+
+/** Die Aktion ausfuehren — ein Zweig je Aktion, `never` meldet eine vergessene. */
+async function aktionAusfuehren(
+  ctx: VersandKontext,
+  aktion: AbteilungsAktionInput,
+  userId: string,
+): Promise<VersandBericht> {
+  switch (aktion.aktion) {
+    case "informieren":
+      return informieren(ctx, userId);
+    case "erneut-senden":
+      return erneutSenden(ctx, aktion.departmentKey, userId);
+    case "erinnern":
+      return erinnern(ctx, aktion.departmentKey, userId);
+    case "link-erneuern":
+      return linkErneuern(ctx, aktion.departmentKey, userId);
+    case "nachtrag":
+      return nachtrag(ctx, aktion.departmentKey, userId);
+    case "absage":
+      return absage(ctx, userId);
+    default: {
+      // Frueher stand hier ein verschachtelter Ternary: Eine neue Aktion
+      // fiel still in „Link erneuern“ und bekam einen NEUEN Token.
+      const unbekannt: never = aktion;
+      throw new Error(`Unbekannte Aktion: ${JSON.stringify(unbekannt)}`);
+    }
+  }
+}
+
+/**
  * Fuehrt eine (schon validierte) Aktion mit geladenem Kontext aus und baut die
  * Antwort (Versandbericht, Status, Meldung). Aufrufer halten die Sperre je
  * Vorgang und haben Rolle, Mandant, Status und (Onboarding) Voraussetzung
@@ -926,14 +1404,7 @@ export async function aktionMitKontextAusfuehren(
   aktion: AbteilungsAktionInput,
   userId: string,
 ): Promise<DienstAntwort> {
-  const bericht: VersandBericht =
-    aktion.aktion === "informieren"
-      ? await informieren(ctx, userId)
-      : aktion.aktion === "erneut-senden"
-        ? await erneutSenden(ctx, aktion.departmentKey, userId)
-        : aktion.aktion === "erinnern"
-          ? await erinnern(ctx, aktion.departmentKey, userId)
-          : await linkErneuern(ctx, aktion.departmentKey, userId);
+  const bericht = await aktionAusfuehren(ctx, aktion, userId);
   const status = httpStatusAusBericht(bericht);
   const { meldung, hinweis } = berichtMeldung(bericht);
   // Versendet, aber nicht gespeichert: Die Warnung steht VOR dem uebrigen
@@ -1014,6 +1485,8 @@ export async function abteilungsAktionAusfuehren(opts: {
 export interface UebersichtVorgang extends FuehrungskraftQuellen {
   id: string;
   organizationId: string;
+  /** Arbeitsort am Austritt (A4, G12): Empfaenger der Karte; fehlt bzw. null = Einrichtung. */
+  arbeitsortId?: string | null;
   status: string;
   lastWorkingDay: Date;
   checklistItems: ReadonlyArray<{
@@ -1024,6 +1497,11 @@ export interface UebersichtVorgang extends FuehrungskraftQuellen {
     isCompleted: boolean;
     dueDate: Date | null;
     completedById: string | null;
+    /**
+     * A4 (G14): Anlage der Aufgabe – fuer „n Aufgaben nach der Information
+     * hinzugekommen“ (`nachInfoNeuZaehlen`); fehlt = zaehlt nie als neu.
+     */
+    createdAt?: Date | null;
   }>;
   departmentLinks: ReadonlyArray<OffboardingDepartmentLink>;
 }
@@ -1079,11 +1557,16 @@ export async function abteilungsUebersichtLaden<
     aufgaben: vorgang.checklistItems,
     links: vorgang.departmentLinks,
     konfigs,
-    organizationId: vorgang.organizationId,
+    // A4 (G12): dieselbe Einrichtung wie beim Versand (Arbeitsort, sonst Einrichtung).
+    organizationId: empfaengerEinrichtung(vorgang),
     fuehrungskraft,
     vorgangAbgeschlossen: abgeschlossen,
     linkUrl: abteilungsAufgabenLink,
     jetzt,
+    // A4 (G14): Ruecknahme- und Sperraufgaben aus „Einstellung zuordnen …“
+    // kommen nach der Information dazu – kein Nachtrag im Offboarding, die
+    // Zeile sagt „… bitte „Erneut senden““ (gleicher Token).
+    nachInfoNeu: nachInfoNeuZaehlen(vorgang.checklistItems, vorgang.departmentLinks),
   });
 
   const abteilungsNamen = Object.fromEntries(zeilen.map((z) => [z.departmentKey, z.departmentName]));

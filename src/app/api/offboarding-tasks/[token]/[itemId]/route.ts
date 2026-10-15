@@ -6,8 +6,11 @@
  * OEFFENTLICH - kein Auth erforderlich!
  * Zugang ausschliesslich ueber einen gueltigen Token.
  *
- * Request: { isCompleted?: boolean, comment?: string | null }
- *          (comment null/fehlend = unveraendert, "" = loeschen)
+ * Request: { isCompleted?: boolean, comment?: string | null,
+ *            zustand?: "ZURUECK" | "BESCHAEDIGT" | "FEHLT" }
+ *          (comment null/fehlend = unveraendert, "" = loeschen; `zustand`
+ *          seit A4 nur mit isCompleted: true und nur an der Ruecknahmeaufgabe
+ *          eines Gegenstands – abgehakt ohne Zustand heisst ZURUECK)
  *
  * Duenne Huelle um oeffentlicheAufgabeAendern
  * (src/lib/abteilungsaufgaben-uebergaenge.ts). Dort: Tokenpruefung,

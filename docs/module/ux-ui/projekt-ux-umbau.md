@@ -4,62 +4,67 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 15.10.2026 (Mailtext im Protokoll: zwei Durchsichten, Handbuch, DSB-Papier, siehe Abschnitt 7; davor 12.10.: Übergabe vor einem Neustart – **0.0 zuerst lesen**; 09.10.: Bestandsaufnahme, vier Fehler auf `main`, Deploy-Anleitung, Prototyp-Tag vorbereitet)
+Letzte Änderung: 15.10.2026 (Prototyp-Tag gelaufen, DSB einverstanden, `main` gemergt – **0.0 zuerst lesen**; davor am selben Tag: Mailtext im Protokoll mit zwei Durchsichten, Handbuch, DSB-Papier, siehe Abschnitt 7)
 
-## 0. Übergabe (Stand 12.10.2026)
+## 0. Übergabe (Stand 15.10.2026)
 
-### 0.0 Hier anfangen (12.10.2026, vor einem Neustart des Rechners)
+### 0.0 Hier anfangen (15.10.2026)
 
-Die Abschnitte 0.1 bis 0.7 stammen vom 08.10.2026 und sind in Teilen überholt; was neuer ist,
-steht hier. Nichts ist deployt – weder `main` seit `f6d3daf` (30.09.2026) noch der Umbau.
+Die Abschnitte 0.1 bis 0.7 stammen vom 08./12.10.2026 und sind in Teilen überholt; was neuer
+ist, steht hier.
 
-**Git (geprüft am 12.10.2026):** `origin/ux-umbau` = `e8e4571` (danach nur der Commit mit
-dieser Übergabe), `origin/main` = `8c1ef05`, beide ohne Abweichung zum lokalen Stand.
-Uncommittet bleiben nur `docs/README.md` (LOGA-Abschnitt) und `docs/module/loga/` – eigener
-Strang, nie in UX- oder `main`-Commits aufnehmen.
+**Erledigt seit der letzten Übergabe:**
 
-**Schritt 1 – Server-Update von `main` (der Projektverantwortliche will deployen):**
+- **Deploy von `main`** am 14.10.2026 (Protokoll und offene Betriebspunkte in
+  [`docs/historie/deploy-main-2026-10.md`](../../historie/deploy-main-2026-10.md)); mit darin
+  „Ausstattung & Zugänge“ Stufe 1+2. Die vier Etappen A–D der alten Übergabe sind damit durch.
+- **Prototyp-Tag (V0)** gelaufen, Rückmeldung: „in allen Punkten wie im Plan“. Die
+  Entscheidungen stehen in Abschnitt 4 („Am 15.10.2026“) — **am Code des Pilots ist nichts
+  nachzuziehen.** E11 (Dialogtitel) und E13 (Textbausteine) betreffen spätere Pakete.
+- **DSB** hat der Speicherung des Mailtexts im Versandprotokoll zugestimmt; die fünf Fragen der
+  Mitteilung sind beantwortet. Der Nebenstrang geht mit dem Umbau live.
+- **`main` in `ux-umbau` gemergt** (15.10.2026, vier Konflikte, alle „beides behalten“ —
+  Protokoll Abschnitt 7). **Nach einem Merge von `main` immer `npm run db:generate`**, sonst
+  meldet `tsc` die neuen Schema-Felder als Fehler.
 
-- Anleitung: [`docs/historie/deploy-main-2026-10.md`](../../historie/deploy-main-2026-10.md)
-  (`f6d3daf` → `main`; Schema +2 Tabellen, Soll der Vorschau 0/0/2/4/3; kein SQL für Vorlagen;
-  Betriebsdateien unverändert außer `package.json`, also `npm ci` ohne Zwischenspeicher).
-- Vorgehen in vier Etappen, nach jeder schickt er die Ausgaben, Claude prüft und gibt die
-  nächste: **A** Abschnitte 1–2 (nur lesen, altes Image etikettieren) · **B** Abschnitt 3
-  (holen, bauen, Schema-Vorschau) · **C** Abschnitt 4 (anhalten, sichern, starten – wenige
-  Minuten Ausfall) · **D** Abschnitte 5–6 (prüfen, Probe-Mail, Handschritte).
-- **Stand:** Etappe A wurde am 09.10.2026 im Chat ausgegeben (alle Befehle von 1.0 bis 2.2,
-  je einer pro Kasten). **Es kamen noch keine Ausgaben zurück.** In der nächsten Sitzung zuerst
-  fragen, ob auf dem Server schon etwas ausgeführt wurde (harmlos wären nur Abschnitt 1 und
-  2.1/2.2), dann Etappe A erneut geben bzw. die Ausgaben prüfen.
-- Zeitfenster laut Anleitung: Dienstag bis Freitag 10–12 Uhr, **nicht montags gegen 9 Uhr**
-  (n8n-Flow „Email-Vertragsende-Personal 3.0“), nicht 07:00–08:45, nicht nachts; HR kurz
-  vorher Bescheid geben. Die Liste der E-Mail-Endungen für 6.1 darf später kommen.
-- Bekannt und in der Anleitung: Scheitert der Build an `next/font` (Google Fonts kurz nicht
-  erreichbar, am 09.10. lokal passiert), einmal wiederholen.
-- **Nach dem Deploy (Claude):** Protokoll unter den Kopf von `deploy-main-2026-10.md`; den nie
-  protokollierten Deploy vom 30.09.2026 im Kopf von `deploy-paket4-stufe1.md` nachtragen
-  (Angaben vom Projektverantwortlichen); „noch nicht deployt“ für Paket 4 in `CLAUDE.md` und
-  Paket 3 berichtigen; danach `git merge main` in `ux-umbau` mit Logbuch.
-- Während Etappe A beantwortet 1.8 nebenbei, ob die **automatischen Läufe** seit dem 30.09.
-  aus sind (dann gehen keine Erinnerungen hinaus) – das Ergebnis dem Projektverantwortlichen
-  erklären; Einschalten ist ein eigener Schritt (Reihenfolge und Probelauf-Pflicht in CLAUDE.md,
-  „Automatische Läufe“).
+**Nächster Schritt: Pilot Tag 6–7 (Abnahme), Feinplan Abschnitt 7.** Die sieben Punkte dort,
+kurz: `npm run pruefen` + `npm run build`; alte Ansicht ohne Cookie bildgleich
+(`scripts/ux-abnahme.js vergleich`); Bilder je Lage in drei Breiten und Höhenmessung bei
+1366×768 (Ziel des Plans: Kopf + Leiste + Reiter höchstens ein Drittel —
+`scripts/ux-abnahme.js vertragsende`); ein Vorgang durch beide Stränge mit Vergleich des
+Audit-Protokolls; Rollen; Tastatur; Umschalten hin und zurück. Technisch deckt
+`scripts/ux-abnahme-pilot.js` Rollen, Tastatur und beide Stränge ab. Danach Befunde beheben,
+Ankündigungstext, **Deploy U0 + U1 + Pilot + Mailtext**.
 
-**Schritt 2 – Prototyp-Tag (V0):** vorbereitet am 09.10.2026 (Protokoll Abschnitt 7,
-„Prototyp-Tag vorbereitet“). Der Docker-Stapel `hr-portal-lokal` läuft mit `8b7b994`
-(`http://localhost:3100`; nach einem Neustart in Docker Desktop von Hand starten), Leitfaden
-[prototyp-tag-leitfaden.md](prototyp-tag-leitfaden.md) und die Leitfaden-Seite (Artifact,
-Version 3) sind gegen den Code geprüft. Offen beim Projektverantwortlichen: Termin, Probe am
-Vortag, am Termintag Testdaten neu einspielen (Abschnitt 2, Schritt 3). Danach: Bogen und
-Antworten in die Sitzung → Texte nachziehen → Tag 6–7 (0.5) → Deploy U0 + U1 + Pilot.
+**Dabei zu klären** (beim Bau aufgefallen, vom Prototyp-Tag nicht beantwortet): Bei drei
+Hinweisen gleichzeitig (z. B. Lage T04) stehen die Reiter bei 1366×768 unter dem sichtbaren
+Bereich, und das Entfristungsrisiko steht dreifach (Pille, „Jetzt dran“, Hinweis). Die Messung
+in Abnahmepunkt 3 zeigt, ob das Drittel-Ziel gerissen wird; wenn ja, dem Projektverantwortlichen
+vorlegen.
 
-**Schritt 3 – übrige offene Punkte:** Die Bestandsaufnahme vom 09.10.2026 (36 Punkte über alle
-Stränge, mit Beleg und Zuständigkeit) steht im Gedächtnis der Sitzung, nicht im Repository – sie
-nennt auch noch offene Schwachstellen. Die wichtigsten beim Projektverantwortlichen: laufende
-Sicherung von Datenbank und `uploads_data` mit der IT klären; n8n aufräumen, aber den
-Vertragsende-Flow behalten; Minijob #1 (Minderjährige) und #3 (RV-Korrektur) entscheiden;
-Mandantentrennung vor dem ersten Zugang einer Einrichtungsleitung (Weg C plus Schreibweg für
-`UserOrgAssignment`, den es noch nicht gibt).
+**Offene Punkte außerhalb des Umbaus:** Die Bestandsaufnahme vom 09.10.2026 (36 Punkte über alle
+Stränge) steht im Gedächtnis der Sitzung, nicht im Repository. Die wichtigsten beim
+Projektverantwortlichen: automatische Läufe auf dem Server einschalten (Probelauf-Pflicht, siehe
+CLAUDE.md „Automatische Läufe“); laufende Sicherung von Datenbank und `uploads_data` mit der IT
+klären; n8n aufräumen, aber den Vertragsende-Flow behalten; Minijob #1 (Minderjährige) und #3
+(RV-Korrektur) entscheiden; Mandantentrennung vor dem ersten Zugang einer Einrichtungsleitung
+(Weg C plus Schreibweg für `UserOrgAssignment`, den es noch nicht gibt).
+
+**PR #3 (Offboarding-Routen) ist erledigt:** `1b4a9b1` kam über den Ausstattungs-Strang nach
+`main` und ist seit dem 14.10.2026 live; der PR auf GitHub kann geschlossen werden.
+
+**Git:** Uncommittet bleiben nur `docs/README.md` (LOGA-Abschnitt) und `docs/module/loga/` –
+eigener Strang, nie in UX- oder `main`-Commits aufnehmen.
+
+**Prüfen:** Es liegen SECHS fremde Arbeitskopien unter `.claude/worktrees/`
+(`ausstattung-zugaenge`, `heuristic-chaplygin-b5558a`, `zealous-dirac-dffdc6`,
+`bold-heisenberg-a615cf`, `competent-turing-c6caae`, `nervous-leavitt-c5af8e`) — **alle sechs
+sind vollständig in `main`** (am 15.10.2026 mit `git merge-base --is-ancestor` geprüft) und
+können nach `git worktree remove` weg, sobald ihre Sitzungen geschlossen sind. Solange sie
+liegen, **nicht `npm run pruefen`**, sondern nach 0.3 prüfen: sonst scheitert z. B.
+`.claude/worktrees/ausstattung-zugaenge/…/pdf-export-zustaendigkeit.test.ts` und verdeckt den
+eigenen Stand. Lohnt sich: `.claude` dauerhaft in `tsconfig.json` und `jest.config.ts`
+ausschließen (gehört nach `main`, nicht in den Umbau).
 
 **Aufräumen, wenn es wieder geht:** `git worktree prune` (Reste `.git/worktrees/hr-fix` und
 `nervous-ritchie-2bbb51` ließen sich wegen „Permission denied“ nicht löschen – OneDrive);
@@ -188,9 +193,10 @@ npx next lint && npx jest --testPathIgnorePatterns ".claude"
 Dauerhaft lösen (auf `main`): `.claude` in `tsconfig.json` (`exclude`) und in
 `jest.config.ts` (`testPathIgnorePatterns`, `modulePathIgnorePatterns`) aufnehmen.
 
-### 0.4 Nächste Aufgabe: der Prototyp-Tag (V0)
+### 0.4 Der Prototyp-Tag (V0) – erledigt am 15.10.2026
 
-Termin setzt der Projektverantwortliche mit dem Personalbüro. Vorbereitet sind die Musterseite
+**Überholt, als Beleg stehen gelassen.** Der Tag ist gelaufen („in allen Punkten wie im Plan“),
+die Antworten auf die Fragen unten stehen in Abschnitt 4, „Am 15.10.2026“. Vorbereitet waren die Musterseite
 `/ui-muster` (nur `SUPER_ADMIN`) und – seit 07.10.2026 – die **echte neue Seite** im lokalen
 Docker-Stapel (0.6): Schalter „Neue Ansicht ausprobieren“ auf einer Vertragsende-Seite,
 Testvorgänge in jeder Lage über `scripts/vertragsende-testdaten.js` (VE-…-T01 bis T10).
@@ -304,10 +310,10 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | Paket | Inhalt | Stand |
 |---|---|---|
 | Schritt 0 | Entscheidungen vor U0, Plan committen | **erledigt** 01.10.2026; offen: Paket 3 deployen |
-| V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | offen – Termin setzt der Projektverantwortliche; **Voraussetzung für den Pilot** (der Plan verlangt ihn vor jedem Paket außer U0; U1 ist als reiner Rahmen davon ausgenommen, siehe Abschnitt 5) |
+| V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | **erledigt** 15.10.2026: „in allen Punkten wie im Plan“ – E9, E11, E13 entschieden, am Code des Pilots nichts nachzuziehen (Abschnitt 4) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Gepusht am 02.10.2026. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); **Tag 3 Rest bis 5 gebaut, durchgesehen und gepusht** (07.10.2026: Seite, Dialoge, Schalter, Testdaten – vor V0 auf Wunsch des Projektverantwortlichen); **Prototyp-Tag vorbereitet** (07.10.2026); **Versandergebnis angeschlossen, Codereview behoben** (08.10.2026, Testumgebung bleibt ohne Mailserver); offen: Prototyp-Tag, danach Tag 6–7 (Abnahme) |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); **Tag 3 Rest bis 5 gebaut, durchgesehen und gepusht** (07.10.2026: Seite, Dialoge, Schalter, Testdaten – vor V0 auf Wunsch des Projektverantwortlichen); **Prototyp-Tag vorbereitet** (07.10.2026); **Versandergebnis angeschlossen, Codereview behoben** (08.10.2026, Testumgebung bleibt ohne Mailserver); **V0 gelaufen, nichts nachzuziehen** (15.10.2026); offen: **Tag 6–7 (Abnahme)** – der nächste Schritt |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -386,11 +392,27 @@ Vollständig mit Begründung und verworfener Alternative im Plan, Abschnitt 6. H
 | P-F9b | Seite vor dem Prototyp-Tag | Ja (Projektverantwortlicher, 06.10.2026, nachdem er die Bausteine in Docker gesehen hatte): Tag 3 Rest bis 5 jetzt bauen, hinter dem Schalter; der Prototyp-Tag läuft dann mit der echten Seite in Docker statt mit der Musterseite. Abnahme (Tag 6–7) erst danach. |
 | – | Gelöschte Testvorgänge | Zurückholen (07.10.2026, „alles beheben“): die sieben Testvorgänge VE-2026-GYM-001 bis -007 aus der Docker-Kopie wieder in die Dev-Datenbank. |
 
+### Am 15.10.2026 (Prototyp-Tag und DSB)
+
+Der Prototyp-Tag mit dem Personalbüro lief, Rückmeldung des Projektverantwortlichen: „in allen
+Punkten wie im Plan“. Damit sind die bis dahin nur angenommenen Festlegungen bestätigt — am Code
+des Pilots ist **nichts** nachzuziehen (anders als in 0.4 vorgesehen).
+
+| # | Thema | Entschieden |
+|---|---|---|
+| – | Texte „Jetzt dran“, Statuspillen | Wie im Feinplan 3.3 und 3.5 gebaut; bleiben unverändert. |
+| – | Schritte am Handy (Feinplan 11, offen 1) | Wie gebaut: Punkte in einer Zeile, darunter die Kurzform („Schritt 4 von 5 · Vertrag“). |
+| – | Zeichen für einen klickbaren Schritt (offen 2) | Wie gebaut: kein zusätzliches Zeichen. |
+| – | „sonst: Offboarding“ nach dem Abschluss (offen 3) | Wie gebaut: bleibt sichtbar. |
+| E9 | Dichte der Listen | Wie im Plan: Vorgangsnummer bleibt als schmaler Chip, E-Mail nur im Detail; **kein** Dichte-Schalter „kompakt“, bis HR ihn verlangt. |
+| E11 | Modulnamen | Wie im Plan: Onboarding und Offboarding behalten; Dialogtitel angleichen („Neues Onboarding“, „Neues Offboarding“) — gehört zu U3/U4, nicht zum Pilot. |
+| E13 | Textbausteine der individuellen E-Mail | Wie im Plan: drei bis fünf, gepflegt vom Personalbüro, ohne Baustein bleibt das Blatt frei; Anlässe wie im Plan genannt (Vertrag zurück, Rückfrage zu Unterlagen, Terminbestätigung) — gehört zum Umbau von Paket 3, nicht zum Pilot. |
+| – | Mailtext im Versandprotokoll | DSB hat zugestimmt (15.10.2026). Die fünf Fragen der Mitteilung sind damit beantwortet; geht mit dem Umbau live. |
+
 ### Noch offen
 
 | # | Thema | Gebraucht vor |
 |---|---|---|
-| E9, E11, E13 | Dichte der Listen, Modulnamen, Textbausteine | Pilot – beantwortet der Prototyp-Tag (V0) |
 | E2, E8 | Startseite, Personenseite | U3 bzw. U8 |
 | E12, E14 | Reiter „Verlauf“, Sprache der automatischen Läufe | U10 bzw. U6 |
 | LOGA (E17, E19, E20, E22) | eigener Strang, siehe `docs/module/loga/` | L0 |
@@ -1665,8 +1687,51 @@ Blickwinkel; Skripte und Server der Prüfer wurden anschließend geprüft und si
   `beispiel.invalid`, danach gelöscht).
 - **Geprüft:** komplette Suite 210 Suites / 5782 Tests, `tsc`, `next lint` für die geänderten
   Dateien. Am 15.10.2026 nach ausdrücklicher Freigabe gepusht (`ux-umbau` `e8e4571..7e815f0`, darunter die zuvor lokal gebliebenen Commits `7ebb336` und `150b2b1`); nicht deployt.
-- **Offen:** DSB-Mitteilung abstimmen (Fragen a bis e); ob `466662b` und `e68d692` früh nach `main`
-  sollen, damit schon Texte entstehen (Schema +1 Tabelle).
+- ~~**Offen:** DSB-Mitteilung abstimmen (Fragen a bis e)~~ — **der DSB hat am 15.10.2026
+  zugestimmt.** Damit entfällt auch die Frage, ob `466662b` und `e68d692` früh allein nach `main`
+  gehen: der Nebenstrang geht mit dem Umbau live.
+
+### 15.10.2026 – Prototyp-Tag gelaufen, DSB einverstanden, `main` gemergt
+
+Der Projektverantwortliche meldet: Der DSB hat der Speicherung des Mailtexts zugestimmt, der
+Prototyp-Tag mit dem Personalbüro lief, und zwar „in allen Punkten wie im Plan“. Damit sind V0
+abgeschlossen und die Entscheidungen E9, E11 und E13 gefallen (Abschnitt 4, „Am 15.10.2026“) —
+**am Code des Pilots ist nichts nachzuziehen**; E11 und E13 betreffen spätere Pakete.
+
+- **Merge `origin/main` (`5595cf7`) in `ux-umbau`:** 19 Commits von `main`, darunter „Ausstattung
+  & Zugänge“ (A1–A4, am 14.10.2026 deployt) und der Offboarding-Routen-Fix. Vier Konflikte, alle
+  „beides behalten“: `CLAUDE.md` (Mailtext-Absatz aus `ux-umbau`, die Variablen-Zeile von `main`
+  als Obermenge — sie nennt zusätzlich die Ausstattungs-Freitexte und `betreffOhne`),
+  `einstellungen-content.tsx` (beide Importe: Mailtext-Dialog und Ausstattungs-Katalog),
+  `offboarding-detail-content.tsx` (Kopfkommentar aus `ux-umbau` — der Kopf kommt seit U1 aus dem
+  Layout —, Ausstattungs-Absatz von `main`), `ui-sperrklinke.test.ts` (`svg` gesamt 149 nach
+  Paket A4).
+- **Vier Nacharbeiten, die erst die Tests des Umbaus zeigten** (der Merge selbst war sauber):
+  1. `ausstattungPortalLink` baute die Adresse von Hand (`/dashboard/<id>?tab=checklist`) und
+     verstieß gegen den Wächter aus U1. Jetzt
+     `${getBaseUrl()}${vorgangPfad("onboarding", id, "checkliste")}` — genau so hatte es der
+     Ausstattungs-Feinplan 1.10 für den Merge vorgemerkt, mit einem Hinweis im Quelltext. Die
+     beiden Erwartungen in `ausstattung-lauf.test.ts` ziehen mit. **Der Wächter liest auch
+     Kommentare:** Die alte Adresse darf dort nicht einmal als Beispiel stehen.
+  2. Fünf Testsuiten von `main` (`abschluss-dialog`, `ausgaben-karte`, `ausstattung-karte`,
+     `brief-vorlagen-listen`, `rueckgaben-karte`) mockten `@/components/portal-header` — die
+     Datei gibt es seit U1 nicht mehr (der Kopf hängt im Layout). Mock entfernt; sonst läuft die
+     ganze Suite nicht an.
+  3. Sperrklinke `svg`: Stand 149 (von `main`) gegen Ist 147. Die Stände **je Datei** sind
+     unverändert, nur die Summe sinkt, weil der Umbau an anderen Stellen Inline-SVG ersetzt hat.
+     `gesamt` im Test nachgezogen, `stand.json` unberührt.
+  4. Nach dem Merge zuerst `npm run db:generate` (siehe unten).
+- Die neuen Mails der Ausstattung laufen über `sendEventEmail` und bekommen damit ohne
+  Zusatzarbeit einen Text im Protokoll.
+- **Nach dem Merge zuerst `npm run db:generate`** — der Merge brachte neue Schema-Felder
+  (`arbeitsortId`, `mitAusstattung`, `ausgabeId`, `zustand`, `herkunft`,
+  `weitereBeschaeftigung`), und `tsc` meldete sie mit dem alten Prisma-Client als 60 Fehler.
+- Geprüft nach 0.3 (ohne die fremden Arbeitskopien): `tsc` grün, `next lint` nur die bekannten
+  Warnungen, Jest grün. Mit `npm run pruefen` scheitert ein Test in
+  `.claude/worktrees/ausstattung-zugaenge` — fremde Kopie, siehe 0.0.
+- Nebenbei festgestellt: Alle sechs Arbeitskopien unter `.claude/worktrees/` sind inzwischen in
+  `main`, darunter PR #3 (`1b4a9b1`, Offboarding-Routen) — der ist damit live und sein PR kann
+  geschlossen werden.
 
 ## 8. Branches und Commits
 
@@ -1724,6 +1789,8 @@ Blickwinkel; Skripte und Server der Prüfer wurden anschließend geprüft und si
 | `ux-umbau` | `e8e4571` | Prototyp-Tag vorbereitet: Docker neu gebaut, Leitfaden gegen den Code geprüft, Bilder neu |
 | `ux-umbau` | `466662b`, `da1c62e` | Mailtext im Versandprotokoll: Backend (eigener Commit), Routen und Dialog |
 | `ux-umbau` | `fb8ec05`, `4bd6f6b`, `e68d692` | Mailtext: Doku, Korrekturen der ersten Durchsicht, Korrekturen der zweiten Durchsicht |
+| `ux-umbau` | `7443ea8` | Logbuch: Push vom 15.10.2026 nachgetragen |
+| `ux-umbau` | (dieser Merge) | Merge von `main` (`5595cf7`, Ausstattung & Zugänge, Offboarding-Routen) samt vier Nacharbeiten; V0 und DSB im Logbuch |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.

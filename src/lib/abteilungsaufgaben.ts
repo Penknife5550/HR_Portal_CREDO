@@ -28,8 +28,19 @@
  *   - Nachweis nur bei echtem Versand (SENT oder an einen Webhook uebergeben).
  *   - Erinnerungen nur an informierte Abteilungen mit offenen Aufgaben, ab dem
  *     letzten Versand gezaehlt, und nicht laenger als 30 Tage nach der
- *     spaetesten offenen Faelligkeit.
+ *     spaetesten offenen Faelligkeit. Die erste Erinnerung mit einer eilenden
+ *     Ausstattungsaufgabe ist hoechstens WARNING (eiltDeckeln, Onboarding).
  *   - Kommentare der Abteilung gehen in HTML-Mails nur maskiert hinaus.
+ *   - Nachtrag (nur Onboarding, Ausstattung & Zugaenge, Regel 10): Was HR
+ *     nach der Information einer Stelle aendert, erfaehrt sie mit „Nachtrag
+ *     senden“ (gleicher Link) oder mit der naechsten Zuweisungsmail (F7).
+ *   - Waechter (nur Onboarding, Regel 15): Ist eine Stelle nicht informiert
+ *     oder ein Nachtrag offen und die frueheste offene Faelligkeit weniger als
+ *     7 Tage entfernt, wird ihre Zeile rot (`waechterHinweis`).
+ *   - Absage (nur Onboarding, E-A20): Nach EXPIRED kann HR die schon
+ *     informierten Stellen per Knopf benachrichtigen — einmal je Stelle, an die
+ *     Adresse, die informiert wurde, ohne Link, mit den schon erledigten
+ *     Aufgaben (`absageStand`, `erledigteListeMailFelder`).
  */
 
 import {
@@ -64,6 +75,16 @@ export const KOMMENTAR_MAX = 1000;
 export const DETAIL_MAX = 300;
 /** INFO-Erinnerung, wenn eine Aufgabe in so vielen Tagen faellig wird. */
 export const VORLAUF_TAGE = 3;
+/**
+ * Regel 15 (Ausstattung & Zugaenge): Der Waechter faerbt die Zeile einer
+ * Stelle rot, wenn die frueheste offene Faelligkeit weniger als so viele
+ * Berliner Kalendertage entfernt ist (oder schon vorbei). Steht hier und nicht
+ * in ausstattung.ts, weil diese Datei von dort nichts importiert; ausstattung.ts
+ * reicht den Wert weiter.
+ */
+export const WAECHTER_TAGE = 7;
+/** So viele Titel nennt die Zeile „Nach der Information geändert: …“ einzeln, der Rest steht als Anzahl. */
+export const NACHTRAG_TITEL_MAX = 4;
 
 /** Schluessel der Fuehrungskraft (geht nie an DepartmentConfig). */
 export const FUEHRUNGSKRAFT_SCHLUESSEL = DEPARTMENT_KEYS.VORGESETZTER;
@@ -94,6 +115,13 @@ export const MELDUNGEN = {
     "Dieser Vorgang ist abgeschlossen. Änderungen sind nicht mehr möglich.",
   ZU_VIELE_ANFRAGEN: "Zu viele Anfragen. Bitte warten Sie einen Moment.",
   AUFGABE_NICHT_GEFUNDEN: "Aufgabe nicht gefunden",
+  /**
+   * Ausstattung & Zugaenge (R9, E-A21, 409): Die Personalabteilung hat die
+   * Aufgabe gestrichen — abhaken und wieder oeffnen geht nicht mehr, ein
+   * Kommentar schon. Link-Seite (Sie) und Portal-PATCH.
+   */
+  AUFGABE_ENTFAELLT:
+    "Diese Aufgabe entfällt – die Personalabteilung hat sie gestrichen. Sie lässt sich nicht mehr abhaken oder wieder öffnen.",
   UNGUELTIGE_EINGABE: "Ungültige Eingabe",
   // HR im Portal
   VORGANG_NICHT_GEFUNDEN: "Offboarding-Vorgang nicht gefunden",
@@ -131,6 +159,14 @@ export const MELDUNGEN = {
     "Der Vertragsbeginn fehlt. Die Fälligkeiten der Aufgaben richten sich nach dem Vertragsbeginn aus den Einstellungsmodalitäten.",
   /** Oeffentliche Onboarding-Seite, solange kein Name bekannt ist. */
   NAME_FOLGT: "Name folgt",
+  // ---- Paket A3: Absage an die Stellen (E-A20, nur Onboarding) ----
+  /** Aktion `absage` an einem Vorgang, der nicht EXPIRED ist (409, grund NICHT_ABGESAGT). */
+  ABSAGE_NUR_ABGELAUFEN:
+    "Eine Absage an die Stellen ist erst möglich, wenn der Vorgang als abgelaufen markiert ist.",
+  /** Absage, aber keine Stelle hat je eine Aufgaben-E-Mail bekommen (409). */
+  ABSAGE_NIEMAND_INFORMIERT: "Keine Stelle war informiert – eine Absage ist nicht nötig.",
+  /** Zweiter Klick: Jede informierte Stelle hat die Absage schon (409). */
+  ABSAGE_BEREITS_GESENDET: "Die Absage ist bereits an alle informierten Stellen gegangen.",
 } as const;
 
 /**
@@ -173,7 +209,13 @@ export type Grund =
   | "MAIL_FEHLGESCHLAGEN"
   | "ADRESSE_GEAENDERT"
   | "SPERRZEIT"
-  | "VORGANG_ABGESCHLOSSEN";
+  | "VORGANG_ABGESCHLOSSEN"
+  /** Ausstattung & Zugaenge: Aufgabe von HR gestrichen (409 beim Abhaken, Link und Portal). */
+  | "AUFGABE_ENTFAELLT"
+  /** Ausstattung & Zugaenge (Regel 10): „Nachtrag senden“, aber die Aenderungsliste ist leer. */
+  | "KEIN_NACHTRAG"
+  /** Absage (E-A20): Diese Stelle hat die Absage schon bekommen (F13, `abgesagtAm`). */
+  | "BEREITS_ABGESAGT";
 
 export const GRUND_TEXTE: Record<Grund, string> = {
   KEINE_ADRESSE: "keine aktive Adresse hinterlegt (Einstellungen → Abteilungen)",
@@ -187,6 +229,9 @@ export const GRUND_TEXTE: Record<Grund, string> = {
   ADRESSE_GEAENDERT: "Adresse geändert, bitte Link erneuern",
   SPERRZEIT: `vor weniger als ${SPERRZEIT_MINUTEN} Minuten bereits angeschrieben – bitte kurz warten`,
   VORGANG_ABGESCHLOSSEN: "Vorgang ist abgeschlossen",
+  AUFGABE_ENTFAELLT: "Aufgabe entfällt (von der Personalabteilung gestrichen)",
+  KEIN_NACHTRAG: "seit der letzten E-Mail nichts geändert – kein Nachtrag nötig",
+  BEREITS_ABGESAGT: "Absage bereits gesendet",
 };
 
 /**
@@ -202,7 +247,12 @@ export function grundText(grund: Grund, detail?: string | null): string {
 }
 
 /** Gruende, die kein Problem sind — sie tauchen in "Nicht informiert: …" nicht auf. */
-const GRUENDE_OHNE_PROBLEM: ReadonlySet<Grund> = new Set(["BEREITS_INFORMIERT", "ALLES_ERLEDIGT"]);
+const GRUENDE_OHNE_PROBLEM: ReadonlySet<Grund> = new Set([
+  "BEREITS_INFORMIERT",
+  "ALLES_ERLEDIGT",
+  "KEIN_NACHTRAG",
+  "BEREITS_ABGESAGT",
+]);
 
 // =============================================
 // Hilfen
@@ -662,6 +712,31 @@ export interface LinkErinnerungsStand {
   lastSentAt?: Date | string | null;
   lastReminderAt: Date | string | null;
   allTasksComplete: boolean;
+  /**
+   * Zahl der bisherigen Erinnerungen an diesen Link (Spalte `reminderCount`).
+   * Nur fuer `eiltDeckeln` — fehlt er, wird nie gedeckelt.
+   */
+  reminderCount?: number | null;
+}
+
+/**
+ * Regel 14 (Ausstattung & Zugaenge, Paket A3): Eine kurzfristige Einstellung
+ * soll mit der ersten Erinnerung nicht gleich eskalieren. Ist das die ERSTE
+ * Erinnerung an den Link (`reminderCount === 0`) und ist unter den offenen
+ * Aufgaben eine, die „eilt“ (ihre Frist wurde beim Anlegen oder beim Versand
+ * auf heute angehoben), wird ESCALATION zu WARNING. Alles andere bleibt: INFO
+ * und WARNING unveraendert, ab der zweiten Erinnerung die volle Stufe, ohne
+ * eilende Aufgabe (Vorlagenaufgaben, Offboarding) nie gedeckelt.
+ *
+ * Genutzt in `erinnerungsStufe` (taeglicher Lauf) und beim Knopf „Erinnern“.
+ */
+export function eiltDeckeln(
+  stufe: ErinnerungsStufe | null,
+  offene: ReadonlyArray<{ eilt?: boolean | null }>,
+  reminderCount: number | null | undefined,
+): ErinnerungsStufe | null {
+  if (stufe !== "ESCALATION" || reminderCount !== 0) return stufe;
+  return offene.some((a) => a.eilt === true) ? "WARNING" : stufe;
 }
 
 /** Bezugspunkt der Abstaende: max(lastSentAt ?? sentAt, lastReminderAt). */
@@ -687,19 +762,26 @@ export type ErinnerungsEntscheidung =
  *   - keine Stufe                             → nein (KEINE_STUFE)
  *   - letzter Versand/Erinnerung zu kurz her  → nein (ZU_FRUEH)
  *
+ * Die Stufe geht durch `eiltDeckeln` (Regel 14): erste Erinnerung mit einer
+ * eilenden Aufgabe hoechstens WARNING — samt deren Abstand (2 statt 5 Tage).
+ *
  * Der Knopf "Erinnern" fragt diese Funktion NICHT: Er ist eine ausdrueckliche
- * HR-Aktion und nimmt `stufeBerechnen(...).level ?? "INFO"`.
+ * HR-Aktion und nimmt `eiltDeckeln(stufeBerechnen(...).level, …) ?? "INFO"`.
  */
 export function erinnerungsStufe(
   link: LinkErinnerungsStand,
-  offene: ReadonlyArray<{ dueDate: Date | string | null }>,
+  offene: ReadonlyArray<{ dueDate: Date | string | null; eilt?: boolean | null }>,
   jetzt: Date,
 ): ErinnerungsEntscheidung {
   if (!alsDatum(link.sentAt)) return { erinnern: false, warum: "NICHT_INFORMIERT", stufe: null };
   if (link.allTasksComplete || offene.length === 0) {
     return { erinnern: false, warum: "ALLES_ERLEDIGT", stufe: null };
   }
-  const stufe = stufeBerechnen(offene, jetzt);
+  const berechnet = stufeBerechnen(offene, jetzt);
+  const stufe: StufenBerechnung = {
+    ...berechnet,
+    level: eiltDeckeln(berechnet.level, offene, link.reminderCount),
+  };
   if (
     stufe.spaetesteFaelligkeit &&
     jetzt.getTime() - stufe.spaetesteFaelligkeit.getTime() >
@@ -754,6 +836,14 @@ export interface AufgabeFuerListe {
    * Fehlt er oder ist er leer, sieht die Liste aus wie in Paket 1b.
    */
   description?: string | null;
+  /**
+   * Bemerkung zur Position (Ausstattung & Zugaenge, Regel 8) mit ihrer
+   * Beschriftung nach Herkunft („Bemerkung der Führungskraft“ …, aus
+   * `bemerkungLabel`). Steht als eigene eingerueckte Zeile unter dem Hinweis.
+   */
+  bemerkung?: { text: string; label: string } | null;
+  /** Frist auf heute angehoben (Regel 14) — „(eilt)“ hinter der Faelligkeit. */
+  eilt?: boolean | null;
 }
 
 /**
@@ -779,10 +869,16 @@ export function nachFaelligkeitSortiert<T extends { dueDate: Date | string | nul
  * zuletzt, sonst Reihenfolge wie uebergeben).
  *
  *   aufgabenliste       Klartext, eine Zeile je Aufgabe: "- Titel – fällig TT.MM.JJJJ",
- *                       ein Hinweis steht eingerueckt in der Zeile darunter
- *   aufgabenliste_html  <ul>…</ul>, Titel und Hinweis maskiert (renderTemplate maskiert nichts)
+ *                       bei angehobener Frist dahinter " (eilt)"; Hinweis und
+ *                       Bemerkung („<Label>: <Text>“) stehen eingerueckt darunter
+ *   aufgabenliste_html  <ul>…</ul>, Titel, Hinweis und Bemerkung maskiert (renderTemplate maskiert nichts)
  *   anzahl_aufgaben     Anzahl
  *   naechste_faelligkeit TT.MM.JJJJ der fruehesten Faelligkeit, sonst ""
+ *
+ * Ohne `bemerkung` und `eilt` (Vorlagenaufgaben, Offboarding) bleibt die
+ * Ausgabe Byte fuer Byte wie vor Paket A3 — die Katalogbeispiele in events.ts
+ * gelten unveraendert. Bemerkungen sind Freitext (≤ 500 Zeichen) und stehen
+ * wie der Hinweis in EINER Zeile (Zeilenumbrueche werden Leerzeichen).
  */
 export function aufgabenlisteMailFelder(aufgaben: ReadonlyArray<AufgabeFuerListe>): {
   aufgabenliste: string;
@@ -791,21 +887,20 @@ export function aufgabenlisteMailFelder(aufgaben: ReadonlyArray<AufgabeFuerListe
   naechste_faelligkeit: string;
 } {
   const sortiert = nachFaelligkeitSortiert(aufgaben).map((a) => ({ a, d: alsDatum(a.dueDate) }));
+  const einzeilig = (text: string | null | undefined) => (text ?? "").replace(/\s+/g, " ").trim();
+  const grau = (text: string) => `<br><span style="color:#6b7280;font-size:13px;">${escapeHtml(text)}</span>`;
 
   const zeilen: string[] = [];
   const punkte: string[] = [];
   for (const { a, d } of sortiert) {
-    const titel = a.title.replace(/\s+/g, " ").trim();
-    const faellig = d ? ` – fällig ${formatDatumDE(d)}` : "";
-    const hinweis = (a.description ?? "").replace(/\s+/g, " ").trim();
-    zeilen.push(`- ${titel}${faellig}${hinweis ? `\n  ${hinweis}` : ""}`);
-    punkte.push(
-      `<li style="margin:0 0 4px;">${escapeHtml(titel)}${faellig}${
-        hinweis
-          ? `<br><span style="color:#6b7280;font-size:13px;">${escapeHtml(hinweis)}</span>`
-          : ""
-      }</li>`,
-    );
+    const titel = einzeilig(a.title);
+    const faellig = d ? ` – fällig ${formatDatumDE(d)}${a.eilt === true ? " (eilt)" : ""}` : "";
+    const hinweis = einzeilig(a.description);
+    const bemerkungText = einzeilig(a.bemerkung?.text);
+    const bemerkung = bemerkungText ? `${einzeilig(a.bemerkung?.label) || "Bemerkung"}: ${bemerkungText}` : "";
+    const darunter = [hinweis, bemerkung].filter((t) => t !== "");
+    zeilen.push(`- ${titel}${faellig}${darunter.map((t) => `\n  ${t}`).join("")}`);
+    punkte.push(`<li style="margin:0 0 4px;">${escapeHtml(titel)}${faellig}${darunter.map(grau).join("")}</li>`);
   }
 
   const erste = sortiert.find((s) => s.d)?.d ?? null;
@@ -817,6 +912,46 @@ export function aufgabenlisteMailFelder(aufgaben: ReadonlyArray<AufgabeFuerListe
         : "",
     anzahl_aufgaben: aufgaben.length,
     naechste_faelligkeit: erste ? formatDatumDE(erste) : "",
+  };
+}
+
+/**
+ * Die schon erledigten Aufgaben einer Stelle fuer die Absage (E-A20, F17):
+ * Vorlagen- UND Ausstattungsaufgaben, die die Stelle erledigt hat — ein „IT-
+ * Zugang einrichten“ aus der Vorlage muss genauso zurueckgebaut werden wie ein
+ * gewaehlter Zugang. Entfallene Aufgaben (F2: formal erledigt, aber
+ * gestrichen) gehoeren nicht dazu; das filtert der Aufrufer, hier steht nur
+ * die Darstellung. Reihenfolge wie uebergeben.
+ *
+ *   erledigte_liste       Klartext, „- Titel“ je Zeile — ROH, nur fuer den
+ *                         Textteil (der Mailer maskiert ihn im HTML-Teil
+ *                         zusaetzlich, FREITEXT_VARIABLEN)
+ *   erledigte_liste_html  dieselben Zeilen als fertige `<ul>` im Stil der
+ *                         Aufgabenliste, maskiert
+ *   anzahl_erledigt       Anzahl
+ *   hat_erledigte         Merker "ja"/"" fuer {{#hat_erledigte}} (Zeichenkette:
+ *                         renderTemplate kennt nur „nicht leer“)
+ *
+ * Nur Titel — nie Bemerkung, Hinweis oder Kommentar. Ein Titel ist einzeilig.
+ */
+export function erledigteListeMailFelder(aufgaben: ReadonlyArray<{ title: string }>): {
+  erledigte_liste: string;
+  erledigte_liste_html: string;
+  anzahl_erledigt: number;
+  hat_erledigte: string;
+} {
+  const titel = aufgaben.map((a) => a.title.replace(/\s+/g, " ").trim()).filter((t) => t !== "");
+  if (titel.length === 0) {
+    return { erledigte_liste: "", erledigte_liste_html: "", anzahl_erledigt: 0, hat_erledigte: "" };
+  }
+  return {
+    erledigte_liste: titel.map((t) => `- ${t}`).join("\n"),
+    erledigte_liste_html:
+      '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+      titel.map((t) => `<li style="margin:0 0 4px;">${escapeHtml(t)}</li>`).join("") +
+      "</ul>",
+    anzahl_erledigt: titel.length,
+    hat_erledigte: "ja",
   };
 }
 
@@ -940,7 +1075,13 @@ export function erinnerungsMerkerSetzen(status: LinkVersandStatus): boolean {
 // Versandbericht
 // =============================================
 
-export type AbteilungsAktion = "informieren" | "erneut-senden" | "erinnern" | "link-erneuern";
+/**
+ * Aktionen der Karte. `nachtrag` (Ausstattung & Zugaenge, Regel 10) und
+ * `absage` (E-A20, nur bei EXPIRED, ohne `departmentKey`) gibt es NUR im
+ * Onboarding: Das Offboarding-Schema kennt sie nicht und antwortet mit 400
+ * „Unbekannte Aktion.“ (validations/abteilungsaufgaben.ts).
+ */
+export type AbteilungsAktion = "informieren" | "erneut-senden" | "erinnern" | "link-erneuern" | "nachtrag" | "absage";
 
 export interface BerichtEintrag {
   departmentKey: string;
@@ -987,7 +1128,45 @@ const AKTIONS_NAMEN: Record<AbteilungsAktion, string> = {
   "erneut-senden": "Erneut senden",
   erinnern: "Erinnern",
   "link-erneuern": "Link erneuern",
+  nachtrag: "Nachtrag senden",
+  absage: "Absage senden",
 };
+
+/**
+ * Erfolgsmeldung zu einer Aktion, die mindestens eine Mail versendet hat. Ein
+ * Zweig je Aktion (`switch` mit `never`): Eine neue Aktion faellt sonst still
+ * in den Text einer anderen.
+ */
+function erfolgsMeldung(aktion: AbteilungsAktion, versendet: ReadonlyArray<BerichtEintrag>): string {
+  const e = versendet[0];
+  const mitNeuemLink = `E-Mail mit neuem Link an ${e.departmentName} (neue Adresse ${e.email}) gesendet. Der bisherige Link ist ungültig.`;
+  switch (aktion) {
+    case "informieren": {
+      const n = versendet.length;
+      return `${n} ${n === 1 ? "Abteilung" : "Abteilungen"} informiert: ${namensListe(versendet)}.`;
+    }
+    case "link-erneuern":
+      return `Neuer Link an ${e.departmentName} gesendet (${e.email}). Der bisherige Link ist ungültig.`;
+    case "erneut-senden":
+      return e.neuerLink ? mitNeuemLink : `E-Mail an ${e.departmentName} erneut gesendet. Der Link ist unverändert.`;
+    case "erinnern":
+      return e.neuerLink ? mitNeuemLink : `Erinnerung an ${e.departmentName} gesendet.`;
+    case "nachtrag":
+      // Adresse seit der Information geaendert: Der Nachtrag ging als Mail mit
+      // neuem Link an die neue Adresse (wie „Erneut senden“).
+      return e.neuerLink
+        ? `Nachtrag mit neuem Link an ${e.departmentName} (neue Adresse ${e.email}) gesendet. Der bisherige Link ist ungültig.`
+        : `Nachtrag an ${e.departmentName} gesendet. Der Link ist unverändert.`;
+    case "absage": {
+      const n = versendet.length;
+      return `Absage an ${n} ${n === 1 ? "Stelle" : "Stellen"} gesendet: ${namensListe(versendet)}.`;
+    }
+    default: {
+      const unbekannt: never = aktion;
+      return `${String(unbekannt)}: E-Mail gesendet.`;
+    }
+  }
+}
 
 /**
  * Deutsche Meldung zum Bericht: `meldung` (gruen bei Erfolg, rot sonst) und
@@ -1003,23 +1182,10 @@ export function berichtMeldung(bericht: VersandBericht): { meldung: string; hinw
   }
 
   if (versendet.length > 0) {
-    let meldung: string;
-    const e = versendet[0];
-    if (aktion === "informieren") {
-      const n = versendet.length;
-      meldung = `${n} ${n === 1 ? "Abteilung" : "Abteilungen"} informiert: ${namensListe(versendet)}.`;
-    } else if (aktion === "link-erneuern") {
-      meldung = `Neuer Link an ${e.departmentName} gesendet (${e.email}). Der bisherige Link ist ungültig.`;
-    } else if (e.neuerLink) {
-      meldung = `E-Mail mit neuem Link an ${e.departmentName} (neue Adresse ${e.email}) gesendet. Der bisherige Link ist ungültig.`;
-    } else if (aktion === "erinnern") {
-      meldung = `Erinnerung an ${e.departmentName} gesendet.`;
-    } else {
-      meldung = `E-Mail an ${e.departmentName} erneut gesendet. Der Link ist unverändert.`;
-    }
+    const meldung = erfolgsMeldung(aktion, versendet);
     if (probleme.length > 0) {
       hinweise.unshift(
-        `Nicht informiert: ${probleme
+        `${aktion === "absage" ? "Absage nicht zugestellt" : "Nicht informiert"}: ${probleme
           .map((p) => `${p.departmentName} (${grundText(p.grund ?? "MAIL_NICHT_VERSENDET", p.detail)})`)
           .join(", ")}.`,
       );
@@ -1028,6 +1194,18 @@ export function berichtMeldung(bericht: VersandBericht): { meldung: string; hinw
   }
 
   // Nichts versendet
+  if (aktion === "absage") {
+    // Mehrere Stellen in einem Klick (wie „informieren“): keine Stelle war
+    // informiert, alle haben die Absage schon, oder die Mails scheiterten.
+    if (uebersprungen.length === 0) return { meldung: MELDUNGEN.ABSAGE_NIEMAND_INFORMIERT, hinweis: null };
+    if (probleme.length === 0) return { meldung: MELDUNGEN.ABSAGE_BEREITS_GESENDET, hinweis: null };
+    return {
+      meldung: `Absage nicht gesendet. ${probleme
+        .map((p) => `${p.departmentName}: ${grundText(p.grund ?? "MAIL_NICHT_VERSENDET", p.detail)}.`)
+        .join(" ")}`,
+      hinweis: null,
+    };
+  }
   if (aktion === "informieren") {
     if (uebersprungen.length === 0) {
       return { meldung: MELDUNGEN.KEINE_ABTEILUNGSAUFGABEN, hinweis: null };
@@ -1084,6 +1262,13 @@ export interface Anzeige {
   zusatz: string | null;
   /** Gelber/roter Hinweis unter der Zeile (Grund, Adressaenderung, letzter Fehlversuch). */
   hinweis: string | null;
+  /**
+   * Farbe des Hinweises, wenn sie nicht am Status haengt — gesetzt vom
+   * Waechter (Regel 15, nur Onboarding): "rot". Fehlt sie, faerbt die Karte wie
+   * bisher nach dem Status (rot bei FEHLGESCHLAGEN, NICHT_VERSENDET,
+   * ABGELAUFEN, sonst gelb).
+   */
+  hinweisTon?: "rot" | "gelb";
 }
 
 export interface LinkAnzeigeStand {
@@ -1215,6 +1400,17 @@ export interface AufgabeFuerZeile {
   id?: string;
   title?: string;
   description?: string | null;
+  /**
+   * Ausstattung & Zugaenge (nur Onboarding, alle optional — das Offboarding
+   * setzt sie nie): Herkunft der Aufgabe (`ChecklistItem.herkunft`,
+   * "AUSSTATTUNG" | "HINWEIS", null = Vorlage), ob ihre Position eine
+   * Bemerkung traegt (nur das Kennzeichen, nie der Text — die Uebersicht geht
+   * an alle PORTAL_ROLES, Feinplan 1.11) und ob sie entfaellt (F2: zaehlt
+   * nicht in `aufgaben.gesamt`).
+   */
+  herkunft?: string | null;
+  mitBemerkung?: boolean;
+  entfaellt?: boolean;
 }
 
 /**
@@ -1226,6 +1422,14 @@ export interface ZeilenVorschau {
   aufgaben: { id: string; title: string; dueDate: string | null; description: string | null }[];
   /** Gueltigkeit, die ein neuer Link jetzt bekaeme (ISO). */
   gueltigBis: string;
+  /**
+   * Ausstattung & Zugaenge (Mockup 6.4): so viele der offenen Aufgaben stammen
+   * aus „Ausstattung & Zugänge“ (Herkunft gesetzt), davon so viele mit
+   * Bemerkung. Beide Schluessel fehlen ganz, solange keine dabei ist (immer
+   * im Offboarding).
+   */
+  ausstattung?: number;
+  mitBemerkung?: number;
 }
 
 export interface LinkFuerZeile extends LinkAnzeigeStand {
@@ -1249,6 +1453,15 @@ export interface ZeilenAktionen {
   erinnernGesperrt: boolean;
   /** Wie `erinnernGesperrt`, fuer "Erneut senden". */
   erneutSendenGesperrt: boolean;
+  /**
+   * „Nachtrag senden“ (nur Onboarding, Regel 10): Link mit `sentAt`,
+   * aufgeloester Empfaenger, Aenderungsliste nicht leer, Vorgang weder
+   * gesperrt noch abgeschlossen, Sperrzeit vorbei. Offene Aufgaben sind NICHT
+   * noetig — auch „nur Entfällt“ geht hinaus. Fehlt im Offboarding ganz.
+   */
+  nachtrag?: boolean;
+  /** Wie `erneutSendenGesperrt`, fuer „Nachtrag senden“ (Sperrzeit laeuft). */
+  nachtragGesperrt?: boolean;
 }
 
 export interface AbteilungsZeile {
@@ -1289,11 +1502,168 @@ export interface AbteilungsZeile {
   sperreBis: string | null;
   /** Paket 5: Inhalt der Mail fuer den Dialog „Abteilungen informieren" (nur bei informierbar). */
   vorschau: ZeilenVorschau | null;
+  /**
+   * Ausstattung & Zugaenge (Regel 10, nur Onboarding): Was sich nach der
+   * Information geaendert hat und noch nicht gesendet ist — Anzahl der
+   * (zusammengefassten) Eintraege und die Zeile der Karte („Nach der
+   * Information geändert: …“). `null` ohne offene Eintraege oder bei
+   * abgeschlossenem Vorgang; fehlt im Offboarding ganz.
+   */
+  nachtrag?: { anzahl: number; text: string } | null;
+}
+
+// =============================================
+// Nachtrag und Waechter (Ausstattung & Zugaenge, Regeln 10 und 15)
+// =============================================
+
+/**
+ * Die zusammengefasste Aenderungsliste EINER Stelle (Regel 10) — Titel je Art,
+ * in der Reihenfolge ihres ersten Eintrags. Gebaut wird sie in ausstattung.ts
+ * (`nachtragListe`); der Typ steht hier, weil `abteilungsZeilenBauen` ihn
+ * liest und diese Datei von ausstattung.ts nichts importiert.
+ */
+export interface NachtragListe {
+  neu: readonly string[];
+  geaendert: readonly string[];
+  entfaellt: readonly string[];
+}
+
+/** Zahl der Eintraege einer zusammengefassten Liste (0 = nichts zu senden). */
+export function nachtragAnzahl(liste: NachtragListe | null | undefined): number {
+  if (!liste) return 0;
+  return liste.neu.length + liste.geaendert.length + liste.entfaellt.length;
+}
+
+/**
+ * Die Zeile der Karte zu einem offenen Nachtrag (Mockup 6.3):
+ *
+ *   „Nach der Information geändert: „Dienst-Laptop / PC bereitstellen“
+ *   hinzugefügt, „Schlüssel ausgeben: Sporthalle“ entfällt. Die Stelle
+ *   erfährt davon erst mit „Nachtrag senden“.“
+ *
+ * Hoechstens NACHTRAG_TITEL_MAX Titel, der Rest als „und N weitere“. Der
+ * zweite Satz haengt an `perKnopf`: Kann HR gerade keinen Nachtrag senden
+ * (etwa nach einem gescheiterten „Link erneuern“), nimmt die naechste
+ * Zuweisungsmail die Eintraege mit (F7).
+ */
+export function nachtragZeilenText(liste: NachtragListe, perKnopf: boolean): string {
+  const teile = [
+    ...liste.neu.map((t) => `„${t}“ hinzugefügt`),
+    ...liste.geaendert.map((t) => `„${t}“ geändert`),
+    ...liste.entfaellt.map((t) => `„${t}“ entfällt`),
+  ];
+  const gezeigt = teile.slice(0, NACHTRAG_TITEL_MAX);
+  const rest = teile.length - gezeigt.length;
+  const aufzaehlung = rest > 0 ? `${gezeigt.join(", ")} und ${rest} weitere` : gezeigt.join(", ");
+  const folge = perKnopf
+    ? "Die Stelle erfährt davon erst mit „Nachtrag senden“."
+    : "Die Stelle erfährt davon erst mit der nächsten Aufgaben-E-Mail („Erneut senden“).";
+  return `Nach der Information geändert: ${aufzaehlung}. ${folge}`;
+}
+
+/**
+ * Regel 15: der Waechter einer Zeile (nur Onboarding). Text, wenn ALLES
+ * zutrifft, sonst `null`:
+ *
+ *   - Modalitaeten eingereicht (`gesperrt` falsch) und Vorgang nicht
+ *     abgeschlossen,
+ *   - Stelle nicht informiert (kein Link oder kein `sentAt`) ODER ein
+ *     Nachtrag offen,
+ *   - die frueheste Faelligkeit der OFFENEN Aufgaben liegt weniger als
+ *     WAECHTER_TAGE Berliner Kalendertage entfernt (oder schon zurueck).
+ *
+ *   „Früheste Fälligkeit 24.01.2027 – Stelle noch nicht informiert“
+ *   „Früheste Fälligkeit 24.01.2027 – Nachtrag noch nicht gesendet“
+ *
+ * Aufgaben ohne Faelligkeit zaehlen nicht (keine kuenstliche Frist).
+ * Gerechnet in Kalendertagen: Heute 18.01. und faellig 25.01. ist genau eine
+ * Woche — noch nicht rot; faellig 24.01. schon.
+ */
+export function waechterHinweis(opts: {
+  link: { sentAt?: Date | string | null } | null;
+  offene: ReadonlyArray<{ dueDate: Date | string | null }>;
+  nachtragOffen: boolean;
+  gesperrt: boolean;
+  abgeschlossen: boolean;
+  jetzt: Date;
+}): string | null {
+  if (opts.gesperrt || opts.abgeschlossen) return null;
+  const informiert = !!alsDatum(opts.link?.sentAt);
+  if (informiert && !opts.nachtragOffen) return null;
+  const frueheste = opts.offene
+    .map((a) => alsDatum(a.dueDate))
+    .filter((d): d is Date => !!d)
+    .sort((a, b) => a.getTime() - b.getTime())[0];
+  const grenze = faelligkeitAus(opts.jetzt, WAECHTER_TAGE);
+  if (!frueheste || !grenze || frueheste.getTime() >= grenze.getTime()) return null;
+  return `Früheste Fälligkeit ${formatDatumDE(frueheste)} – ${
+    informiert ? "Nachtrag noch nicht gesendet" : "Stelle noch nicht informiert"
+  }`;
+}
+
+/**
+ * Ausstattung & Zugaenge, Stufe 2 (A4, G14, nur Offboarding): Hinweis einer
+ * Zeile, wenn nach der Information neue Aufgaben dazugekommen sind
+ * (Ruecknahme- und Sperraufgaben aus „Einstellung zuordnen …“). Einen Nachtrag
+ * gibt es im Offboarding nicht; „Erneut senden“ schickt die Liste mit
+ * demselben Link (ausser bei neuer Adresse).
+ */
+export function nachInfoNeuText(anzahl: number): string {
+  return `${anzahl === 1 ? "1 Aufgabe" : `${anzahl} Aufgaben`} nach der Information hinzugekommen – bitte „Erneut senden“`;
+}
+
+/**
+ * A4 (G14, nur Offboarding; Eingabe von `abteilungsZeilenBauen({ nachInfoNeu })`):
+ * je Stelle die OFFENEN Aufgaben, die nach der letzten Mail an sie angelegt
+ * wurden – `createdAt` spaeter als `lastSentAt ?? sentAt` ihres Links. Ohne
+ * Link, ohne Versand oder ohne `createdAt` zaehlt nichts; Stellen ohne neue
+ * Aufgabe fehlen im Ergebnis. „Erneut senden“ setzt `lastSentAt` und nimmt
+ * die Aufgaben damit wieder heraus.
+ */
+export function nachInfoNeuZaehlen(
+  aufgaben: ReadonlyArray<{
+    assigneeDepartment: string | null;
+    isCompleted: boolean;
+    createdAt?: Date | string | null;
+  }>,
+  links: ReadonlyArray<{ departmentKey: string; sentAt?: Date | string | null; lastSentAt?: Date | string | null }>,
+): Record<string, number> {
+  const ergebnis: Record<string, number> = {};
+  for (const link of links) {
+    const informiert = alsDatum(link.lastSentAt) ?? alsDatum(link.sentAt);
+    if (!informiert) continue;
+    const neu = aufgaben.filter((a) => {
+      if (a.isCompleted || a.assigneeDepartment !== link.departmentKey) return false;
+      const angelegt = alsDatum(a.createdAt);
+      return !!angelegt && angelegt.getTime() > informiert.getTime();
+    }).length;
+    if (neu > 0) ergebnis[link.departmentKey] = neu;
+  }
+  return ergebnis;
+}
+
+/** Eigenschaft ohne Prototyp-Kette (ein Schluessel wie „constructor“ traefe sonst Object.prototype). */
+function eigenerEintrag<T>(tabelle: Readonly<Record<string, T>> | undefined, key: string): T | undefined {
+  return tabelle && Object.prototype.hasOwnProperty.call(tabelle, key) ? tabelle[key] : undefined;
 }
 
 function iso(wert: Date | string | null | undefined): string | null {
   const d = alsDatum(wert);
   return d ? d.toISOString() : null;
+}
+
+/**
+ * Zaehler der Vorschau (Mockup 6.4): offene Aufgaben aus „Ausstattung &
+ * Zugänge“ (Herkunft gesetzt, auch die Hinweis-Aufgabe) und davon die mit
+ * Bemerkung. Ohne solche Aufgabe ein leeres Objekt — die Schluessel fehlen
+ * dann ganz (Offboarding, Vorgaenge ohne Ausstattung).
+ */
+function ausstattungZaehler(
+  offene: ReadonlyArray<AufgabeFuerZeile>,
+): Pick<ZeilenVorschau, "ausstattung" | "mitBemerkung"> {
+  const aus = offene.filter((a) => a.herkunft != null && a.herkunft !== "");
+  if (aus.length === 0) return {};
+  return { ausstattung: aus.length, mitBemerkung: aus.filter((a) => a.mitBemerkung === true).length };
 }
 
 /**
@@ -1313,6 +1683,22 @@ function iso(wert: Date | string | null | undefined): string | null {
  *   - `unbekannteZustaendigkeiten`: Freitexte an offenen Aufgaben, die keine
  *     Abteilung sind (istLinkAbteilung) und auch nicht HR/MITARBEITER — sie
  *     gehen nie per Link hinaus; die Karte nennt sie, statt sie zu verschweigen.
+ *
+ * Ausstattung & Zugaenge (Paket A3, nur Onboarding — beide Optionen fehlen im
+ * Offboarding, dann bleibt jede Zeile Byte fuer Byte wie bisher):
+ *   - `nachtraege` (Regel 10): je Stelle die zusammengefasste
+ *     Aenderungsliste. Daraus `zeile.nachtrag` und die Aktionen `nachtrag`/
+ *     `nachtragGesperrt` — gesetzt fuer JEDE Zeile, sobald die Option da ist.
+ *   - `waechter` (Regel 15): `waechterHinweis` je Zeile; trifft er zu, steht
+ *     sein Text vorn im Hinweis der Zeile und `anzeige.hinweisTon` ist "rot".
+ *
+ * Ausstattung & Zugaenge, Stufe 2 (Paket A4, G14, nur Offboarding — fehlt die
+ * Option, bleibt jede Zeile Byte fuer Byte wie bisher):
+ *   - `nachInfoNeu`: je Stelle die Zahl der offenen Aufgaben, die nach der
+ *     Information dazukamen (`createdAt > lastSentAt ?? sentAt`, rechnet der
+ *     Dienst). Ab 1, mit zugestelltem Link und bei laufendem Vorgang, steht
+ *     `nachInfoNeuText` im Hinweis der Zeile — gelb, wenn es keinen anderen
+ *     Hinweis gibt, sonst hinter ihm und in dessen Farbe.
  */
 export function abteilungsZeilenBauen(opts: {
   aufgaben: ReadonlyArray<AufgabeFuerZeile>;
@@ -1325,6 +1711,12 @@ export function abteilungsZeilenBauen(opts: {
   gesperrt?: boolean;
   linkUrl: (token: string) => string;
   jetzt: Date;
+  /** Regel 15 (Onboarding): Waechter je Zeile. */
+  waechter?: boolean;
+  /** Regel 10 (Onboarding): offene, zusammengefasste Aenderungsliste je Stelle. */
+  nachtraege?: Readonly<Record<string, NachtragListe>>;
+  /** A4 (Offboarding): offene Aufgaben je Stelle, die nach der Information dazukamen. */
+  nachInfoNeu?: Readonly<Record<string, number>>;
 }): {
   zeilen: AbteilungsZeile[];
   informierbar: number;
@@ -1339,6 +1731,9 @@ export function abteilungsZeilenBauen(opts: {
 
   const zeilen = schluessel.map((key): AbteilungsZeile => {
     const eigene = opts.aufgaben.filter((a) => a.assigneeDepartment === key);
+    // Entfallene (F2) sind erledigt und damit nie offen; in `gesamt` zaehlen
+    // sie auch nicht — wie in checklistFortschritt (ausstattung.ts).
+    const zaehlend = eigene.filter((a) => a.entfaellt !== true);
     const offene = eigene.filter((a) => !a.isCompleted);
     const naechste = offene
       .map((a) => alsDatum(a.dueDate))
@@ -1381,7 +1776,8 @@ export function abteilungsZeilenBauen(opts: {
     // schickte eine Aufforderung zu laengst erledigten Aufgaben.
     const moeglich = !!link && offen && empfaenger.ok;
     const erinnernMoeglich = moeglich && !!alsDatum(link?.sentAt);
-    const aktionen: ZeilenAktionen = opts.vorgangAbgeschlossen || gesperrt
+    const stillgelegt = opts.vorgangAbgeschlossen || gesperrt;
+    const aktionen: ZeilenAktionen = stillgelegt
       ? {
           erinnern: false,
           erneutSenden: false,
@@ -1399,6 +1795,43 @@ export function abteilungsZeilenBauen(opts: {
           erneutSendenGesperrt: moeglich && !!sperre,
         };
 
+    // Regel 10 (nur mit `nachtraege`): „Nachtrag senden“ braucht einen
+    // zugestellten Link, einen Empfaenger und eine nicht leere Liste — offene
+    // Aufgaben NICHT (auch „nur Entfällt“ geht hinaus). Dieselbe Pruefung macht
+    // der Server (`nachtragPruefung` im Versandkern).
+    const liste = eigenerEintrag(opts.nachtraege, key) ?? null;
+    const anzahl = nachtragAnzahl(liste);
+    const nachtragMoeglich = anzahl > 0 && !!link && !!alsDatum(link.sentAt) && empfaenger.ok;
+    if (opts.nachtraege) {
+      aktionen.nachtrag = !stillgelegt && nachtragMoeglich && !sperre;
+      aktionen.nachtragGesperrt = !stillgelegt && nachtragMoeglich && !!sperre;
+    }
+
+    // Regel 15: Waechter — vorn im Hinweis, die Zeile wird rot.
+    if (opts.waechter) {
+      const text = waechterHinweis({
+        link,
+        offene,
+        nachtragOffen: anzahl > 0,
+        gesperrt,
+        abgeschlossen: opts.vorgangAbgeschlossen,
+        jetzt: opts.jetzt,
+      });
+      if (text) {
+        anzeige = { ...anzeige, hinweis: anzeige.hinweis ? `${text} · ${anzeige.hinweis}` : text, hinweisTon: "rot" };
+      }
+    }
+
+    // A4 (Offboarding): nach der Information hinzugekommene Aufgaben — kein
+    // Nachtrag, sondern „Erneut senden“ mit demselben Link.
+    const neuNachInfo = eigenerEintrag(opts.nachInfoNeu, key) ?? 0;
+    if (neuNachInfo > 0 && link && alsDatum(link.sentAt) && !opts.vorgangAbgeschlossen) {
+      const text = nachInfoNeuText(neuNachInfo);
+      anzeige = anzeige.hinweis
+        ? { ...anzeige, hinweis: `${anzeige.hinweis} · ${text}` }
+        : { ...anzeige, hinweis: text, hinweisTon: "gelb" };
+    }
+
     return {
       departmentKey: key,
       departmentName: link?.departmentName || empfaenger.departmentName || abteilungLabel(key),
@@ -1407,7 +1840,7 @@ export function abteilungsZeilenBauen(opts: {
       fuehrungskraftName: istFuehrungskraft(key) ? (opts.fuehrungskraft?.name?.trim() || null) : null,
       email: link?.email ?? (empfaenger.ok ? empfaenger.email : null),
       aufgaben: {
-        gesamt: eigene.length,
+        gesamt: zaehlend.length,
         offen: offene.length,
         naechsteFaelligkeit: naechste ? naechste.toISOString() : null,
       },
@@ -1451,8 +1884,17 @@ export function abteilungsZeilenBauen(opts: {
               opts.jetzt,
               offene.map((a) => a.dueDate),
             ).toISOString(),
+            ...ausstattungZaehler(offene),
           }
         : null,
+      ...(opts.nachtraege
+        ? {
+            nachtrag:
+              liste && anzahl > 0 && !opts.vorgangAbgeschlossen
+                ? { anzahl, text: nachtragZeilenText(liste, nachtragMoeglich) }
+                : null,
+          }
+        : {}),
     };
   });
 
@@ -1693,18 +2135,99 @@ export interface SichtbarkeitsHinweis {
   alle: string;
   /** Wer zusaetzlich was sieht — nur Stellen mit Zusatzfeldern. */
   zusaetzlich: { departmentKey: string; departmentName: string; felder: string[] }[];
+  /**
+   * Ausstattung & Zugaenge (Mockup 6.4), nur Onboarding: was die Empfaenger
+   * ausserdem zu lesen bekommen — Bemerkungen zu ihren Aufgaben, Angaben und
+   * den Hinweis an die eigene Stelle (Regel 7). `null`, wenn nichts davon
+   * hinausgeht; im Offboarding fehlt der Schluessel ganz.
+   */
+  ausstattungSatz?: string | null;
   /** Schlusssatz, im Onboarding „Keine Angaben aus dem Personalfragebogen." */
   hinweis: string | null;
+}
+
+/**
+ * Was die Uebersicht ueber „Ausstattung & Zugänge“ fuer den Satz im Dialog
+ * mitgibt — je Stelle die Labels der Angaben, die sie sieht (eigene und
+ * freigegebene, `angabenFuer` in ausstattung.ts), und ob ein Hinweis an sie
+ * geht. NIE die Werte oder der Hinweistext: Die Uebersicht geht an alle
+ * PORTAL_ROLES (Feinplan 1.11). Nur Stellen mit etwas davon stehen darin.
+ */
+export interface AusstattungSicht {
+  stellen: Record<string, { angaben: string[]; hinweis: boolean }>;
+}
+
+/** Ein Empfaenger fuer `sichtbarkeitsHinweis` — eine `AbteilungsZeile` passt. */
+export interface SichtbarkeitsEmpfaenger {
+  departmentKey: string;
+  departmentName: string;
+  /** Aus `abteilungsZeilenBauen`: Zahl der Aufgaben mit Bemerkung (Ausstattung). */
+  vorschau?: Pick<ZeilenVorschau, "mitBemerkung"> | null;
+}
+
+/** „A“, „A und B“, „A, B und C“ (wie namenAufzaehlen in ausstattung.ts — diese Datei importiert von dort nichts). */
+function aufzaehlen(teile: ReadonlyArray<string>): string {
+  if (teile.length <= 1) return teile[0] ?? "";
+  return `${teile.slice(0, -1).join(", ")} und ${teile[teile.length - 1]}`;
+}
+
+/**
+ * Der Satz zu „Ausstattung & Zugänge“ unter „Was die Empfänger sehen“
+ * (Mockup 6.4), nur fuer die Empfaenger DIESES Versands:
+ *
+ *   „Zu ihren Aufgaben: die Bemerkungen der Führungskraft bzw. der
+ *   Personalabteilung. Dazu die Angaben „Unterrichtsfächer“ (IT-Abteilung,
+ *   Facility Management) und der Hinweis an die eigene Stelle (IT-Abteilung).“
+ *
+ * Teile fehlen, wenn es sie nicht gibt; ganz ohne → `null`. Die Stellen in
+ * Klammern sind die Empfaenger, die die Angabe bzw. einen Hinweis bekommen —
+ * dieselbe Regel (`angabenFuer`), nach der Mail und Link-Seite zuschneiden.
+ */
+function ausstattungsSatz(
+  empfaenger: ReadonlyArray<SichtbarkeitsEmpfaenger>,
+  ausstattung: AusstattungSicht | null | undefined,
+): string | null {
+  const bemerkungen = empfaenger.some((e) => (e.vorschau?.mitBemerkung ?? 0) > 0);
+  const stellen = ausstattung?.stellen ?? {};
+  const jeAngabe = new Map<string, string[]>();
+  const mitHinweis: string[] = [];
+  for (const e of empfaenger) {
+    const s = stellen[e.departmentKey];
+    if (!s) continue;
+    for (const label of s.angaben) {
+      const namen = jeAngabe.get(label) ?? [];
+      if (!namen.includes(e.departmentName)) namen.push(e.departmentName);
+      jeAngabe.set(label, namen);
+    }
+    if (s.hinweis && !mitHinweis.includes(e.departmentName)) mitHinweis.push(e.departmentName);
+  }
+
+  const dazu: string[] = [];
+  if (jeAngabe.size > 0) {
+    dazu.push(
+      `die Angaben ${aufzaehlen([...jeAngabe].map(([label, namen]) => `„${label}“ (${namen.join(", ")})`))}`,
+    );
+  }
+  if (mitHinweis.length > 0) dazu.push(`der Hinweis an die eigene Stelle (${mitHinweis.join(", ")})`);
+
+  const saetze = [
+    bemerkungen ? "Zu ihren Aufgaben: die Bemerkungen der Führungskraft bzw. der Personalabteilung." : null,
+    dazu.length > 0 ? `Dazu ${aufzaehlen(dazu)}.` : null,
+  ].filter((s): s is string => !!s);
+  return saetze.length > 0 ? saetze.join(" ") : null;
 }
 
 /**
  * Text fuer den Dialog „Abteilungen informieren", Abschnitt „Was die
  * Empfänger sehen" — aus derselben Tabelle, nach der Payload und Link-Seite
  * zugeschnitten werden (eine Quelle, kein zweiter Text in der Oberflaeche).
+ * `ausstattung` (Onboarding, aus `AbteilungsUebersichtDaten.ausstattungSicht`)
+ * ergaenzt den Satz zu „Ausstattung & Zugänge“ (`ausstattungSatz`).
  */
 export function sichtbarkeitsHinweis(
   modul: AbteilungsModul,
-  empfaenger: ReadonlyArray<{ departmentKey: string; departmentName: string }>,
+  empfaenger: ReadonlyArray<SichtbarkeitsEmpfaenger>,
+  ausstattung?: AusstattungSicht | null,
 ): SichtbarkeitsHinweis {
   const texte = MODUL_TEXTE[modul];
   if (modul === "OFFBOARDING") {
@@ -1712,13 +2235,20 @@ export function sichtbarkeitsHinweis(
   }
   const gesehen = new Set<string>();
   const zusaetzlich: SichtbarkeitsHinweis["zusaetzlich"] = [];
+  const eindeutig: SichtbarkeitsEmpfaenger[] = [];
   for (const e of empfaenger) {
     if (gesehen.has(e.departmentKey)) continue;
     gesehen.add(e.departmentKey);
+    eindeutig.push(e);
     const felder = zusatzfelderFuer(e.departmentKey).map((f) => ZUSATZFELD_LABELS[f]);
     if (felder.length > 0) zusaetzlich.push({ departmentKey: e.departmentKey, departmentName: e.departmentName, felder });
   }
-  return { alle: texte.grunddaten, zusaetzlich, hinweis: "Keine Angaben aus dem Personalfragebogen." };
+  return {
+    alle: texte.grunddaten,
+    zusaetzlich,
+    ausstattungSatz: ausstattungsSatz(eindeutig, ausstattung),
+    hinweis: "Keine Angaben aus dem Personalfragebogen.",
+  };
 }
 
 /** Warum der Versand grundsaetzlich gesperrt ist (Onboarding). */
@@ -1751,8 +2281,122 @@ export function onboardingVersandSperre(v: {
   return null;
 }
 
+/**
+ * Einrichtung, deren Adressen (Einstellungen → Abteilungen) die Aufgaben eines
+ * Vorgangs bekommen: der Arbeitsort, sonst die Einrichtung des Vorgangs
+ * (`arbeitsortId ?? organizationId`). Gilt fuer ALLE Abteilungsaufgaben des
+ * Vorgangs, auch fuer die aus der Checklisten-Vorlage — sonst gaebe es zwei
+ * FACILITY-Stellen, aber nur einen Link. Der Mandant (`canAccessProcess`,
+ * Listenfilter, Unterlagen, Mailfeld `einrichtung`) bleibt `organizationId`.
+ * Ein leerer Arbeitsort ("") zaehlt wie keiner.
+ *
+ *   - Onboarding (E-A10): Arbeitsort aus dem Anlegen bzw. der Karte.
+ *   - Offboarding (seit A4, G12): Arbeitsort, den die Zuordnung einer
+ *     Einstellung derselben Einrichtung uebernimmt, solange keine Stelle
+ *     informiert ist; ohne Zuordnung `null`, also wie bisher die Einrichtung.
+ */
+export function empfaengerEinrichtung(v: { arbeitsortId?: string | null; organizationId: string }): string {
+  return v.arbeitsortId || v.organizationId;
+}
+
+/** Der Name aus A1–A3 – dieselbe Funktion (`empfaengerEinrichtung`), fuer die bestehenden Aufrufer. */
+export const onboardingEmpfaengerEinrichtung = empfaengerEinrichtung;
+
 /** Endstatus: keine Aktion, keine Erinnerung, Link nur lesend bzw. 410. */
 export const ONBOARDING_ENDSTATUS = ["COMPLETED", "EXPIRED"] as const;
+
+// =============================================
+// Absage an die Stellen (Ausstattung & Zugaenge, E-A20, nur Onboarding)
+// =============================================
+
+/** Was die Absage von einem Link braucht — eine Zeile der Link-Tabelle passt. */
+export interface AbsageLinkStand {
+  departmentKey: string;
+  departmentName: string;
+  sentAt: Date | string | null;
+  lastSentAt?: Date | string | null;
+  /** F13: Absage an diese Stelle schon gesendet (nur bei SENT gesetzt). */
+  abgesagtAm?: Date | string | null;
+}
+
+/**
+ * Hat diese Stelle je eine Aufgaben-Mail bekommen? `sentAt ?? lastSentAt`: Nach
+ * einem gescheiterten „Link erneuern“ steht `sentAt` wieder auf null, die
+ * Stelle hat aber eine aeltere Mail samt Aufgaben — auch sie bekommt die Absage.
+ */
+export function absageInformiert(link: AbsageLinkStand): boolean {
+  return alsDatum(link.sentAt ?? link.lastSentAt ?? null) != null;
+}
+
+/** Bekommt diese Stelle mit dem naechsten Klick eine Absage? Informiert und noch nicht abgesagt (F13). */
+export function absageOffen(link: AbsageLinkStand): boolean {
+  return absageInformiert(link) && alsDatum(link.abgesagtAm ?? null) == null;
+}
+
+/**
+ * F16: Empfaenger der Absage — die Adresse, die die Aufgaben TATSAECHLICH
+ * bekommen hat. `link.email` allein taugt dafuer nicht: `zuweisungSenden`
+ * schreibt eine neue Adresse schon VOR dem Versand (Erneut senden, Erinnern,
+ * Nachtrag nach einem Adresswechsel); scheitert diese Mail, steht dort eine
+ * Adresse, die nie etwas bekam. Massgeblich ist deshalb `zugestelltAn` (die
+ * Empfaenger der letzten zugestellten Mail, nur bei SENT gesetzt):
+ *   - steht `email` darunter, bleibt es bei ihr (weitere An-Adressen der
+ *     Zuweisungsvorlage bekommen die Absage nicht ueber `{{email}}`);
+ *   - sonst gehen alle zugestellten Adressen (wer die Stelle war, laesst sich
+ *     nicht mehr trennen — lieber eine Adresse zu viel als die Stelle nicht);
+ *   - ohne `zugestelltAn` (Bestand vor Paket 1b) `email`.
+ */
+export function absageEmpfaenger(link: { email: string; zugestelltAn?: string | null }): string {
+  const zugestellt = (link.zugestelltAn ?? "")
+    .split(/[,;]/)
+    .map((a) => a.trim())
+    .filter((a) => a !== "");
+  if (zugestellt.length === 0) return link.email;
+  const email = link.email.trim().toLowerCase();
+  if (email && zugestellt.some((a) => a.toLowerCase() === email)) return link.email;
+  return zugestellt.join(", ");
+}
+
+/** Stand der Absage fuer die Karte (`AbteilungsUebersichtDaten.absage`). */
+export interface AbsageStand {
+  /** Ein Klick auf „Stellen über die Absage informieren…“ schickt noch etwas. */
+  moeglich: boolean;
+  /** Anzeigenamen (wie am Link gespeichert) der Stellen, die noch keine Absage haben. */
+  stellen: string[];
+  /** Letzte gesendete Absage (ISO), null, solange keine hinausging. */
+  gesendetAm: string | null;
+}
+
+/**
+ * Stand der Absage — `null`, solange es nichts abzusagen gibt: Der Vorgang ist
+ * nicht EXPIRED (die Absage gibt es nur dann, sonst 409 `NICHT_ABGESAGT`) oder
+ * keine Stelle wurde je informiert. Die Karte zeigt den Block nur mit Stand,
+ * im Offboarding fehlt er ganz. Stellen in der Reihenfolge der Karte
+ * (`abteilungsReihenfolge`), Namen wie am Link (dort steht, wer informiert wurde).
+ */
+export function absageStand(v: {
+  status: string;
+  links: ReadonlyArray<AbsageLinkStand>;
+}): AbsageStand | null {
+  if (v.status !== "EXPIRED") return null;
+  const informiert = v.links.filter(absageInformiert);
+  if (informiert.length === 0) return null;
+  const offen = informiert.filter(absageOffen);
+  const reihenfolge = abteilungsReihenfolge(offen.map((l) => l.departmentKey));
+  const rang = (key: string) => {
+    const i = reihenfolge.indexOf(key);
+    return i < 0 ? reihenfolge.length : i;
+  };
+  const gesendet = informiert
+    .map((l) => alsDatum(l.abgesagtAm ?? null))
+    .filter((d): d is Date => d != null)
+    .reduce<Date | null>((spaetestes, d) => spaeteres(spaetestes, d), null);
+  return {
+    moeglich: offen.length > 0,
+    stellen: [...offen].sort((a, b) => rang(a.departmentKey) - rang(b.departmentKey)).map((l) => l.departmentName),
+    gesendetAm: gesendet ? gesendet.toISOString() : null,
+  };
+}
 
 /**
  * Stand der Karte „Aufgaben für Abteilungen" — dieselbe Form in beiden Modulen
@@ -1775,6 +2419,17 @@ export interface AbteilungsUebersichtDaten {
   gesperrt: VersandSperre | null;
   /** Freitext-Zustaendigkeiten offener Aufgaben, die nie per Link hinausgehen. */
   unbekannteZustaendigkeiten: string[];
+  /**
+   * Onboarding, Ausstattung & Zugaenge: Angaben-Labels und Hinweis-Kennzeichen
+   * je Stelle fuer den Satz im Dialog (`sichtbarkeitsHinweis`). Nur geladen,
+   * solange jemand informierbar ist; fehlt im Offboarding.
+   */
+  ausstattungSicht?: AusstattungSicht | null;
+  /**
+   * Onboarding, Absage an die Stellen (E-A20, `absageStand`): nur bei EXPIRED
+   * und mindestens einer informierten Stelle; fehlt sonst und im Offboarding.
+   */
+  absage?: AbsageStand;
 }
 
 // =============================================
@@ -1791,6 +2446,10 @@ export const ABTEILUNGS_AUDIT = {
   /** Paket 5: Faelligkeiten aus Vertragsbeginn + Tagen einmal gesetzt. */
   FAELLIGKEITEN_GESETZT: "CHECKLIST_DUE_DATES_SET",
   LINK_ERNEUERT: "DEPARTMENT_LINK_RENEWED",
+  /** Ausstattung & Zugaenge (Regel 10): „Nachtrag senden“ — Details nur mit Anzahlen, nie Titeln. */
+  NACHTRAG_GESENDET: "DEPARTMENT_NACHTRAG_SENT",
+  /** Ausstattung & Zugaenge (E-A20): Absage an die informierten Stellen — Details ohne Titel. */
+  ABSAGE_GESENDET: "DEPARTMENT_ABSAGE_SENT",
   ERLEDIGT: "ABTEILUNGSAUFGABE_ERLEDIGT",
   WIEDER_GEOEFFNET: "ABTEILUNGSAUFGABE_WIEDER_GEOEFFNET",
   KOMMENTIERT: "ABTEILUNGSAUFGABE_KOMMENTIERT",
@@ -1811,6 +2470,8 @@ export const ABTEILUNGS_AUDIT_LABELS: Record<string, string> = {
   ONBOARDING_DEPARTMENT_REMINDER_SENT: "Abteilung automatisch erinnert",
   CHECKLIST_DUE_DATES_SET: "Fälligkeiten der Checkliste gesetzt",
   DEPARTMENT_LINK_RENEWED: "Abteilungs-Link erneuert",
+  DEPARTMENT_NACHTRAG_SENT: "Nachtrag an Abteilung gesendet",
+  DEPARTMENT_ABSAGE_SENT: "Absage an Abteilungen gesendet",
   ABTEILUNGSAUFGABE_ERLEDIGT: "Aufgabe per Link erledigt",
   ABTEILUNGSAUFGABE_WIEDER_GEOEFFNET: "Aufgabe per Link wieder geöffnet",
   ABTEILUNGSAUFGABE_KOMMENTIERT: "Kommentar der Abteilung",

@@ -14,7 +14,10 @@
  * Vertragsbeginn, die eigenen Aufgaben mit dem Hinweis aus der Vorlage und die
  * Zusatzfelder, die dem Schluessel erlaubt sind (`zusatz`). NIE die interne
  * HR-Notiz, die private Adresse der Person, Fragebogen-Angaben oder den
- * Fortschritt anderer Abteilungen.
+ * Fortschritt anderer Abteilungen. Seit Stufe 2 (A4, G6) traegt eine
+ * Ausstattungsaufgabe der eigenen Stelle, deren Position beim Austritt
+ * zurueckkommt bzw. gesperrt wird, das Feld `ausgabe` (vermerkte Stuecke samt
+ * Kennung — nur fuer die ausgebende Stelle); an allen uebrigen fehlt es ganz.
  */
 
 import { NextRequest, NextResponse } from "next/server";

@@ -3,7 +3,9 @@
  */
 
 import { z } from "zod";
+import { MELDUNGEN_AUSGABEN, RUECKGABE_ZUSTAENDE, RUECKGABE_ZUSTAENDE_STELLE } from "@/lib/ausgaben";
 import {
+  OHNE_KLAMMERN_STEUERZEICHEN,
   abteilungConfigSchema,
   abteilungConfigUpdateSchema,
   abteilungsAktionSchema,
@@ -11,7 +13,9 @@ import {
   fuehrungskraftAenderungFelder,
   fuehrungskraftAnlageFelder,
   meldungReservierterSchluessel,
+  offboardingAufgabeLinkPatchSchema,
   portalAufgabePatchSchema,
+  schluesselFeld,
 } from "@/lib/validations/abteilungsaufgaben";
 
 function fehler(ergebnis: { success: boolean; error?: { errors: { message: string }[] } }): string | undefined {
@@ -93,6 +97,71 @@ describe("portalAufgabePatchSchema", () => {
   });
 });
 
+// =============================================
+// Ausstattung & Zugaenge, Stufe 2 (Paket A4, S22): Rueckgabezustand
+// =============================================
+
+describe("Rueckgabezustand an der Aufgabe (A4, G15)", () => {
+  it("das Onboarding-Schema verwirft `zustand` still (unveraendert)", () => {
+    expect(aufgabeLinkPatchSchema.parse({ isCompleted: true, zustand: "FEHLT" })).toEqual({ isCompleted: true });
+    expect(fehler(aufgabeLinkPatchSchema.safeParse({ zustand: "FEHLT" }))).toBe("Bitte Status oder Kommentar angeben.");
+  });
+
+  it("das Offboarding-Link-Schema nimmt `zustand` nur mit isCompleted: true", () => {
+    expect(offboardingAufgabeLinkPatchSchema.parse({ isCompleted: true, zustand: "BESCHAEDIGT" })).toEqual({
+      isCompleted: true,
+      zustand: "BESCHAEDIGT",
+    });
+    // Abhaken ohne Zustand bleibt gueltig – an einer Ruecknahmeaufgabe heisst das ZURUECK (Dienst).
+    expect(offboardingAufgabeLinkPatchSchema.parse({ isCompleted: true })).toEqual({ isCompleted: true });
+    expect(fehler(offboardingAufgabeLinkPatchSchema.safeParse({ isCompleted: false, zustand: "FEHLT" }))).toBe(
+      MELDUNGEN_AUSGABEN.ZUSTAND_NUR_ERLEDIGT,
+    );
+    expect(fehler(offboardingAufgabeLinkPatchSchema.safeParse({ comment: "da", zustand: "FEHLT" }))).toBe(
+      MELDUNGEN_AUSGABEN.ZUSTAND_NUR_ERLEDIGT,
+    );
+    expect(fehler(offboardingAufgabeLinkPatchSchema.safeParse({ zustand: "FEHLT" }))).toBe(
+      "Bitte Status oder Kommentar angeben.",
+    );
+  });
+
+  it("ueber den Link waehlt die Stelle nur ZURUECK, BESCHAEDIGT oder FEHLT", () => {
+    for (const zustand of RUECKGABE_ZUSTAENDE_STELLE) {
+      expect(offboardingAufgabeLinkPatchSchema.safeParse({ isCompleted: true, zustand }).success).toBe(true);
+    }
+    for (const zustand of ["VERBLEIBT", "ENTFAELLT", "WEG", 1]) {
+      expect(fehler(offboardingAufgabeLinkPatchSchema.safeParse({ isCompleted: true, zustand }))).toBe(
+        MELDUNGEN_AUSGABEN.ZUSTAND_UNBEKANNT,
+      );
+    }
+  });
+
+  it("das Offboarding-Link-Schema behaelt die Regeln des bisherigen (Kommentar, notes, kein Objekt)", () => {
+    expect(offboardingAufgabeLinkPatchSchema.parse({ comment: "  ok  ", notes: "HR-intern" })).toEqual({ comment: "ok" });
+    expect(fehler(offboardingAufgabeLinkPatchSchema.safeParse(undefined))).toBe("Ungültige Eingabe");
+  });
+
+  it("Portal-Schema: alle fuenf Zustaende, auch allein; nie mit isCompleted: false", () => {
+    for (const zustand of RUECKGABE_ZUSTAENDE) {
+      expect(portalAufgabePatchSchema.parse({ zustand })).toEqual({ zustand });
+    }
+    expect(portalAufgabePatchSchema.parse({ isCompleted: true, zustand: "VERBLEIBT" })).toEqual({
+      isCompleted: true,
+      zustand: "VERBLEIBT",
+    });
+    expect(fehler(portalAufgabePatchSchema.safeParse({ isCompleted: false, zustand: "FEHLT" }))).toBe(
+      MELDUNGEN_AUSGABEN.ZUSTAND_NUR_ERLEDIGT,
+    );
+    expect(fehler(portalAufgabePatchSchema.safeParse({ zustand: "WEG" }))).toBe(MELDUNGEN_AUSGABEN.ZUSTAND_UNBEKANNT);
+  });
+
+  it("OHNE_KLAMMERN_STEUERZEICHEN ist exportiert und unveraendert", () => {
+    expect(OHNE_KLAMMERN_STEUERZEICHEN.test("Sekretariat Minden")).toBe(true);
+    expect(OHNE_KLAMMERN_STEUERZEICHEN.test("a<b")).toBe(false);
+    expect(OHNE_KLAMMERN_STEUERZEICHEN.test("a\nb")).toBe(false);
+  });
+});
+
 describe("abteilungConfigSchema", () => {
   const gueltig = { departmentKey: "VERWALTUNG", departmentName: "Sekretariat Minden", email: " sek@example.org " };
 
@@ -134,6 +203,22 @@ describe("abteilungConfigUpdateSchema", () => {
     });
     expect(abteilungConfigUpdateSchema.safeParse({}).success).toBe(false);
     expect(abteilungConfigUpdateSchema.safeParse({ email: 42 }).success).toBe(false);
+  });
+});
+
+describe("schluesselFeld (exportiert fuer den Katalog, Verhalten unveraendert)", () => {
+  it("trimmt und verlangt die Schluesselform", () => {
+    expect(schluesselFeld.parse(" IT ")).toBe("IT");
+    expect(schluesselFeld.parse("EMPFANG_2")).toBe("EMPFANG_2");
+    expect(fehler(schluesselFeld.safeParse(""))).toBe("Bitte einen Schlüssel angeben.");
+    expect(fehler(schluesselFeld.safeParse(undefined))).toBe("Bitte einen Schlüssel angeben.");
+    expect(fehler(schluesselFeld.safeParse(42))).toBe("Bitte einen Schlüssel angeben.");
+    expect(fehler(schluesselFeld.safeParse("it"))).toMatch(/nur Großbuchstaben, Ziffern und _/);
+  });
+
+  it("prueft weder reservierte noch bekannte Schluessel (das tun die Aufrufer)", () => {
+    expect(schluesselFeld.parse("VORGESETZTER")).toBe("VORGESETZTER");
+    expect(schluesselFeld.parse("HR")).toBe("HR");
   });
 });
 

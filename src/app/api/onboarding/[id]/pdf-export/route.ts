@@ -13,11 +13,17 @@ import { getSession } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { heuteInBerlin } from "@/lib/kalendertag";
+import { onboardingEmpfaengerEinrichtung } from "@/lib/abteilungsaufgaben";
 import {
   generateOnboardingPDF,
   type OnboardingExportContext,
   type OnboardingExportType,
 } from "@/lib/pdf-export-onboarding";
+import {
+  UEBERSICHT_HINWEIS_AUSWAHL,
+  UEBERSICHT_ZEILEN_AUSWAHL,
+  UEBERSICHT_ZEILEN_ORDNUNG,
+} from "@/lib/ausstattung-dienst";
 
 const VALID_TYPES = ["gesamtakte", "fragebogen", "modalitaeten", "dokumente", "checkliste"];
 const exportLimiter = createRateLimiter("onboarding-export", { maxRequests: 10, windowMs: 60_000 });
@@ -80,6 +86,12 @@ export async function GET(
             completedBy: { select: { firstName: true, lastName: true } },
           },
         },
+        // Ausstattung & Zugaenge (Paket A2): Abschnitt im PDF der
+        // Modalitaeten, samt Bemerkungen — diesen Export erzeugen nur
+        // HR-Rollen (oben). Dieselbe Auswahl wie die Karte im Reiter
+        // „Vorgesetzter“ (ausstattungUebersichtLaden).
+        ausstattung: { select: UEBERSICHT_ZEILEN_AUSWAHL, orderBy: UEBERSICHT_ZEILEN_ORDNUNG },
+        stellenHinweise: { select: UEBERSICHT_HINWEIS_AUSWAHL },
       },
     });
 
@@ -110,11 +122,13 @@ export async function GET(
     // Scheitert die Abfrage, bleibt es dabei — ein Export darf daran nicht
     // scheitern.
     // Eine Abteilung kann je Einrichtung einen eigenen Namen tragen; die
-    // Zeile der Einrichtung dieses Vorgangs sticht die allgemeine.
+    // Zeile der Einrichtung dieses Vorgangs sticht die allgemeine — im
+    // Onboarding die des ARBEITSORTS (E-A10): Dort gehen die Aufgaben hin,
+    // also heisst die Stelle im PDF wie in Karte und Mail.
     const abteilungsNamen: Record<string, string> = {};
     try {
       const konfigs = await prisma.departmentConfig.findMany({
-        where: { OR: [{ organizationId: null }, { organizationId: process.organizationId }] },
+        where: { OR: [{ organizationId: null }, { organizationId: onboardingEmpfaengerEinrichtung(process) }] },
         select: { departmentKey: true, departmentName: true, organizationId: true },
         orderBy: { organizationId: "asc" },
       });
@@ -284,8 +298,15 @@ export async function GET(
         assignee: c.assignee,
         notes: c.notes,
         dueDate: c.dueDate?.toISOString() || null,
+        // Von HR gestrichen (Ausstattung & Zugaenge, F2): „entfällt“, zaehlt nicht.
+        entfaelltAm: c.entfaelltAm?.toISOString() ?? null,
       })),
       abteilungsNamen,
+      // `?? []`: Aeltere Testgerueste liefern die Relationen nicht mit.
+      ausstattung: {
+        zeilen: process.ausstattung ?? [],
+        hinweise: process.stellenHinweise ?? [],
+      },
     };
 
     const pdfBuffer = await generateOnboardingPDF(ctx, type as OnboardingExportType);

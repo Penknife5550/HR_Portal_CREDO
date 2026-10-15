@@ -1,6 +1,6 @@
 # Mitteilung an den Datenschutzbeauftragten: Text der versendeten E-Mail im Versandprotokoll
 
-**Entwurf zur Abstimmung** · Stand 15.10.2026 · Verfasst für den Projektverantwortlichen des HR-Portals
+**Abgestimmt: der Datenschutzbeauftragte hat am 15.10.2026 zugestimmt.** · Stand 15.10.2026 · Verfasst für den Projektverantwortlichen des HR-Portals
 Technischer Plan: [`mailtext-im-protokoll-plan.html`](mailtext-im-protokoll-plan.html) · Regeln im Code: `CLAUDE.md`, Abschnitt „Text der Mail im Protokoll“
 
 Dieses Papier beschreibt Tatsachen und stellt Fragen. Rechtliche Wertungen (Rechtsgrundlage, Eintrag im Verzeichnis der Verarbeitungstätigkeiten, Information der Betroffenen) trifft der Datenschutzbeauftragte.

@@ -19,6 +19,15 @@
  * Paket 5 (Onboarding) nutzt dieselbe Karte; deshalb steht hier nichts von
  * „Offboarding" — das Bezugsdatum heisst ueber `bezugsdatumLabel`.
  *
+ * Paket A3 (Ausstattung & Zugaenge, nur Onboarding — im Offboarding fehlen die
+ * Felder, die Karte bleibt wie sie war): Knopf „Nachtrag senden“
+ * (`aktionen.nachtrag`/`nachtragGesperrt`, Regel 10), die Zeile „Nach der
+ * Information geändert: …“ (`zeile.nachtrag`) und der rote Waechter
+ * (`anzeige.hinweisTon`, Regel 15). Markup dafuer in
+ * src/components/ausstattung/nachtrag-hinweis.tsx. Seit S19 der Block
+ * „Absage an die Stellen“ nach EXPIRED (`abteilungen.absage`, E-A20; Markup
+ * und Rueckfrage in src/components/ausstattung/absage-block.tsx).
+ *
  * Nebenbei exportiert: `abteilungsAktionSenden` (ruft die Versandroute und
  * macht aus der Antwort eine Meldung) und `AktionsMeldungen` (gruene/rote
  * Leiste plus gelber Hinweis). Die Detailseite haelt den Zustand, die Karte
@@ -38,6 +47,9 @@ import {
   type Fuehrungskraft,
 } from "@/lib/abteilungsaufgaben";
 import { AbteilungenDialog } from "@/components/abteilungsaufgaben/abteilungen-dialog";
+import { NachtragHinweis, WaechterHinweis } from "@/components/ausstattung/nachtrag-hinweis";
+import { ZuordnungEmpfohlenHinweis } from "@/components/ausgaben/einstellung-zuordnen-dialog";
+import { AbsageBlock } from "@/components/ausstattung/absage-block";
 import { formatDatumDE } from "@/lib/format";
 
 // =============================================
@@ -95,7 +107,22 @@ export interface AbteilungenKarteProps {
   setDialogOffen?: (offen: boolean) => void;
   /** Nur fuer Tests: Bezugszeit fuer die Sperre „Bitte kurz warten". */
   jetzt?: Date;
+  /**
+   * Offboarding, Ausstattung & Zugaenge Stufe 2 (A4, S32, G12): Hinweis
+   * „Einstellung zuordnen, bevor Sie die Abteilungen informieren“ samt Knopf –
+   * nur mit `empfohlen` (`rueckgaben.zuordnungEmpfohlen` der Detailroute, die
+   * nur HR_EDIT_ROLES bekommen) und nur, wenn die Karte handeln darf. Ohne die
+   * Eigenschaft bleibt die Karte unveraendert.
+   */
+  zuordnung?: { empfohlen: boolean; onZuordnen?: () => void } | null;
 }
+
+/**
+ * Id des Kartentitels (`tabIndex={-1}`) — Ersatzziel des Fokus, wenn der
+ * Ausloeser eines Dialogs nach der Aktion verschwunden ist (Absage: nach der
+ * letzten Stelle gibt es den Knopf nicht mehr).
+ */
+export const ABTEILUNGEN_KARTE_TITEL_ID = "abteilungen-karte-titel";
 
 // =============================================
 // Kleine Helfer (auch von der Checkliste und der oeffentlichen Seite genutzt)
@@ -293,6 +320,7 @@ export function AbteilungenKarte({
   dialogOffen,
   setDialogOffen,
   jetzt,
+  zuordnung = null,
 }: AbteilungenKarteProps) {
   const [laeuft, setLaeuft] = useState<string | null>(null);
   // Ref zusaetzlich zum Zustand: Zwei Klicks vor dem naechsten Rendern
@@ -339,14 +367,15 @@ export function AbteilungenKarte({
 
   return (
     <section
-      aria-labelledby="abteilungen-karte-titel"
+      aria-labelledby={ABTEILUNGEN_KARTE_TITEL_ID}
       className="rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-sm"
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3
-            id="abteilungen-karte-titel"
-            className="flex items-center gap-2 text-sm font-bold text-foreground"
+            id={ABTEILUNGEN_KARTE_TITEL_ID}
+            tabIndex={-1}
+            className="flex items-center gap-2 text-sm font-bold text-foreground outline-none"
           >
             <span className="h-1 w-1 rounded-full bg-credo-gruen" />
             Aufgaben für Abteilungen
@@ -373,6 +402,13 @@ export function AbteilungenKarte({
         )}
       </div>
 
+      {/* Offboarding, Stufe 2 (G12): erst die Einstellung zuordnen, dann informieren. */}
+      {zuordnung?.empfohlen && !nurLesen && (
+        <div className="mb-3">
+          <ZuordnungEmpfohlenHinweis onZuordnen={zuordnung.onZuordnen} gesperrt={laeuft !== null} />
+        </div>
+      )}
+
       {/* Voraussetzung fehlt (Onboarding): Grund im Klartext, nicht nur ein
           grauer Knopf. Die Zeilen darunter bleiben als Vorschau stehen. */}
       {gesperrt && !vorgangAbgeschlossen && (
@@ -398,6 +434,20 @@ export function AbteilungenKarte({
               ? MELDUNGEN.HR_VORGANG_ABGELAUFEN
               : MELDUNGEN.HR_VORGANG_ABGEBROCHEN}
         </p>
+      )}
+
+      {/* Absage nach EXPIRED (Onboarding, E-A20): nur mit Stand vom Server.
+          Bewusst NICHT an `nurLesen` gebunden — der Vorgang ist abgeschlossen,
+          die Absage ist die eine Aktion, die danach noch geht. */}
+      {abteilungen.absage && (
+        <AbsageBlock
+          absage={abteilungen.absage}
+          darfAktionen={darfAktionen}
+          sendet={laeuft === "absage"}
+          gesperrt={laeuft !== null}
+          onSenden={() => ausfuehren("absage")}
+          fokusZiel={ABTEILUNGEN_KARTE_TITEL_ID}
+        />
       )}
 
       {zeilen.length === 0 ? (
@@ -540,6 +590,8 @@ function AbteilungsZeileAnzeige({
   // es weitergeht. Die Regel selbst steht nur in abteilungsZeilenBauen.
   const zeigeErinnern = !nurLesen && (zeile.aktionen.erinnern || zeile.aktionen.erinnernGesperrt);
   const zeigeErneut = !nurLesen && (zeile.aktionen.erneutSenden || zeile.aktionen.erneutSendenGesperrt);
+  // Nur Onboarding (Regel 10): Die Felder fehlen im Offboarding, dann kein Knopf.
+  const zeigeNachtrag = !nurLesen && (zeile.aktionen.nachtrag === true || zeile.aktionen.nachtragGesperrt === true);
   const zeigeErneuern = !nurLesen && zeile.aktionen.linkErneuern;
   const zeigeKopieren = zeile.aktionen.linkKopieren && !!link?.url;
   const sperrTitel = gesperrt && sperreBis
@@ -557,7 +609,8 @@ function AbteilungsZeileAnzeige({
     }
   };
 
-  const hinweisRot = ROTE_HINWEISE.has(anzeige.status);
+  // Rot nach Status wie bisher — oder weil der Server es sagt (Waechter, Regel 15).
+  const hinweisRot = ROTE_HINWEISE.has(anzeige.status) || anzeige.hinweisTon === "rot";
   const quelleText =
     zeile.istFuehrungskraft && fuehrungskraft?.quelle ? QUELLEN_TEXT[fuehrungskraft.quelle] : undefined;
 
@@ -590,6 +643,7 @@ function AbteilungsZeileAnzeige({
             Eintragen
           </button>
         )}
+        <WaechterHinweis anzeige={anzeige} />
       </li>
     );
   }
@@ -606,6 +660,7 @@ function AbteilungsZeileAnzeige({
           {zeile.departmentName} · {anzeige.text}
         </span>
         <span className="text-xs text-amber-900/80">{aufgabenText(zeile.aufgaben)}</span>
+        <WaechterHinweis anzeige={anzeige} />
       </li>
     );
   }
@@ -664,6 +719,17 @@ function AbteilungsZeileAnzeige({
               className={knopf}
             >
               {laeuft === `erneut-senden:${key}` ? "Wird gesendet…" : "Erneut senden"}
+            </button>
+          )}
+          {zeigeNachtrag && (
+            <button
+              type="button"
+              onClick={() => onAktion("nachtrag", key)}
+              disabled={gesperrt || laeuft !== null}
+              title={sperrTitel}
+              className={knopf}
+            >
+              {laeuft === `nachtrag:${key}` ? "Wird gesendet…" : "Nachtrag senden"}
             </button>
           )}
           {zeigeKopieren && (
@@ -737,6 +803,8 @@ function AbteilungsZeileAnzeige({
             )}
         </p>
       )}
+
+      <NachtragHinweis nachtrag={zeile.nachtrag} />
     </li>
   );
 }

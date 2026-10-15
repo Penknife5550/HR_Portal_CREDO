@@ -14,6 +14,8 @@ import Link from "next/link";
 import { ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 import { UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
 import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
+import { AUSSTATTUNG_AUDIT_LABELS } from "@/lib/ausstattung";
+import { AUSGABEN_AUDIT_LABELS } from "@/lib/ausgaben";
 
 interface User {
   userId: string;
@@ -54,6 +56,9 @@ const ACTION_LABELS: Record<string, string> = {
   NOTE_UPDATED: "Notiz bearbeitet",
   NOTE_DELETED: "Notiz gelöscht",
   DOCUMENT_UPLOADED: "Dokument hochgeladen",
+  // Entfernen eines hochgeladenen Uebergabeprotokolls (Ausstattung A4) und
+  // die Dokumente-Routen von Verbeamtung, Elternzeit und Mutterschutz.
+  DOCUMENT_DELETED: "Dokument gelöscht",
   CHECKLIST_TOGGLED: "Checkliste aktualisiert",
   DEPARTMENT_LINKS_GENERATED: "Abteilungs-Links erstellt",
   REMINDER_SENT: "Reminder gesendet",
@@ -61,6 +66,13 @@ const ACTION_LABELS: Record<string, string> = {
   EXIT_INTERVIEW_SENT: "Exit-Interview versendet",
   ZEUGNIS_CREATED: "Zeugnis-Bewertung erstellt",
   ZEUGNIS_UPDATED: "Zeugnis-Bewertung aktualisiert",
+  // Die Codes, die die Offboarding-Routen tatsaechlich schreiben
+  // (/api/offboarding/:id/exit-interview/send, …/zeugnis-bewertung[/hr-review]).
+  // Die beiden Zeilen darueber bleiben fuer Alteintraege stehen.
+  EXIT_INTERVIEW_INVITED: "Exit-Interview-Einladung versendet",
+  ZEUGNIS_BEWERTUNG_CREATED: "Zeugnis-Bewertung angelegt",
+  ZEUGNIS_BEWERTUNG_HR_REVIEWED: "Zeugnis-Bewertung von HR geprüft",
+  ZEUGNIS_BEWERTUNG_FINALIZED: "Zeugnis-Bewertung abgeschlossen",
   ONBOARDING_CREATED: "Onboarding erstellt",
   OFFBOARDING_CREATED: "Offboarding erstellt",
   QUESTIONNAIRE_SUBMITTED: "Fragebogen eingereicht",
@@ -72,7 +84,10 @@ const ACTION_LABELS: Record<string, string> = {
   // (`details.quelle`), Erinnerung des naechtlichen Laufs.
   DOKUMENT_FRIST_GEAENDERT: "Ablaufdatum geändert",
   DOKUMENT_ABLAUF_ERINNERT: "Ablauf-Erinnerung gesendet",
+  // Reiter „Rückgaben“ im Offboarding (/api/offboarding/:id/return-items)
+  RETURN_ITEM_CREATED: "Rückgabe-Gegenstand erfasst",
   RETURN_ITEM_UPDATED: "Rückgabe aktualisiert",
+  RETURN_ITEM_DELETED: "Rückgabe-Gegenstand gelöscht",
   DEPARTMENT_FEEDBACK_SUBMITTED: "Abteilungs-Feedback eingereicht",
   // Abteilungsaufgaben (Paket 1b): Informieren, Erinnern, Link erneuern,
   // Abhaken und Kommentieren ueber den Link, Einstellungen → Abteilungen.
@@ -86,6 +101,13 @@ const ACTION_LABELS: Record<string, string> = {
   ...UNTERLAGEN_AUDIT_LABELS,
   // Individuelle E-Mail aus einem Vorgang (Paket 3).
   ...INDIVIDUELLE_MAIL_AUDIT_LABELS,
+  // Ausstattung & Zugaenge (A1 bis A3): Katalogpflege (processType SYSTEM),
+  // Arbeitsort, Aufgaben, HR-Ergaenzungen, Hinweise, Sammelmail, Loeschfrist.
+  // Eine Quelle mit den Diensten, die die Codes schreiben (AUSSTATTUNG_AUDIT).
+  ...AUSSTATTUNG_AUDIT_LABELS,
+  // Ausstattung & Zugaenge, Stufe 2 (A4): Ausgaben je Stueck, Zuordnung von
+  // Austritt und Einstellung, Rueckgaben, Loeschfrist (AUSGABEN_AUDIT).
+  ...AUSGABEN_AUDIT_LABELS,
 };
 
 /**

@@ -8,9 +8,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { DOCUMENT_TYPE_LABELS } from "@/lib/required-documents";
+import { SELECTABLE_DOCUMENT_TYPES } from "@/lib/required-documents";
 
-const VALID_DOCUMENT_TYPES = new Set(Object.keys(DOCUMENT_TYPE_LABELS));
+// Nur die im Editor waehlbaren Typen. Frueher alle Schluessel von
+// DOCUMENT_TYPE_LABELS — seit A4 steht dort auch UEBERGABEPROTOKOLL (laedt nur
+// HR hoch); als Pflichtdokument des Fragebogens haelt es die Abgabe auf, weil
+// die Person es gar nicht hochladen kann.
+const VALID_DOCUMENT_TYPES = new Set<string>(SELECTABLE_DOCUMENT_TYPES);
 
 // =============================================
 // GET /api/vorlagen/:id

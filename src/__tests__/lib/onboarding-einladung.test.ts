@@ -15,6 +15,10 @@
  * Dazu: Die Payload-Bausteine liefern genau die Felder, die der Event-Katalog
  * als Beispiel fuehrt (Test-Versand und Doku zeigen also das Echte), und
  * `vorgesetztenLinkSetzen` rollt zurueck, wenn der Link inzwischen ein anderer ist.
+ * Seit A2 (Ausstattung & Zugaenge, Regel 2) setzt es ausserdem den Merker
+ * `mitAusstattung` — beim Anlegen der Zeile, beim Erneuern nur, solange er leer
+ * und das Formular nie gespeichert ist —, und die Einladung nennt den Schritt
+ * nur mit diesem Merker.
  *
  * @/lib/mailer wird NICHT gemockt: geprueft wird der echte Renderer mit den
  * echten Standardvorlagen. @/lib/db ist ersetzt, weil der Mailer es importiert;
@@ -68,16 +72,20 @@ function einladung(teil: { firstName?: string | null; lastName?: string | null }
 
 function vorgesetztenLink(
   teil: Partial<Parameters<typeof vorgesetztenLinkMailFelder>[0]> = {},
+  { ausstattungAngeboten = false }: { ausstattungAngeboten?: boolean } = {},
 ) {
-  return vorgesetztenLinkMailFelder({
-    id: "ob1",
-    displayId: "2026-GYM-014",
-    supervisorEmail: LEITUNG,
-    supervisorToken: "mod-token",
-    supervisorTokenExpiresAt: new Date("2026-10-22T10:00:00Z"),
-    organization: ORG,
-    ...teil,
-  });
+  return vorgesetztenLinkMailFelder(
+    {
+      id: "ob1",
+      displayId: "2026-GYM-014",
+      supervisorEmail: LEITUNG,
+      supervisorToken: "mod-token",
+      supervisorTokenExpiresAt: new Date("2026-10-22T10:00:00Z"),
+      organization: ORG,
+      ...teil,
+    },
+    { ausstattungAngeboten },
+  );
 }
 
 function rendere(event: string, payload: Record<string, unknown>) {
@@ -167,6 +175,13 @@ describe("vorgesetztenLinkMailFelder", () => {
     });
     expect(felder.employeeName).toBe("Anna");
   });
+
+  // Merker als Zeichenkette: renderTemplate kennt nur „nicht leer“, String(false)
+  // waere nicht leer und der Block bliebe stehen.
+  it("fuehrt den Merker ausstattung_angeboten als \"ja\" bzw. \"\" — der Schluessel steht immer da", () => {
+    expect(vorgesetztenLink({}, { ausstattungAngeboten: true }).ausstattung_angeboten).toBe("ja");
+    expect(vorgesetztenLink({}, { ausstattungAngeboten: false })).toHaveProperty("ausstattung_angeboten", "");
+  });
 });
 
 describe("Vorlage onboarding-created", () => {
@@ -228,6 +243,35 @@ describe("Vorlage supervisor-link-created", () => {
     expect(mail.text).not.toContain("Bitte ausfüllen bis");
     expect(mail.html).not.toContain("Bitte ausfüllen bis");
     expect(mail.text).toContain("Formular öffnen:");
+  });
+
+  const SATZ_AUSSTATTUNG = "Im Formular können Sie auch angeben, was zum Arbeitsbeginn bereitstehen soll.";
+
+  it("nennt den Ausstattungsschritt nur, wenn das Formular ihn zeigt (Regel 2)", () => {
+    const mit = rendere("supervisor-link-created", vorgesetztenLink({}, { ausstattungAngeboten: true }));
+    expect(mit.html).toContain(SATZ_AUSSTATTUNG);
+    expect(mit.text).toContain(SATZ_AUSSTATTUNG);
+    expect(mit.subject).not.toContain("Arbeitsbeginn");
+
+    const ohne = rendere("supervisor-link-created", vorgesetztenLink());
+    for (const teil of [ohne.subject, ohne.html, ohne.text ?? ""]) {
+      expect(teil).not.toContain(SATZ_AUSSTATTUNG);
+      expect(teil).not.toContain("ausstattung_angeboten");
+      expect(teil).not.toContain("{{");
+    }
+    // Der Textteil bleibt ohne den Satz so, wie er vorher war: Liste, Leerzeile, „So geht es weiter".
+    expect(ohne.text).toContain("- Vergütung (Entgeltgruppe/Stufe oder Festgehalt)\n\nSo geht es weiter:");
+  });
+
+  it("steht in HTML und Text im selben flachen Block (kein Block im Block)", () => {
+    const vorlage = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === "supervisor-link-created")!;
+    for (const teil of [vorlage.bodyHtml, vorlage.bodyText ?? ""]) {
+      const block = teil.match(/\{\{#ausstattung_angeboten\}\}([\s\S]*?)\{\{\/ausstattung_angeboten\}\}/);
+      expect(block?.[1]).toContain(SATZ_AUSSTATTUNG);
+      expect(block?.[1]).not.toContain("{{");
+    }
+    expect(vorlage.subject).not.toContain("ausstattung_angeboten");
+    expect(vorlage.variables.map((v) => v.key)).toContain("{{ausstattung_angeboten}}");
   });
 });
 
@@ -383,7 +427,15 @@ describe("Vorlage employee-reminder", () => {
 });
 
 describe("vorgesetztenLinkSetzen", () => {
-  function tx(count: number) {
+  /**
+   * `zeile` = was das upsert zurueckgibt. Ohne Angabe: die frisch angelegte
+   * Zeile (Merker aus `create`, `currentStep` 0) — wie Prisma bei einer neuen.
+   */
+  function tx(
+    count: number,
+    zeile?: { mitAusstattung: boolean | null; currentStep: number },
+    gesetzt = 1,
+  ) {
     return {
       onboardingProcess: {
         updateMany: jest.fn().mockResolvedValue({ count }),
@@ -397,7 +449,13 @@ describe("vorgesetztenLinkSetzen", () => {
         }),
         update: jest.fn(),
       },
-      supervisorData: { upsert: jest.fn().mockResolvedValue({}) },
+      supervisorData: {
+        upsert: jest.fn(
+          async ({ create }: { where: unknown; update: unknown; create: { mitAusstattung: boolean } }) =>
+            zeile ?? { mitAusstattung: create.mitAusstattung, currentStep: 0 },
+        ),
+        updateMany: jest.fn().mockResolvedValue({ count: gesetzt }),
+      },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
   }
@@ -409,9 +467,11 @@ describe("vorgesetztenLinkSetzen", () => {
     bisherigeEmail: "falsch@example.org",
     userId: "u1",
     organizationName: "FES Gymnasium",
+    ausstattungAngeboten: false,
+    arbeitsortId: null,
   };
 
-  it("liefert Token, Frist und Abgleich und vermerkt den ersetzten Link", async () => {
+  it("liefert Token, Frist, Abgleich und Merker und vermerkt den ersetzten Link", async () => {
     const t = tx(1);
     const ergebnis = await vorgesetztenLinkSetzen(t as never, eingabe);
 
@@ -419,16 +479,123 @@ describe("vorgesetztenLinkSetzen", () => {
       supervisorToken: "mod-token",
       supervisorTokenExpiresAt: new Date("2026-10-22T10:00:00Z"),
       abgleich: { von: "INVITED", nach: "INVITED" },
+      mitAusstattung: false,
     });
     expect(t.onboardingProcess.updateMany.mock.calls[0][0].where.supervisorToken).toBe("alter-token");
     expect(t.auditLog.create.mock.calls[0][0].data.details.ersetztLinkAn).toBe("falsch@example.org");
+  });
+
+  it("die Sperre gilt nur, solange der Vorgang auf dem Arbeitsort steht, aus dem der Merker stammt", async () => {
+    // Ein Arbeitsort-PATCH zwischen dem Lesen des Aufrufers und dieser Sperre
+    // laesst sie nichts treffen (LinkGeaendert unten) — sonst kaeme der Merker
+    // aus dem Katalog des alten Orts und bliebe, weil der Ort ab dem Link
+    // eingefroren ist.
+    const mitOrt = tx(1);
+    await vorgesetztenLinkSetzen(mitOrt as never, { ...eingabe, arbeitsortId: "org-grundschule" });
+    expect(mitOrt.onboardingProcess.updateMany.mock.calls[0][0].where).toEqual({
+      id: "ob1",
+      supervisorToken: "alter-token",
+      supervisorSubmittedAt: null,
+      status: { notIn: ["REVIEWED", "COMPLETED", "EXPIRED"] },
+      arbeitsortId: "org-grundschule",
+    });
+
+    const ohneOrt = tx(1);
+    await vorgesetztenLinkSetzen(ohneOrt as never, eingabe);
+    expect(ohneOrt.onboardingProcess.updateMany.mock.calls[0][0].where.arbeitsortId).toBeNull();
+
+    // Fehlt der Wert (ungetypter Aufrufer), faellt die Bedingung nicht still
+    // weg (Prisma ignoriert `undefined`): Die Sperre trifft dann nur ohne Arbeitsort.
+    const fehlt = tx(1);
+    await vorgesetztenLinkSetzen(fehlt as never, { ...eingabe, arbeitsortId: undefined as unknown as null });
+    expect(fehlt.onboardingProcess.updateMany.mock.calls[0][0].where).toHaveProperty("arbeitsortId", null);
   });
 
   it("wirft LinkGeaendert und schreibt sonst nichts, wenn das UPDATE nichts trifft", async () => {
     const t = tx(0);
     await expect(vorgesetztenLinkSetzen(t as never, eingabe)).rejects.toBeInstanceOf(LinkGeaendert);
     expect(t.supervisorData.upsert).not.toHaveBeenCalled();
+    expect(t.supervisorData.updateMany).not.toHaveBeenCalled();
     expect(t.onboardingProcess.findUniqueOrThrow).not.toHaveBeenCalled();
     expect(t.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  describe("Merker mitAusstattung (Regel 2)", () => {
+    it("angeboten: eine neue Zeile bekommt den Merker true mit dem Anlegen", async () => {
+      const t = tx(1);
+      const ergebnis = await vorgesetztenLinkSetzen(t as never, { ...eingabe, ausstattungAngeboten: true });
+
+      expect(t.supervisorData.upsert).toHaveBeenCalledWith({
+        where: { onboardingId: "ob1" },
+        update: {},
+        create: { onboardingId: "ob1", mitAusstattung: true },
+        select: { mitAusstattung: true, currentStep: true },
+      });
+      // Schon beim Anlegen gesetzt — kein zweites Schreiben.
+      expect(t.supervisorData.updateMany).not.toHaveBeenCalled();
+      expect(ergebnis.mitAusstattung).toBe(true);
+    });
+
+    it("nicht angeboten: eine neue Zeile bekommt false, nicht null", async () => {
+      const t = tx(1);
+      const ergebnis = await vorgesetztenLinkSetzen(t as never, { ...eingabe, ausstattungAngeboten: false });
+
+      expect(t.supervisorData.upsert.mock.calls[0][0].create).toEqual({ onboardingId: "ob1", mitAusstattung: false });
+      // Beim Ersetzen bleibt die bestehende Zeile, wie sie ist.
+      expect(t.supervisorData.upsert.mock.calls[0][0].update).toEqual({});
+      expect(t.supervisorData.updateMany).not.toHaveBeenCalled();
+      expect(ergebnis.mitAusstattung).toBe(false);
+    });
+
+    it("Erneuern einer Zeile ohne Merker, nie gespeichert: setzt ihn bedingt", async () => {
+      const t = tx(1, { mitAusstattung: null, currentStep: 0 });
+      const ergebnis = await vorgesetztenLinkSetzen(t as never, { ...eingabe, ausstattungAngeboten: true });
+
+      expect(t.supervisorData.updateMany).toHaveBeenCalledWith({
+        where: { onboardingId: "ob1", mitAusstattung: null, currentStep: 0 },
+        data: { mitAusstattung: true },
+      });
+      expect(ergebnis.mitAusstattung).toBe(true);
+    });
+
+    it("das bedingte Setzen trifft nichts (Formular inzwischen gespeichert): der Merker bleibt leer und gilt als false", async () => {
+      const t = tx(1, { mitAusstattung: null, currentStep: 0 }, 0);
+      const ergebnis = await vorgesetztenLinkSetzen(t as never, { ...eingabe, ausstattungAngeboten: true });
+
+      expect(t.supervisorData.updateMany).toHaveBeenCalledTimes(1);
+      expect(ergebnis.mitAusstattung).toBe(false);
+    });
+
+    it("Erneuern mit currentStep > 0 laesst den Merker unveraendert — das Formular springt nicht", async () => {
+      const t = tx(1, { mitAusstattung: null, currentStep: 2 });
+      const ergebnis = await vorgesetztenLinkSetzen(t as never, { ...eingabe, ausstattungAngeboten: true });
+
+      expect(t.supervisorData.updateMany).not.toHaveBeenCalled();
+      expect(ergebnis.mitAusstattung).toBe(false);
+    });
+
+    it.each([
+      [false, true],
+      [true, false],
+    ])(
+      "ein gesetzter Merker (%s) bleibt, auch wenn der Katalog heute anders entscheidet (%s)",
+      async (gespeichert, angeboten) => {
+        const t = tx(1, { mitAusstattung: gespeichert, currentStep: 0 });
+        const ergebnis = await vorgesetztenLinkSetzen(t as never, { ...eingabe, ausstattungAngeboten: angeboten });
+
+        expect(t.supervisorData.updateMany).not.toHaveBeenCalled();
+        expect(ergebnis.mitAusstattung).toBe(gespeichert);
+      },
+    );
+
+    it("setzt den Merker vor dem Status-Abgleich und dem Protokoll — alles in derselben Transaktion", async () => {
+      const t = tx(1, { mitAusstattung: null, currentStep: 0 });
+      await vorgesetztenLinkSetzen(t as never, { ...eingabe, ausstattungAngeboten: true });
+
+      const merker = t.supervisorData.updateMany.mock.invocationCallOrder[0];
+      expect(t.onboardingProcess.updateMany.mock.invocationCallOrder[0]).toBeLessThan(merker);
+      expect(merker).toBeLessThan(t.onboardingProcess.findUniqueOrThrow.mock.invocationCallOrder[0]);
+      expect(merker).toBeLessThan(t.auditLog.create.mock.invocationCallOrder[0]);
+    });
   });
 });

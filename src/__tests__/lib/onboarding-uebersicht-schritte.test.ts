@@ -477,6 +477,64 @@ describe("Schritt „Checkliste abarbeiten“", () => {
     expect(step.items?.[0].assignee).toBeUndefined();
     expect(step.info).toBeUndefined();
   });
+
+  // Ausstattung & Zugaenge (Paket A3, F2): Von HR gestrichene Aufgaben sind
+  // zugleich `isCompleted`, zaehlen aber weder im Zaehler noch im Nenner —
+  // dieselbe Rechnung wie Reiter, Kopfzeile, Balken und Link-Seite.
+  const geprueft = {
+    status: "REVIEWED",
+    submittedAt: "2026-09-19T12:00:00.000Z",
+    personalData: { isComplete: true, currentStep: 9 },
+  };
+
+  it("entfallene Punkte zählen nicht: „alle erledigt“ trotz gestrichener Aufgaben", () => {
+    const alle = schritte(
+      stand({
+        ...geprueft,
+        checklistItems: [
+          { id: "c1", title: "Konto anlegen", isCompleted: true, assignee: "IT", notes: null },
+          { id: "c2", title: "Schlüssel ausgeben: Sporthalle", isCompleted: true, assignee: "FACILITY", notes: null, entfaelltAm: "2026-09-20T08:00:00.000Z" },
+        ],
+      }),
+    );
+    const step = finde(alle, "checkliste");
+    expect(step.progress).toEqual({ done: 1, total: 1 });
+    expect(step.status).toBe("completed");
+    expect(finde(alle, "abschluss").status).toBe("active");
+  });
+
+  it("eine offene Aufgabe neben einer entfallenen: 0 von 1, die entfallene steht nicht in der Liste", () => {
+    const step = finde(
+      schritte(
+        stand({
+          ...geprueft,
+          checklistItems: [
+            { id: "c1", title: "Konto anlegen", isCompleted: false, assignee: "IT", notes: null },
+            { id: "c2", title: "Parkplatz bereitstellen", isCompleted: true, assignee: "FACILITY", notes: null, entfaelltAm: "2026-09-20T08:00:00.000Z" },
+          ],
+        }),
+      ),
+      "checkliste",
+    );
+    expect(step.progress).toEqual({ done: 0, total: 1 });
+    expect((step.items ?? []).map((i) => i.title)).toEqual(["Konto anlegen"]);
+  });
+
+  it("nur entfallene Punkte zählen nicht als „Checkliste fertig“ — und nicht als „Keine Checkliste“", () => {
+    const alle = schritte(
+      stand({
+        ...geprueft,
+        checklistItems: [
+          { id: "c1", title: "Parkplatz bereitstellen", isCompleted: true, assignee: "FACILITY", notes: null, entfaelltAm: "2026-09-20T08:00:00.000Z" },
+        ],
+      }),
+    );
+    const step = finde(alle, "checkliste");
+    expect(step.status).toBe("active");
+    expect(step.progress).toBeUndefined();
+    expect(step.info).toBeUndefined();
+    expect(finde(alle, "abschluss").status).toBe("upcoming");
+  });
 });
 
 // =============================================
@@ -909,5 +967,76 @@ describe("onboardingKurzschritte", () => {
     );
     expect(stationen.every((x) => x.done)).toBe(true);
     expect([...aktuell]).toEqual([5]);
+  });
+
+  it("Station „Checkliste“ ohne entfallene Aufgaben (F2): erledigt + entfallen = fertig, nur entfallen = nicht", () => {
+    const basis = {
+      status: "REVIEWED",
+      submittedAt: "2026-09-19T12:00:00.000Z",
+      personalData: { isComplete: true, currentStep: 9 },
+      supervisorSubmittedAt: "2026-09-18T12:00:00.000Z",
+      supervisorData: { isComplete: true, currentStep: 5 },
+    };
+    const weg = { id: "w", title: "Parkplatz", isCompleted: true, assignee: null, notes: null, entfaelltAm: "2026-09-20T08:00:00.000Z" };
+    const mitErledigter = onboardingKurzschritte(
+      stand({ ...basis, checklistItems: [{ id: "c1", title: "Konto", isCompleted: true, assignee: null, notes: null }, weg] }),
+    );
+    expect(mitErledigter.schritte[4]).toEqual({ label: "Checkliste", done: true });
+    const nurEntfallen = onboardingKurzschritte(stand({ ...basis, checklistItems: [weg] }));
+    expect(nurEntfallen.schritte[4]).toEqual({ label: "Checkliste", done: false });
+    expect([...nurEntfallen.aktuell]).toEqual([4]);
+  });
+});
+
+// =============================================
+// Paket A2: Merker `mitAusstattung` (sechs statt fuenf Schritte)
+// =============================================
+
+describe("Modalitaeten-Fortschritt mit Merker `mitAusstattung`", () => {
+  const mitLink = {
+    supervisorToken: "tok-sv",
+    supervisorEmail: "leitung@example.org",
+    supervisorTokenExpiresAt: "2026-10-20T12:00:00.000Z",
+  };
+
+  it("Stepper: dieselbe Zahl wie im Formular der Fuehrungskraft („von 6“)", () => {
+    const step = finde(
+      schritte(
+        stand({
+          ...mitLink,
+          supervisorData: { isComplete: false, currentStep: 4, mitAusstattung: true },
+        }),
+        { modalitaetenLink: "https://hr.fes-credo.de/modalitaeten/tok-sv" },
+      ),
+      "modalitaeten",
+    );
+    expect(step.info).toBe(
+      "Modalitäten in Bearbeitung — Schritt 5 von 6 · Ausstattung & Zugänge · leitung@example.org",
+    );
+  });
+
+  it("Chip im Kopf: „Schritt 5 von 6“", () => {
+    const [, chip] = spurenChips(
+      stand({
+        ...mitLink,
+        supervisorData: { isComplete: false, currentStep: 4, mitAusstattung: true },
+      }),
+      JETZT,
+    );
+    expect(chip.text).toBe("Modalitäten: Schritt 5 von 6");
+    expect(chip.kurz).toBe("Schritt 5 von 6");
+  });
+
+  it("ohne Merker (false/null) bleibt alles wie bisher: „von 5“", () => {
+    for (const mitAusstattung of [false, null]) {
+      const s = stand({
+        ...mitLink,
+        supervisorData: { isComplete: false, currentStep: 4, mitAusstattung },
+      });
+      expect(finde(schritte(s), "modalitaeten").info).toBe(
+        "Modalitäten in Bearbeitung — Schritt 5 von 5 · Zusammenfassung · leitung@example.org",
+      );
+      expect(spurenChips(s, JETZT)[1].text).toBe("Modalitäten: Schritt 5 von 5");
+    }
   });
 });

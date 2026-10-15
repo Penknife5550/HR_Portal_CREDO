@@ -17,6 +17,47 @@
  * `onboardingAufgaben` (ChecklistItem, Zustaendigkeit in `assignee`). Die
  * Links beider Module liegen in `links` (offboardingId ODER onboardingId).
  *
+ * Ausstattung & Zugaenge (Paket A2/A3, seit S10): `ausstattungZeilen`
+ * (OnboardingAusstattung), `ausstattungAufgaben` (OnboardingAusstattungAufgabe,
+ * Schluessel `ausstattungId_option`), `stellenHinweise`
+ * (OnboardingStellenHinweis, Schluessel `onboardingId_departmentKey`),
+ * `ausstattungAenderungen` (OnboardingAusstattungAenderung), dazu der Katalog
+ * (`ausstattungsPositionen`, `ausstattungsAusblendungen`, nur lesend) und
+ * `checklistItem.create/delete/deleteMany`. Leer als Vorgabe — bestehende
+ * Faelle bleiben unveraendert. Eindeutigkeit wie im Schema (P2002) und die
+ * Kaskaden (Aufgabe geloescht → Verknuepfung weg, Hinweis behaelt die Zeile
+ * mit `checklistItemId: null`; Zeile geloescht → Verknuepfungen weg) bildet
+ * der Fake nach. `smtpConfig` liefert `replyToEmail` aus `db.replyToEmail`.
+ *
+ * Ausstattung & Zugaenge, Stufe 2 (Paket A4, seit S24): `ausgaben` (Ausgabe,
+ * eine Zeile je Stueck) mit `ersetztDurchId @unique` und SetNull beim Loeschen,
+ * dazu `checklistItem.findFirst` und `ausstattungsPosition.findUnique`. Die
+ * Austrittsbezuege (`returnItem`, Offboarding-Aufgaben mit `ausgabeId`) kennt
+ * der Fake noch nicht – Tests, die sie brauchen, geben
+ * `austrittsBezuegeLaden` einen eigenen Mock (S29 haengt `returnItem` an).
+ * Seit S25 liest `offboardingProcess.findMany` auch Austritte per ID ohne
+ * Statusfilter (`where: { id: { in } }`): Die Link-Seite fragt die Bindung
+ * ueber `linkAusgabenLaden` selbst ab, dort greift kein Modul-Mock. Eine
+ * Offboarding-Aufgabe mit `ausgabeId` und `herkunft` in `aufgaben` ergibt den
+ * Bezug.
+ *
+ * Seit S29 (A4, Rueckgaben im Offboarding): Tabelle `rueckgaben` (ReturnItem,
+ * `@@unique([offboardingId, ausgabeId])`, NULL kollidiert nicht) als
+ * `returnItem` mit allen Methoden von `tabelle`; die Offboarding-Aufgaben
+ * kennen `herkunft`/`ausgabeId` (`neueOffboardingAufgabe`, Standardwerte des
+ * Schemas) samt `@@unique([offboardingId, ausgabeId, herkunft])` und dazu
+ * `create`, `createMany` und `deleteMany`. `createMany` versteht
+ * `skipDuplicates` (Doppelte fallen still weg, `count` zaehlt nur neue) –
+ * ohne das wirft eine verletzte Eindeutigkeit P2002 wie Prisma. Das `include`
+ * am Vorgang liefert `returnItems` aus der Tabelle; `offboardingDocument`
+ * liefert leere Listen (Dokumente fuehrt der Fake nicht). Tests, die
+ * `returnItem` frueher selbst angehaengt haben, duerfen es weiter ersetzen.
+ *
+ * Seit S30 (A4, Gleichlauf): `offboardingChecklistItem.findFirst` (Ruecknahme-
+ * bzw. Folgeaufgabe einer Ausgabe). Die Austrittssperre des Link- und
+ * Portal-Wegs (`updateMany` mit `status: { notIn }` bzw. `{ not }`) versteht
+ * `offboardingProcess.updateMany` schon.
+ *
  * Einbinden (Pfad relativ zur Testdatei):
  *
  *   import { db, fakePrisma, dbLeeren } from "../hilfen/abteilungs-fake-db";
@@ -49,6 +90,24 @@ export const db: {
   onboardingVorgaenge: Zeile[];
   /** Paket 5: ChecklistItem-Zeilen (Onboarding). */
   onboardingAufgaben: Zeile[];
+  /** Paket A2: OnboardingAusstattung-Zeilen. */
+  ausstattungZeilen: Zeile[];
+  /** Paket A3: OnboardingAusstattungAufgabe (Verknuepfung Zeile/Option → ChecklistItem). */
+  ausstattungAufgaben: Zeile[];
+  /** Paket A2: OnboardingStellenHinweis-Zeilen. */
+  stellenHinweise: Zeile[];
+  /** Paket A3: OnboardingAusstattungAenderung (Nachtragsliste). */
+  ausstattungAenderungen: Zeile[];
+  /** Paket A1: Katalog (AusstattungsPosition), nur lesend. */
+  ausstattungsPositionen: Zeile[];
+  /** Paket A1: AusstattungsAusblendung, nur lesend. */
+  ausstattungsAusblendungen: Zeile[];
+  /** Paket A4 (S24): Ausgabe-Zeilen (eine je Stueck). */
+  ausgaben: Zeile[];
+  /** Paket A4 (S29): ReturnItem-Zeilen (Rueckgaben im Offboarding). */
+  rueckgaben: Zeile[];
+  /** SmtpConfig.replyToEmail (HR-Postfach). */
+  replyToEmail: string | null;
 } = {
   vorgaenge: [],
   aufgaben: [],
@@ -61,6 +120,15 @@ export const db: {
   zuweisungen: [],
   onboardingVorgaenge: [],
   onboardingAufgaben: [],
+  ausstattungZeilen: [],
+  ausstattungAufgaben: [],
+  stellenHinweise: [],
+  ausstattungAenderungen: [],
+  ausstattungsPositionen: [],
+  ausstattungsAusblendungen: [],
+  ausgaben: [],
+  rueckgaben: [],
+  replyToEmail: null,
 };
 
 let idZaehler = 0;
@@ -87,6 +155,11 @@ export function passt(zeile: Zeile, where: Record<string, unknown> | undefined):
     if (k === "onboardingId_departmentKey") {
       const b = bed as { onboardingId: string; departmentKey: string };
       if (zeile.onboardingId !== b.onboardingId || zeile.departmentKey !== b.departmentKey) return false;
+      continue;
+    }
+    if (k === "ausstattungId_option") {
+      const b = bed as { ausstattungId: string; option: string };
+      if (zeile.ausstattungId !== b.ausstattungId || zeile.option !== b.option) return false;
       continue;
     }
     if (k === "userId_organizationId") return false;
@@ -189,7 +262,10 @@ function vorgangMitInclude(v: Zeile, include: Record<string, unknown>): Zeile {
       ).map((a) => structuredClone(a));
     } else if (k === "departmentLinks") {
       r.departmentLinks = db.links.filter((l) => l.offboardingId === v.id).map((l) => structuredClone(l));
-    } else if (["returnItems", "documents", "notes", "auditLogs"].includes(k)) {
+    } else if (k === "returnItems") {
+      // Seit S29: aus der Tabelle (Rueckgaben im Offboarding).
+      r.returnItems = db.rueckgaben.filter((x) => x.offboardingId === v.id).map((x) => structuredClone(x));
+    } else if (["documents", "notes", "auditLogs"].includes(k)) {
       r[k] = [];
     } else {
       r[k] = structuredClone(v[k] ?? null);
@@ -220,6 +296,373 @@ function onboardingProjektion(v: Zeile, select?: Record<string, unknown>): Zeile
   return r;
 }
 
+// =============================================
+// Ausstattung & Zugaenge (seit S10): Tabellen samt Eindeutigkeit und Kaskaden
+// =============================================
+
+/** Wie Prisma bei einer verletzten Eindeutigkeit (P2002). */
+function eindeutigkeitVerletzt(felder: string): Error {
+  return Object.assign(new Error(`Unique constraint failed on the fields: (${felder})`), { code: "P2002" });
+}
+
+/** Wie Prisma, wenn die Zeile zu update/delete fehlt (P2025). */
+function zeileFehlt(): Error {
+  return Object.assign(new Error("Record not found."), { code: "P2025" });
+}
+
+/** Neue ChecklistItem-Zeile (Onboarding) mit den Standardwerten des Schemas. */
+export function neueOnboardingAufgabe(data: Zeile): Zeile {
+  return {
+    id: `i-${naechsteId()}`,
+    templateItemId: null,
+    title: "",
+    description: null,
+    category: "",
+    orderIndex: 0,
+    assignee: null,
+    relativeDueDays: null,
+    isCompleted: false,
+    completedAt: null,
+    completedById: null,
+    dueDate: null,
+    notes: null,
+    abteilungKommentar: null,
+    abteilungKommentarAm: null,
+    herkunft: null,
+    eilt: false,
+    entfaelltAm: null,
+    ausgabenGeloeschtAm: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neue Ausgabe (A4) mit den Standardwerten des Schemas. */
+export function neueAusgabe(data: Zeile): Zeile {
+  return {
+    id: `ag-${naechsteId()}`,
+    employeeId: null,
+    onboardingId: null,
+    checklistItemId: null,
+    zentral: false,
+    kennungLabel: null,
+    kennung: null,
+    rueckgabeKategorie: null,
+    erfasstVonId: null,
+    zustand: "AUSGEGEBEN",
+    zustandAm: new Date(),
+    ersetztDurchId: null,
+    loeschenAb: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neue OffboardingChecklistItem-Zeile mit den Standardwerten des Schemas (seit S29 mit `herkunft`/`ausgabeId`). */
+export function neueOffboardingAufgabe(data: Zeile): Zeile {
+  return {
+    id: `oi-${naechsteId()}`,
+    title: "",
+    category: "",
+    orderIndex: 0,
+    description: null,
+    assigneeDepartment: null,
+    isCompleted: false,
+    completedAt: null,
+    completedById: null,
+    dueDate: null,
+    notes: null,
+    abteilungKommentar: null,
+    abteilungKommentarAm: null,
+    herkunft: null,
+    ausgabeId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neue ReturnItem-Zeile (S29) mit den Standardwerten des Schemas. */
+export function neueRueckgabe(data: Zeile): Zeile {
+  return {
+    id: `ri-${naechsteId()}`,
+    serialNumber: null,
+    isReturned: false,
+    returnedAt: null,
+    returnedToId: null,
+    condition: null,
+    notes: null,
+    zustand: null,
+    ausgabeId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** @@unique([offboardingId, ausgabeId, herkunft]) – NULL kollidiert nicht (Postgres). */
+function offboardingAufgabePruefen(x: Zeile, ohne?: Zeile): void {
+  if (x.ausgabeId == null || x.herkunft == null) return;
+  const doppelt = db.aufgaben.some(
+    (a) => a !== ohne && a.offboardingId === x.offboardingId && a.ausgabeId === x.ausgabeId && a.herkunft === x.herkunft,
+  );
+  if (doppelt) throw eindeutigkeitVerletzt("offboardingId,ausgabeId,herkunft");
+}
+
+/** Neue OnboardingAusstattung-Zeile mit den Standardwerten des Schemas. */
+export function neueAusstattungsZeile(data: Zeile): Zeile {
+  return {
+    id: `aus-${naechsteId()}`,
+    positionId: null,
+    angabeSchluessel: null,
+    aufgabeTitel: "",
+    hinweisStelle: null,
+    relativeDueDays: null,
+    sichtbarFuer: [],
+    ausgabeKennung: null,
+    rueckgabeKategorie: null,
+    beiAustritt: null,
+    reihenfolge: 0,
+    auswahl: [],
+    angabe: null,
+    bemerkung: null,
+    bemerkungQuelle: null,
+    erfasstVonId: null,
+    gestrichenAm: null,
+    inhaltGeleertAm: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neuer OnboardingStellenHinweis mit den Standardwerten des Schemas. */
+export function neuerStellenHinweis(data: Zeile): Zeile {
+  return {
+    checklistItemId: null,
+    gesehenAm: null,
+    inhaltGeleertAm: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...data,
+  };
+}
+
+/** Neue OnboardingAusstattungAufgabe (Verknuepfung) mit den Standardwerten des Schemas. */
+function neueAusstattungsAufgabe(data: Zeile): Zeile {
+  return { option: "", createdAt: new Date(), ...data };
+}
+
+/** Neue OnboardingAusstattungAenderung mit den Standardwerten des Schemas. */
+function neueAusstattungsAenderung(data: Zeile): Zeile {
+  return { id: `aen-${naechsteId()}`, erfasstAm: new Date(), gesendetAm: null, ...data };
+}
+
+/**
+ * Eine Tabelle mit den Methoden, die die Ausstattung braucht:
+ * findMany/findUnique/findFirst/count/create/createMany/update/updateMany/
+ * delete/deleteMany. `pruefen` wirft P2002, `nachLoeschen` bildet Kaskaden
+ * nach. Die Zeilen liest sie bei jedem Aufruf frisch aus `db` (dbLeeren
+ * ersetzt die Arrays).
+ */
+function tabelle(opts: {
+  zeilen: () => Zeile[];
+  ersetzen: (zeilen: Zeile[]) => void;
+  neu: (data: Zeile) => Zeile;
+  pruefen?: (kandidat: Zeile, ohne?: Zeile) => void;
+  nachLoeschen?: (geloescht: Zeile[]) => void;
+}) {
+  const finden = (where: Zeile) => opts.zeilen().find((x) => passt(x, where));
+  const loeschen = (treffer: Zeile[]) => {
+    opts.ersetzen(opts.zeilen().filter((x) => !treffer.includes(x)));
+    opts.nachLoeschen?.(treffer);
+  };
+  return {
+    findMany: jest.fn(async (args: { where?: Zeile; select?: Zeile; orderBy?: unknown } = {}) =>
+      sortieren(opts.zeilen().filter((x) => passt(x, args.where)), args.orderBy).map((x) => projizieren(x, args.select)),
+    ),
+    findUnique: jest.fn(async ({ where, select }: { where: Zeile; select?: Zeile }) => {
+      const x = finden(where);
+      return x ? projizieren(x, select) : null;
+    }),
+    findFirst: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) => {
+      const x = opts.zeilen().find((z) => passt(z, where));
+      return x ? projizieren(x, select) : null;
+    }),
+    count: jest.fn(async ({ where }: { where?: Zeile } = {}) => opts.zeilen().filter((x) => passt(x, where)).length),
+    create: jest.fn(async ({ data, select }: { data: Zeile; select?: Zeile }) => {
+      const x = opts.neu(data);
+      opts.pruefen?.(x);
+      opts.zeilen().push(x);
+      return projizieren(x, select);
+    }),
+    // Seit S29: `skipDuplicates` laesst Doppelte (P2002) still weg, `count` zaehlt nur neue.
+    createMany: jest.fn(async ({ data, skipDuplicates }: { data: Zeile[] | Zeile; skipDuplicates?: boolean }) => {
+      const liste = Array.isArray(data) ? data : [data];
+      let count = 0;
+      for (const d of liste) {
+        const x = opts.neu(d);
+        try {
+          opts.pruefen?.(x);
+        } catch (err) {
+          if (skipDuplicates && (err as { code?: string }).code === "P2002") continue;
+          throw err;
+        }
+        opts.zeilen().push(x);
+        count += 1;
+      }
+      return { count };
+    }),
+    update: jest.fn(async ({ where, data, select }: { where: Zeile; data: Zeile; select?: Zeile }) => {
+      const x = finden(where);
+      if (!x) throw zeileFehlt();
+      const kandidat = { ...x };
+      anwenden(kandidat, data);
+      opts.pruefen?.(kandidat, x);
+      anwenden(x, data);
+      return projizieren(x, select);
+    }),
+    updateMany: jest.fn(async ({ where, data }: { where?: Zeile; data: Zeile }) => {
+      const treffer = opts.zeilen().filter((x) => passt(x, where));
+      treffer.forEach((x) => anwenden(x, data));
+      return { count: treffer.length };
+    }),
+    delete: jest.fn(async ({ where }: { where: Zeile }) => {
+      const x = finden(where);
+      if (!x) throw zeileFehlt();
+      loeschen([x]);
+      return structuredClone(x);
+    }),
+    deleteMany: jest.fn(async ({ where }: { where?: Zeile } = {}) => {
+      const treffer = opts.zeilen().filter((x) => passt(x, where));
+      loeschen(treffer);
+      return { count: treffer.length };
+    }),
+  };
+}
+
+/** Kaskaden beim Loeschen von ChecklistItems: Verknuepfung weg, Hinweis behaelt die Zeile (SetNull). */
+function aufgabenGeloescht(geloescht: Zeile[]): void {
+  const ids = new Set(geloescht.map((a) => a.id));
+  db.ausstattungAufgaben = db.ausstattungAufgaben.filter((v) => !ids.has(v.checklistItemId));
+  for (const h of db.stellenHinweise) if (ids.has(h.checklistItemId)) h.checklistItemId = null;
+}
+
+const ausstattungsTabellen = {
+  onboardingAusstattung: tabelle({
+    zeilen: () => db.ausstattungZeilen,
+    ersetzen: (z) => (db.ausstattungZeilen = z),
+    neu: neueAusstattungsZeile,
+    // @@unique([onboardingId, positionId]) — NULL kollidiert nicht (Postgres)
+    pruefen: (x, ohne) => {
+      if (x.positionId == null) return;
+      const doppelt = db.ausstattungZeilen.some(
+        (z) => z !== ohne && z.onboardingId === x.onboardingId && z.positionId === x.positionId,
+      );
+      if (doppelt) throw eindeutigkeitVerletzt("onboardingId,positionId");
+    },
+    nachLoeschen: (geloescht) => {
+      const ids = new Set(geloescht.map((z) => z.id));
+      db.ausstattungAufgaben = db.ausstattungAufgaben.filter((v) => !ids.has(v.ausstattungId));
+    },
+  }),
+  onboardingAusstattungAufgabe: tabelle({
+    zeilen: () => db.ausstattungAufgaben,
+    ersetzen: (z) => (db.ausstattungAufgaben = z),
+    neu: neueAusstattungsAufgabe,
+    // @@id([ausstattungId, option]) und checklistItemId @unique
+    pruefen: (x, ohne) => {
+      for (const v of db.ausstattungAufgaben) {
+        if (v === ohne) continue;
+        if (v.ausstattungId === x.ausstattungId && v.option === x.option) {
+          throw eindeutigkeitVerletzt("ausstattungId,option");
+        }
+        if (v.checklistItemId === x.checklistItemId) throw eindeutigkeitVerletzt("checklistItemId");
+      }
+    },
+  }),
+  onboardingStellenHinweis: tabelle({
+    zeilen: () => db.stellenHinweise,
+    ersetzen: (z) => (db.stellenHinweise = z),
+    neu: neuerStellenHinweis,
+    // @@id([onboardingId, departmentKey]) und checklistItemId @unique
+    pruefen: (x, ohne) => {
+      for (const h of db.stellenHinweise) {
+        if (h === ohne) continue;
+        if (h.onboardingId === x.onboardingId && h.departmentKey === x.departmentKey) {
+          throw eindeutigkeitVerletzt("onboardingId,departmentKey");
+        }
+        if (x.checklistItemId != null && h.checklistItemId === x.checklistItemId) {
+          throw eindeutigkeitVerletzt("checklistItemId");
+        }
+      }
+    },
+  }),
+  onboardingAusstattungAenderung: tabelle({
+    zeilen: () => db.ausstattungAenderungen,
+    ersetzen: (z) => (db.ausstattungAenderungen = z),
+    neu: neueAusstattungsAenderung,
+  }),
+  ausstattungsPosition: {
+    findMany: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) =>
+      db.ausstattungsPositionen.filter((x) => passt(x, where)).map((x) => projizieren(x, select)),
+    ),
+    // Seit S24 (A4): Ist die Position zentral? (`vermerkZielLadenIn`)
+    findUnique: jest.fn(async ({ where, select }: { where: Zeile; select?: Zeile }) => {
+      const x = db.ausstattungsPositionen.find((p) => passt(p, where));
+      return x ? projizieren(x, select) : null;
+    }),
+  },
+  // Seit S24 (A4): Ausgaben. ersetztDurchId @unique; beim Loeschen zeigt eine
+  // Vorgaengerin nicht mehr ins Leere (SetNull, Relation „AusgabeTausch“).
+  ausgabe: tabelle({
+    zeilen: () => db.ausgaben,
+    ersetzen: (z) => (db.ausgaben = z),
+    neu: neueAusgabe,
+    pruefen: (x, ohne) => {
+      if (x.ersetztDurchId == null) return;
+      if (db.ausgaben.some((a) => a !== ohne && a.ersetztDurchId === x.ersetztDurchId)) {
+        throw eindeutigkeitVerletzt("ersetztDurchId");
+      }
+    },
+    nachLoeschen: (geloescht) => {
+      const ids = new Set(geloescht.map((a) => a.id));
+      for (const a of db.ausgaben) if (ids.has(a.ersetztDurchId)) a.ersetztDurchId = null;
+    },
+  }),
+  ausstattungsAusblendung: {
+    findMany: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) =>
+      db.ausstattungsAusblendungen.filter((x) => passt(x, where)).map((x) => projizieren(x, select)),
+    ),
+  },
+  // Seit S29 (A4): Rueckgaben im Offboarding. @@unique([offboardingId, ausgabeId]).
+  returnItem: tabelle({
+    zeilen: () => db.rueckgaben,
+    ersetzen: (z) => (db.rueckgaben = z),
+    neu: neueRueckgabe,
+    pruefen: (x, ohne) => {
+      if (x.ausgabeId == null) return;
+      if (db.rueckgaben.some((r) => r !== ohne && r.offboardingId === x.offboardingId && r.ausgabeId === x.ausgabeId)) {
+        throw eindeutigkeitVerletzt("offboardingId,ausgabeId");
+      }
+    },
+  }),
+  // Seit S29: Dokumente fuehrt der Fake nicht (Rueckgabeprotokoll im Reiter „Rückgaben“).
+  offboardingDocument: {
+    findMany: jest.fn(async (): Promise<Zeile[]> => []),
+  },
+};
+
+/** Seit S29: Offboarding-Aufgaben anlegen und loeschen (Ruecknahme- und Sperraufgaben), mit dem Unique-Index. */
+const offboardingAufgabenAnlage = tabelle({
+  zeilen: () => db.aufgaben,
+  ersetzen: (z) => (db.aufgaben = z),
+  neu: neueOffboardingAufgabe,
+  pruefen: offboardingAufgabePruefen,
+});
+
 export const fakePrisma: Record<string, unknown> = {
   offboardingProcess: {
     findUnique: jest.fn(
@@ -230,6 +673,9 @@ export const fakePrisma: Record<string, unknown> = {
       },
     ),
     findMany: jest.fn(async ({ where, select }: { where: Record<string, Zeile>; select: Record<string, Zeile> }) => {
+      // Seit S25 (A4): Austritte per ID ohne Statusfilter (`austrittsBezuegeLaden`
+      // auf der Link-Seite) – einfache Bedingungen, flache Projektion.
+      if (!where.status) return db.vorgaenge.filter((v) => passt(v, where)).map((v) => projizieren(v, select));
       const status = where.status as { notIn: string[] };
       const links = select.departmentLinks as { where: Zeile } | undefined;
       const aufgaben = select.checklistItems as { where: Zeile } | undefined;
@@ -268,6 +714,8 @@ export const fakePrisma: Record<string, unknown> = {
       treffer.forEach((v) => anwenden(v, data));
       return { count: treffer.length };
     }),
+    // Seit S29 (A4): andere laufende Austritte derselben Einstellung (EINSTELLUNG_VERGEBEN).
+    count: jest.fn(async ({ where }: { where?: Zeile } = {}) => db.vorgaenge.filter((v) => passt(v, where)).length),
   },
   offboardingChecklistItem: {
     findMany: jest.fn(async ({ where, select, orderBy }: { where: Zeile; select?: Zeile; orderBy?: unknown }) =>
@@ -289,6 +737,12 @@ export const fakePrisma: Record<string, unknown> = {
       treffer.forEach((a) => anwenden(a, data));
       return { count: treffer.length };
     }),
+    // Seit S29 (A4): Ruecknahme-, Sperr- und Folgeaufgaben.
+    create: offboardingAufgabenAnlage.create,
+    createMany: offboardingAufgabenAnlage.createMany,
+    deleteMany: offboardingAufgabenAnlage.deleteMany,
+    // Seit S30 (A4): Ruecknahme- bzw. Folgeaufgabe einer Ausgabe im Gleichlauf.
+    findFirst: offboardingAufgabenAnlage.findFirst,
   },
   offboardingDepartmentLink: {
     findMany: jest.fn(async ({ where, select }: { where: Zeile; select?: Zeile }) =>
@@ -378,6 +832,11 @@ export const fakePrisma: Record<string, unknown> = {
       },
     ),
     count: jest.fn(async ({ where }: { where: Zeile }) => db.onboardingAufgaben.filter((a) => passt(a, where)).length),
+    // Seit S24 (A4): die Aufgabe eines Vermerks (`vermerkZielLadenIn`).
+    findFirst: jest.fn(async ({ where, select }: { where?: Zeile; select?: Zeile } = {}) => {
+      const a = db.onboardingAufgaben.find((x) => passt(x, where));
+      return a ? projizieren(a, select) : null;
+    }),
     update: jest.fn(async ({ where, data }: { where: Zeile; data: Zeile }) => {
       const a = db.onboardingAufgaben.find((x) => passt(x, where));
       if (!a) throw new Error("Onboarding-Aufgabe fehlt");
@@ -389,7 +848,28 @@ export const fakePrisma: Record<string, unknown> = {
       treffer.forEach((a) => anwenden(a, data));
       return { count: treffer.length };
     }),
+    // Seit S10 (fuer A3): Ausstattungsaufgaben anlegen und loeschen, mit den
+    // Kaskaden des Schemas (aufgabenGeloescht).
+    create: jest.fn(async ({ data, select }: { data: Zeile; select?: Zeile }) => {
+      const a = neueOnboardingAufgabe(data);
+      db.onboardingAufgaben.push(a);
+      return projizieren(a, select);
+    }),
+    delete: jest.fn(async ({ where }: { where: Zeile }) => {
+      const a = db.onboardingAufgaben.find((x) => passt(x, where));
+      if (!a) throw zeileFehlt();
+      db.onboardingAufgaben = db.onboardingAufgaben.filter((x) => x !== a);
+      aufgabenGeloescht([a]);
+      return structuredClone(a);
+    }),
+    deleteMany: jest.fn(async ({ where }: { where?: Zeile } = {}) => {
+      const treffer = db.onboardingAufgaben.filter((a) => passt(a, where));
+      db.onboardingAufgaben = db.onboardingAufgaben.filter((a) => !treffer.includes(a));
+      aufgabenGeloescht(treffer);
+      return { count: treffer.length };
+    }),
   },
+  ...ausstattungsTabellen,
   departmentConfig: {
     findMany: jest.fn(async () => db.konfigs.map((k) => structuredClone(k))),
   },
@@ -407,7 +887,7 @@ export const fakePrisma: Record<string, unknown> = {
     findUnique: jest.fn(async ({ where }: { where: Zeile }) => db.users.find((u) => passt(u, where)) ?? null),
   },
   smtpConfig: {
-    findUnique: jest.fn(async () => ({ allowedRecipientDomains: db.domains })),
+    findUnique: jest.fn(async () => ({ allowedRecipientDomains: db.domains, replyToEmail: db.replyToEmail })),
   },
   userOrgAssignment: {
     findUnique: jest.fn(async ({ where }: { where: { userId_organizationId: Zeile } }) =>
@@ -434,4 +914,13 @@ export function dbLeeren(): void {
   db.zuweisungen = [];
   db.onboardingVorgaenge = [];
   db.onboardingAufgaben = [];
+  db.ausstattungZeilen = [];
+  db.ausstattungAufgaben = [];
+  db.stellenHinweise = [];
+  db.ausstattungAenderungen = [];
+  db.ausstattungsPositionen = [];
+  db.ausstattungsAusblendungen = [];
+  db.ausgaben = [];
+  db.rueckgaben = [];
+  db.replyToEmail = null;
 }

@@ -202,3 +202,35 @@ describe("Onboarding-Übersicht: Fuehrungskraft war schneller", () => {
     expect(seitentext()).toContain("Eingereicht am 18.09.2026");
   });
 });
+
+describe("Onboarding-Übersicht: Formular mit Ausstattungsschritt (Paket A2)", () => {
+  const mitLink = {
+    supervisorToken: "tok-sv",
+    supervisorEmail: "leitung@example.org",
+    supervisorTokenExpiresAt: "2099-10-20T12:00:00.000Z",
+  };
+
+  /** Wie oft steht `teil` im Seitentext? Stepper UND Karte „Vorgesetzten-Link“ sollen es nennen. */
+  function anzahl(teil: string): number {
+    return seitentext().split(teil).length - 1;
+  }
+
+  it("Stepper und Karte „Vorgesetzten-Link“ zeigen „Schritt 5 von 6“", () => {
+    uebersicht(
+      { ...mitLink, supervisorData: { isComplete: false, currentStep: 4, mitAusstattung: true } },
+      "leitung@example.org",
+    );
+    expect(seitentext()).toContain("Modalitäten in Bearbeitung — Schritt 5 von 6 · Ausstattung & Zugänge");
+    expect(anzahl("Schritt 5 von 6 · Ausstattung & Zugänge")).toBeGreaterThanOrEqual(2);
+    expect(seitentext()).not.toContain("von 5");
+  });
+
+  it("ohne Merker: Stepper und Karte bleiben bei „von 5“", () => {
+    uebersicht(
+      { ...mitLink, supervisorData: { isComplete: false, currentStep: 4, mitAusstattung: false } },
+      "leitung@example.org",
+    );
+    expect(anzahl("Schritt 5 von 5 · Zusammenfassung")).toBeGreaterThanOrEqual(2);
+    expect(seitentext()).not.toContain("von 6");
+  });
+});

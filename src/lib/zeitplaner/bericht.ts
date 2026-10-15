@@ -94,6 +94,9 @@ const VERSAND: Record<string, string> = {
 };
 const HINWEIS_ERINNERUNGEN =
   "Nicht zugestellte Mails stehen im Versandprotokoll (Einstellungen → E-Mail-Versand). Fehlgeschlagene versucht der nächste Lauf erneut, übersprungene (Vorlage aus oder ohne Empfänger) erst nach dem nächsten Abstand.";
+/** Zusatz, wenn die Sammelmail zur offenen Ausstattung (E-A18) nicht ankam. */
+const HINWEIS_SAMMELMAIL =
+  "Die Sammelmail „Ausstattung noch offen“ kommt je Vorgang nur einmal: Eine fehlgeschlagene versucht der nächste Lauf bis zum Dienstbeginn erneut, eine übersprungene nicht mehr. Übersprungen heißt meist: In den SMTP-Einstellungen ist keine Antwortadresse (HR-Postfach) hinterlegt, oder die Vorlage „Onboarding: Ausstattung noch offen (HR)“ ist deaktiviert.";
 
 /** Versuche und Uebersprungene der Abteilungserinnerungen (On- und Offboarding) ohne Namen. */
 function abteilungsSchritte(ergebnis: AntwortLeser, praefix: string): { schritte: string[]; nicht: number; uebersprungen: number } {
@@ -206,24 +209,40 @@ const AUSWERTER: Record<LaufSchluessel, Auswerter> = {
 
   reminders: (b) => {
     const abt = b.objekt("departmentReminders");
+    // Ausstattung & Zugaenge: Abschnitt 3a (nachgeholte Aufgaben, keine Mails)
+    // und Abschnitt 4 (Sammelmail an HR, E-A18) teilen sich ein Antwortfeld.
+    const ausstattung = b.objekt("ausstattung");
+    const sammelmail = ausstattung.objekt("sammelmail");
     const s = abteilungsSchritte(abt, "Abteilung");
     const nicht = b.zahl("notSent");
-    const fehler = b.zahl("errors") + abt.zahl("errors");
-    const versendet = b.zahl("employeeReminders") + b.zahl("supervisorReminders") + abt.zahl("remindersProcessed");
+    // Eine nicht zugestellte (FAILED) wie eine uebersprungene (SKIPPED)
+    // Sammelmail erreicht HR nicht — beides ist ein Befund.
+    const sammelNicht = sammelmail.zahl("nichtZugestellt");
+    const sammelUeber = sammelmail.zahl("uebersprungen");
+    const fehler = b.zahl("errors") + abt.zahl("errors") + ausstattung.zahl("errors");
+    const versendet =
+      b.zahl("employeeReminders") +
+      b.zahl("supervisorReminders") +
+      abt.zahl("remindersProcessed") +
+      sammelmail.zahl("versendet");
     return {
-      problem: nicht + s.nicht + fehler > 0,
+      problem: nicht + s.nicht + sammelNicht + sammelUeber + fehler > 0,
       versendet,
       zaehler: [
         ["Fragebogen (Mitarbeitende)", b.zahl("employeeReminders")],
         ["Einstellungsmodalitäten (Führungskräfte)", b.zahl("supervisorReminders")],
         ["Aufgaben von Abteilungen", abt.zahl("remindersProcessed")],
+        ["Ausstattung nachgeholt (Aufgaben)", ausstattung.objekt("nachgeholt").zahl("aufgaben")],
+        ["Sammelmail offene Ausstattung an HR", sammelmail.zahl("versendet")],
         ["Fragebogen/Modalitäten nicht zugestellt", nicht, nicht > 0],
         ["Abteilungen nicht zugestellt", s.nicht, s.nicht > 0],
         ["Abteilungen übersprungen", s.uebersprungen],
+        ["Sammelmail nicht zugestellt", sammelNicht, sammelNicht > 0],
+        ["Sammelmail übersprungen (Vorlage oder Empfänger)", sammelUeber, sammelUeber > 0],
         ["Fehler", fehler, fehler > 0],
       ],
       schritte: s.schritte,
-      hinweis: HINWEIS_ERINNERUNGEN,
+      hinweis: sammelNicht + sammelUeber > 0 ? `${HINWEIS_ERINNERUNGEN} ${HINWEIS_SAMMELMAIL}` : HINWEIS_ERINNERUNGEN,
     };
   },
 
@@ -368,7 +387,14 @@ const AUSWERTER: Record<LaufSchluessel, Auswerter> = {
   "dokumente-aufbewahrung": (b, probelauf) => {
     // Der Probelauf zaehlt nur und traegt kein `fehler`.
     const m = b.objekt("individuelleMails");
-    const fehler = probelauf ? 0 : b.zahl("fehler") + m.zahl("fehler");
+    // Ausstattung & Zugaenge (E-A22): Bemerkungen, Angaben und Hinweise nach
+    // sechs Monaten — nur Anzahlen, nie Inhalte oder Vorgaenge.
+    const a = b.objekt("ausstattung");
+    // Ausgaben aus „Ausstattung & Zugänge“ (E-A37, A4): geloescht nach Ablauf
+    // der Frist samt Kopien und Protokollen. „Ohne Frist, älter als drei
+    // Jahre“ ist nur eine Zahl, kein Befund (Feinplan A4, 1.11 Schritt 6).
+    const g = b.objekt("ausgaben");
+    const fehler = probelauf ? 0 : b.zahl("fehler") + m.zahl("fehler") + a.zahl("fehler") + g.zahl("fehler");
     return {
       problem: fehler > 0,
       versendet: 0,
@@ -376,10 +402,20 @@ const AUSWERTER: Record<LaufSchluessel, Auswerter> = {
         ? [
             ["Würde löschen (Dokumente)", b.zahl("wuerdeLoeschen")],
             ["Würde leeren (individuelle E-Mails)", m.zahl("wuerdeLeeren")],
+            ["Würde leeren (Ausstattung: Bemerkungen, Angaben, Hinweise)", a.zahl("wuerdeLeeren")],
+            ["Würde löschen (Ausgaben nach Ablauf der Frist)", g.zahl("wuerdeLoeschen")],
+            ["Ausgaben ohne Löschfrist, älter als drei Jahre", g.zahl("ohneFristAelterDreiJahre")],
           ]
         : [
             ["Gelöscht: Dokumente / Dateien / Ordner", `${b.zahl("geloescht")} / ${b.zahl("dateienGeloescht")} / ${b.zahl("ordnerGeloescht")}`],
             ["Geleert: individuelle E-Mails / Anhänge", `${m.zahl("geleert")} / ${m.zahl("dateienGeloescht")}`],
+            ["Geleert: Ausstattung – Positionen / Hinweise", `${a.zahl("geleert")} / ${a.zahl("hinweiseGeleert")}`],
+            ["Gelöscht: Ausgaben / Rückgaben geleert", `${g.zahl("geloescht")} / ${g.zahl("rueckgabenGeleert")}`],
+            [
+              "Gelöscht: Übergabe- und Rückgabeprotokolle – hochgeladen / erzeugt",
+              `${g.zahl("protokolleGeloescht")} / ${g.zahl("erzeugteProtokolleGeloescht")}`,
+            ],
+            ["Ausgaben ohne Löschfrist, älter als drei Jahre", g.zahl("ohneFristAelterDreiJahre")],
             ["Fehler", fehler, fehler > 0],
           ],
       schritte: [],

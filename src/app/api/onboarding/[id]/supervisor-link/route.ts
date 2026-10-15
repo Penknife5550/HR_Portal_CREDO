@@ -38,6 +38,15 @@
  *     Die schon im Vorgang hinterlegte Adresse ist immer erlaubt: Wiederverwenden
  *     und Erneuern eines abgelaufenen Links scheitern nie an einer spaeter
  *     gepflegten Liste. Geprueft VOR jedem Schreiben und vor jeder Mail.
+ *   - SCHRITTLISTE STEHT FEST (Ausstattung & Zugaenge, Regel 2). Mit dem Link
+ *     entsteht der Merker `SupervisorData.mitAusstattung` aus dem Katalog am
+ *     Arbeitsort (`ausstattungAngebotenIn`, dieselbe Transaktion). Ein neuer
+ *     Link fuer eine bestehende Zeile aendert ihn nur, solange er leer ist und
+ *     das Formular nie gespeichert wurde (`vorgesetztenLinkSetzen`); ein
+ *     wiederverwendeter Link aendert nichts. Hat ein gleichzeitiger
+ *     Arbeitsort-PATCH den Ort seit dem Lesen geaendert, trifft die Sperre
+ *     nichts — 409 „Vorgang wurde gerade geändert“ statt eines Merkers aus
+ *     dem Katalog des alten Orts.
  */
 
 import { NextResponse } from "next/server";
@@ -47,6 +56,7 @@ import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
 import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { ausstattungAngebotenIn } from "@/lib/ausstattung-katalog";
 import {
   istHrStatus,
   mitarbeiterName,
@@ -167,10 +177,17 @@ export const POST = apiHandler<SupervisorLinkInput>(
     }
 
     // Schreiben, Status abgleichen und Protokoll in EINER Transaktion —
-    // dieselbe Funktion wie beim Anlegen mit Fuehrungskraft.
+    // dieselbe Funktion wie beim Anlegen mit Fuehrungskraft. Der Merker der
+    // Schrittliste (Ausstattung & Zugaenge, Regel 2) kommt aus dem Katalog am
+    // Arbeitsort, gelesen in derselben Transaktion; die Skalare liefert das
+    // `include` oben schon mit (VORGANG_INCLUDE bleibt, wie es ist). Der
+    // Arbeitsort geht mit in die Sperre: Hat ihn ein gleichzeitiger PATCH
+    // seit dem Lesen geaendert, trifft sie nichts (`LinkGeaendert`, 409 unten),
+    // statt den Merker aus dem Katalog des alten Orts einzufrieren.
+    const arbeitsortId = onboarding.arbeitsortId;
     let link: Awaited<ReturnType<typeof vorgesetztenLinkSetzen>>;
     try {
-      link = await prisma.$transaction((tx) =>
+      link = await prisma.$transaction(async (tx) =>
         vorgesetztenLinkSetzen(tx, {
           id,
           supervisorEmail,
@@ -178,6 +195,13 @@ export const POST = apiHandler<SupervisorLinkInput>(
           bisherigeEmail: onboarding.supervisorEmail,
           userId: session.userId,
           organizationName: onboarding.organization.name,
+          arbeitsortId,
+          ausstattungAngeboten: await ausstattungAngebotenIn(tx, {
+            organizationId: onboarding.organizationId,
+            arbeitsortId,
+            questionnaireType: onboarding.questionnaireType,
+            processType: onboarding.processType,
+          }),
         }),
       );
     } catch (error) {
@@ -206,22 +230,26 @@ export const POST = apiHandler<SupervisorLinkInput>(
       );
     }
 
-    const { supervisorToken, supervisorTokenExpiresAt } = link;
+    const { supervisorToken, supervisorTokenExpiresAt, mitAusstattung } = link;
     const modalitaetenLink = modalitaetenLinkZu(supervisorToken);
 
     // E-Mail an die Fuehrungskraft (SMTP primaer, Webhooks nur zusaetzlich).
     // Wirft nicht; das Ergebnis steht im EmailLog und geht an die Oberflaeche,
     // damit HR weiss, ob der Link selbst weitergegeben werden muss. Ohne Namen
     // heisst die Person dort MITARBEITER_NEUTRAL, nie ihre E-Mail-Adresse
-    // (Payload-Baustein in src/lib/onboarding-einladung.ts).
+    // (Payload-Baustein in src/lib/onboarding-einladung.ts). Den Satz zur
+    // Ausstattung bekommt sie nur mit dem WIRKSAMEN Merker.
     const mail = await triggerWebhooks(
       "supervisor-link-created",
-      vorgesetztenLinkMailFelder({
-        ...onboarding,
-        supervisorEmail,
-        supervisorToken,
-        supervisorTokenExpiresAt,
-      }),
+      vorgesetztenLinkMailFelder(
+        {
+          ...onboarding,
+          supervisorEmail,
+          supervisorToken,
+          supervisorTokenExpiresAt,
+        },
+        { ausstattungAngeboten: mitAusstattung },
+      ),
     );
 
     return NextResponse.json(

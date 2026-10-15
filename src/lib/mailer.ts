@@ -498,6 +498,30 @@ const FREITEXT_VARIABLEN = [
   // HR — im HTML nur maskiert, falls ein Admin sie roh in die Vorlage setzt.
   "betreff",
   "anhaenge_liste",
+  // Ausstattung & Zugaenge (Paket A3): Angaben und Hinweis an die Stelle
+  // (Freitext der Fuehrungskraft bzw. von HR). Die Standardvorlage setzt im
+  // HTML `angaben_html` ein (schon maskiert, steht deshalb NICHT hier).
+  "angaben",
+  // Nachtrag (Paket A3, Regel 10): Titel der geaenderten Aufgaben, bei einer
+  // freien Position von HR frei getippt. Im HTML steht `nachtrag_liste_html`
+  // (schon maskiert, deshalb NICHT hier).
+  "nachtrag_liste",
+  // Sammelmail „Ausstattung noch offen“ (Paket A3, E-A18): Titel der offenen
+  // Aufgaben, bei einer freien Position von HR frei getippt. Im HTML steht
+  // `offene_liste_html` (schon maskiert, deshalb NICHT hier).
+  "offene_liste",
+  // Absage an die Stellen (Paket A3, E-A20, F17): Titel der erledigten
+  // Aufgaben, bei einer freien Position von HR frei getippt. Im HTML steht
+  // `erledigte_liste_html` (schon maskiert, deshalb NICHT hier).
+  "erledigte_liste",
+  // Uebergabevermerk (Paket A4, G9): Kennungen der Stuecke, von der Stelle
+  // ueber ihren Link getippt. Im HTML steht `ausgabe_vermerk_html` (schon
+  // maskiert, deshalb NICHT hier).
+  "ausgabe_vermerk",
+  // Absage an die Stellen (Paket A4, G10): Bezeichnungen und Kennungen der
+  // noch ausgegebenen Stuecke (Kennung von der Stelle bzw. HR getippt). Im
+  // HTML steht `ausgaben_liste_html` (schon maskiert, deshalb NICHT hier).
+  "ausgaben_liste",
 ];
 
 /** Variablen fuer den HTML-Teil: Namen und Rohtexte maskiert, der Rest unveraendert. */

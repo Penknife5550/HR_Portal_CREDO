@@ -172,6 +172,18 @@ describe("Katalog", () => {
     }
   });
 
+  it("Onboarding-Erinnerungen nennen die Sammelmail „Ausstattung noch offen“ (Paket A3, E-A18)", () => {
+    // Abschnitt 4 des Laufs verschickt sie — die Einstellungsseite zeigt die
+    // Vorlagen eines Laufs aus dieser Liste.
+    expect(laufDefinition("reminders")?.vorlagen).toEqual([
+      "employee-reminder",
+      "supervisor-reminder",
+      "onboarding-department-reminder",
+      "onboarding-ausstattung-offen",
+    ]);
+    expect(laufDefinition("reminders")?.beschreibung).toContain("Werktag vor Dienstbeginn");
+  });
+
   it("jede genannte Route gibt es als Datei", () => {
     for (const l of LAEUFE) {
       if (!l.route) continue;
@@ -246,15 +258,103 @@ describe("Auswertung", () => {
           ],
           uebersprungen: [{ displayId: "ONB-2026-GYM-002", departmentKey: "IT", grund: "KEINE_ADRESSE", detail: "x" }],
         },
+        // Abschnitt 3a (Paket A3): nachgeholte Ausstattungsaufgaben, keine
+        // Mails; Abschnitt 4: Sammelmail an HR.
+        ausstattung: {
+          nachgeholt: { vorgaenge: 1, aufgaben: 3 },
+          sammelmail: { versendet: 1, nichtZugestellt: 0, uebersprungen: 0 },
+          errors: 0,
+        },
       },
       false,
     );
     expect(a.ergebnis).toBe("PROBLEME");
-    expect(a.versendet).toBe(4);
+    // 2 + 1 + 1 Erinnerungen und 1 Sammelmail.
+    expect(a.versendet).toBe(5);
+    expect(a.zaehler).toContainEqual(["Ausstattung nachgeholt (Aufgaben)", 3]);
+    expect(a.zaehler).toContainEqual(["Sammelmail offene Ausstattung an HR", 1]);
     const alles = JSON.stringify(a);
     expect(alles).not.toContain("ONB-2026");
     expect(alles).not.toContain("example.org");
+    expect(alles).not.toContain("unvollständig");
     expect(a.schritte).toEqual(["1 × Abteilung · Warnung · versendet", "1 × Abteilung übersprungen · KEINE_ADRESSE"]);
+  });
+
+  it("Onboarding-Erinnerungen: ein Fehler beim Nachholen der Ausstattung ist ein Problem, das Feld ist Pflicht", () => {
+    const basis = {
+      employeeReminders: 0,
+      supervisorReminders: 0,
+      notSent: 0,
+      errors: 0,
+      departmentReminders: { remindersProcessed: 0, errors: 0, details: [], uebersprungen: [] },
+    };
+    const ohneSammelmail = { versendet: 0, nichtZugestellt: 0, uebersprungen: 0 };
+    const ok = laufAuswerten(
+      "reminders",
+      200,
+      { ...basis, ausstattung: { nachgeholt: { vorgaenge: 0, aufgaben: 0 }, sammelmail: ohneSammelmail, errors: 0 } },
+      false,
+    );
+    expect(ok.ergebnis).toBe("OK");
+    const fehler = laufAuswerten(
+      "reminders",
+      200,
+      { ...basis, ausstattung: { nachgeholt: { vorgaenge: 0, aufgaben: 0 }, sammelmail: ohneSammelmail, errors: 1 } },
+      false,
+    );
+    expect(fehler.ergebnis).toBe("PROBLEME");
+    expect(fehler.zaehler).toContainEqual(["Fehler", 1, true]);
+    // Fehlt das Feld (etwa nach einer Umbenennung im Lauf), meldet der Bericht es — nie still 0.
+    const ohne = laufAuswerten("reminders", 200, basis, false);
+    expect(ohne.ergebnis).toBe("PROBLEME");
+    expect(JSON.stringify(ohne)).toContain("ausstattung");
+  });
+
+  it("Onboarding-Erinnerungen: Sammelmail (Abschnitt 4) — nicht zugestellt und übersprungen sind ein Befund, das Feld ist Pflicht", () => {
+    const basis = {
+      employeeReminders: 0,
+      supervisorReminders: 0,
+      notSent: 0,
+      errors: 0,
+      departmentReminders: { remindersProcessed: 0, errors: 0, details: [], uebersprungen: [] },
+    };
+    const mit = (sammelmail: Record<string, number>) =>
+      laufAuswerten(
+        "reminders",
+        200,
+        { ...basis, ausstattung: { nachgeholt: { vorgaenge: 0, aufgaben: 0 }, sammelmail, errors: 0 } },
+        false,
+      );
+
+    const versendet = mit({ versendet: 2, nichtZugestellt: 0, uebersprungen: 0 });
+    expect(versendet.ergebnis).toBe("OK");
+    expect(versendet.versendet).toBe(2);
+    expect(versendet.zaehler).toContainEqual(["Sammelmail offene Ausstattung an HR", 2]);
+    // „Bericht auch bei Erfolg“: eine versendete Sammelmail zaehlt als Mail.
+    expect(berichtNoetig(versendet, { probelauf: false, berichtBeiErfolg: true })).toBe(true);
+
+    const nicht = mit({ versendet: 0, nichtZugestellt: 1, uebersprungen: 0 });
+    expect(nicht.ergebnis).toBe("PROBLEME");
+    expect(nicht.zaehler).toContainEqual(["Sammelmail nicht zugestellt", 1, true]);
+    expect(nicht.hinweis).toContain("Ausstattung noch offen");
+
+    const ueber = mit({ versendet: 0, nichtZugestellt: 0, uebersprungen: 1 });
+    expect(ueber.ergebnis).toBe("PROBLEME");
+    expect(ueber.zaehler).toContainEqual(["Sammelmail übersprungen (Vorlage oder Empfänger)", 1, true]);
+    expect(ueber.hinweis).toContain("Antwortadresse (HR-Postfach)");
+
+    // Ohne Befund kein Zusatz zur Sammelmail im Hinweis.
+    expect(versendet.hinweis).not.toContain("Ausstattung noch offen");
+
+    // Fehlt `sammelmail` (Lauf vor S18 oder umbenannt): „Antwort unvollständig“, nie still 0.
+    const ohne = laufAuswerten(
+      "reminders",
+      200,
+      { ...basis, ausstattung: { nachgeholt: { vorgaenge: 0, aufgaben: 0 }, errors: 0 } },
+      false,
+    );
+    expect(ohne.ergebnis).toBe("PROBLEME");
+    expect(JSON.stringify(ohne.zaehler)).toContain("ausstattung.sammelmail");
   });
 
   it("Unterlagen-Fristen: Probleme aus Zaehlern, Schritte mit deutschen Texten", () => {
@@ -344,7 +444,121 @@ describe("Auswertung", () => {
   });
 
   it("Probelauf der Loeschlaeufe verlangt kein `fehler`", () => {
-    expect(laufAuswerten("dokumente-aufbewahrung", 200, { dryRun: true, wuerdeLoeschen: 4, individuelleMails: { wuerdeLeeren: 1 } }, true).ergebnis).toBe("OK");
+    const a = laufAuswerten(
+      "dokumente-aufbewahrung",
+      200,
+      {
+        dryRun: true,
+        wuerdeLoeschen: 4,
+        individuelleMails: { wuerdeLeeren: 1 },
+        ausstattung: { wuerdeLeeren: 3 },
+        // Seit A4 (S35): Ausgaben – im Probelauf ebenfalls ohne `fehler`.
+        ausgaben: { aufbewahrungMonate: 6, verjaehrungJahre: 3, wuerdeLoeschen: 2, ohneFristAelterDreiJahre: 1 },
+      },
+      true,
+    );
+    expect(a.ergebnis).toBe("OK");
+    expect(a.zaehler).toContainEqual(["Würde leeren (Ausstattung: Bemerkungen, Angaben, Hinweise)", 3]);
+    expect(a.zaehler).toContainEqual(["Würde löschen (Ausgaben nach Ablauf der Frist)", 2]);
+    expect(a.zaehler).toContainEqual(["Ausgaben ohne Löschfrist, älter als drei Jahre", 1]);
+  });
+
+  it("Aufbewahrung: Freitexte der Ausstattung (E-A22) — gezaehlt, Fehler ein Befund, fehlendes Feld laut", () => {
+    const antwort = {
+      geloescht: 1,
+      dateienGeloescht: 2,
+      ordnerGeloescht: 1,
+      fehler: 0,
+      individuelleMails: { geleert: 0, dateienGeloescht: 0, fehler: 0 },
+      ausstattung: { aufbewahrungMonate: 6, grenze: "2027-03-14T23:00:00.000Z", geleert: 4, hinweiseGeleert: 1, fehler: 0 },
+      ausgaben: {
+        aufbewahrungMonate: 6,
+        verjaehrungJahre: 3,
+        geloescht: 0,
+        rueckgabenGeleert: 0,
+        protokolleGeloescht: 0,
+        erzeugteProtokolleGeloescht: 0,
+        ohneFristAelterDreiJahre: 0,
+        fehler: 0,
+      },
+    };
+    const ok = laufAuswerten("dokumente-aufbewahrung", 200, antwort, false);
+    expect(ok.ergebnis).toBe("OK");
+    expect(ok.zaehler).toContainEqual(["Geleert: Ausstattung – Positionen / Hinweise", "4 / 1"]);
+    // Nur Anzahlen — keine Grenze, keine Vorgaenge im Bericht.
+    expect(JSON.stringify(ok.zaehler)).not.toContain("2027-03-14");
+
+    const fehler = laufAuswerten(
+      "dokumente-aufbewahrung",
+      200,
+      { ...antwort, ausstattung: { ...antwort.ausstattung, fehler: 2 } },
+      false,
+    );
+    expect(fehler.ergebnis).toBe("PROBLEME");
+    expect(fehler.zaehler).toContainEqual(["Fehler", 2, true]);
+
+    // Fehlt `ausstattung` (Lauf vor S20 oder umbenannt): „Antwort unvollständig“, nie still 0.
+    const { ausstattung: _weg, ...ohne } = antwort;
+    void _weg;
+    const unvollstaendig = laufAuswerten("dokumente-aufbewahrung", 200, ohne, false);
+    expect(unvollstaendig.ergebnis).toBe("PROBLEME");
+    expect(JSON.stringify(unvollstaendig.zaehler)).toContain("ausstattung");
+  });
+
+  it("die Aufbewahrung nennt die Freitexte der Ausstattung in ihrer Beschreibung (E-A22)", () => {
+    const def = laufDefinition("dokumente-aufbewahrung");
+    expect(def?.beschreibung).toContain("Ausstattung & Zugänge");
+    expect(def?.loescht).toBe(true);
+    expect(def?.kannProbelauf).toBe(true);
+  });
+
+  it("Aufbewahrung: Ausgaben (E-A37, S35) — gezaehlt, Fehler ein Befund, „ohne Frist“ nur eine Zahl, fehlendes Feld laut", () => {
+    const ausgaben = {
+      aufbewahrungMonate: 6,
+      verjaehrungJahre: 3,
+      geloescht: 5,
+      rueckgabenGeleert: 2,
+      protokolleGeloescht: 1,
+      erzeugteProtokolleGeloescht: 1,
+      ohneFristAelterDreiJahre: 7,
+      fehler: 0,
+    };
+    const antwort = {
+      geloescht: 0,
+      dateienGeloescht: 0,
+      ordnerGeloescht: 0,
+      fehler: 0,
+      individuelleMails: { geleert: 0, dateienGeloescht: 0, fehler: 0 },
+      ausstattung: { geleert: 0, hinweiseGeleert: 0, fehler: 0 },
+      ausgaben,
+    };
+    const ok = laufAuswerten("dokumente-aufbewahrung", 200, antwort, false);
+    expect(ok.ergebnis).toBe("OK");
+    expect(ok.hinweis).toBeNull();
+    expect(ok.zaehler).toContainEqual(["Gelöscht: Ausgaben / Rückgaben geleert", "5 / 2"]);
+    expect(ok.zaehler).toContainEqual(["Gelöscht: Übergabe- und Rückgabeprotokolle – hochgeladen / erzeugt", "1 / 1"]);
+    // Nur eine Zahl – sieben alte Bestaende ohne Frist sind kein Befund.
+    expect(ok.zaehler).toContainEqual(["Ausgaben ohne Löschfrist, älter als drei Jahre", 7]);
+
+    const fehler = laufAuswerten("dokumente-aufbewahrung", 200, { ...antwort, ausgaben: { ...ausgaben, fehler: 3 } }, false);
+    expect(fehler.ergebnis).toBe("PROBLEME");
+    expect(fehler.zaehler).toContainEqual(["Fehler", 3, true]);
+    expect(fehler.hinweis).toMatch(/nächste Lauf erneut/);
+
+    // Fehlt `ausgaben` (Lauf vor S35 oder umbenannt): „Antwort unvollständig“, nie still 0.
+    const { ausgaben: _weg, ...ohne } = antwort;
+    void _weg;
+    const unvollstaendig = laufAuswerten("dokumente-aufbewahrung", 200, ohne, false);
+    expect(unvollstaendig.ergebnis).toBe("PROBLEME");
+    expect(JSON.stringify(unvollstaendig.zaehler)).toContain("ausgaben");
+  });
+
+  it("die Aufbewahrung nennt die Ausgaben und ihre Fristen in ihrer Beschreibung (E-A37)", () => {
+    const def = laufDefinition("dokumente-aufbewahrung");
+    expect(def?.beschreibung).toContain("vermerkte Ausgaben");
+    expect(def?.beschreibung).toContain("6 Monate nach der Rückgabe");
+    expect(def?.beschreibung).toContain("3 Jahre ab Jahresende");
+    expect(def?.beschreibung).toContain("Übergabe- und Rückgabeprotokollen");
   });
 
   it("berichtNoetig: Probleme, Fehler, Probelauf — Erfolg nur mit Schalter und Versand", () => {

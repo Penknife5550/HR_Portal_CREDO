@@ -162,7 +162,9 @@ const MUSTER: Muster[] = [
     schluessel: "confirm",
     name: "confirm(",
     zaehle: perRegex(/\bconfirm\(/g),
-    gesamt: 30,
+    // 28 seit Paket A4 (S32): auch „Vorgang abschließen“ im Offboarding nutzt den Abschluss-Dialog,
+    // die Rückgabe-Bestätigung (`confirmReturn`) gibt es nicht mehr.
+    gesamt: 28,
     stattdessen: "eigener Bestaetigungsdialog (ui/dialog, bis dahin unterlagen/dialog-rahmen.tsx)",
   },
   {
@@ -190,7 +192,8 @@ const MUSTER: Muster[] = [
     schluessel: "hexKlasse",
     name: "Hex-Farbe in einer Klasse ([…#…])",
     zaehle: perRegex(/\[[^\][\s"'`]*#[0-9A-Fa-f]{3,8}(?![0-9A-Fa-f])[^\][\s"'`]*\]/g),
-    gesamt: 181,
+    // 178 seit Paket A4 (S32): Reiter „Rückgaben“ ohne Hex-Klassen (tab-returns.tsx).
+    gesamt: 178,
     stattdessen: "Farb-Token aus globals.css (z. B. shadow-[0_3px_0_0] shadow-primary)",
   },
   {
@@ -211,7 +214,8 @@ const MUSTER: Muster[] = [
     schluessel: "palette",
     name: "Tailwind-Palettenfarbe (bg-green-100, text-red-500 …)",
     zaehle: perRegex(new RegExp(`\\b(?:${FARB_PRAEFIXE})-(?:${PALETTE})-(?:50|[1-9]00|950)\\b`, "g")),
-    gesamt: 1373,
+    // 1371 seit Paket A4 (S32): Schritt „Rückgaben einsammeln“ ohne Palettenfarben (tab-overview.tsx).
+    gesamt: 1371,
     stattdessen: "Farb-Token aus globals.css; Zustaende ueber die Statuspille (Branch ux-umbau)",
   },
   {
@@ -226,7 +230,11 @@ const MUSTER: Muster[] = [
     schluessel: "svg",
     name: "Inline-<svg",
     zaehle: perRegex(/<svg\b/g),
-    gesamt: 148,
+    // 147 seit dem Merge von `main` nach `ux-umbau` (15.10.2026): Paket A4 (S32)
+    // brachte eine Leeranzeige mit lucide-react dazu (auf `main` 149), der Umbau
+    // hat an anderen Stellen Inline-SVG ersetzt. Die Staende je Datei sind
+    // unveraendert — nur die Summe sinkt.
+    gesamt: 147,
     stattdessen: "Symbol aus lucide-react",
   },
   {

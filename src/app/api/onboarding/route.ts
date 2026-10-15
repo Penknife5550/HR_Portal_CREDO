@@ -13,6 +13,8 @@ import { triggerWebhooks } from "@/lib/webhooks";
 import { abteilungAusZustaendigkeit, MELDUNGEN } from "@/lib/abteilungsaufgaben";
 import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
 import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
+import { arbeitsortSpeicherwert } from "@/lib/ausstattung";
+import { ausstattungAngebotenIn } from "@/lib/ausstattung-katalog";
 import {
   canAccessProcess,
   canEditProcess,
@@ -128,6 +130,7 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
       firstName,
       lastName,
       supervisorEmail,
+      arbeitsortId,
     } = body;
 
     // Dieselbe Regel wie in /supervisor-link: Wer den Link spaeter nicht
@@ -152,6 +155,27 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
         { error: "Organisation nicht gefunden" },
         { status: 404 }
       );
+    }
+
+    // Arbeitsort (E-A10): die Einrichtung, an der die Person arbeitet, wenn
+    // das nicht der Arbeitgeber ist. Er bestimmt nur, an wen die
+    // Abteilungsaufgaben gehen und welchen Katalog die Fuehrungskraft sieht —
+    // der Mandant (Zugriff, Listen, Unterlagen) bleibt `organizationId`.
+    // Dieselbe Pruefung wie fuer die Einrichtung: unbekannt ODER fremd = 404
+    // mit demselben Text. Gleich der Einrichtung (oder leer) wird `null`
+    // gespeichert, also „wie Einrichtung“.
+    const arbeitsortGespeichert = arbeitsortSpeicherwert(org.id, arbeitsortId);
+    if (arbeitsortGespeichert) {
+      const ort = await prisma.organization.findUnique({
+        where: { id: arbeitsortGespeichert },
+        select: { id: true },
+      });
+      if (!ort || !(await canAccessProcess(session, ort.id))) {
+        return NextResponse.json(
+          { error: "Organisation nicht gefunden" },
+          { status: 404 }
+        );
+      }
     }
 
     // Fuehrungskraft: An die frei eingetippte Adresse geht gleich ein Link zu
@@ -232,6 +256,7 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
             data: {
               email,
               organizationId: org.id,
+              arbeitsortId: arbeitsortGespeichert,
               processType,
               questionnaireType,
               token,
@@ -264,6 +289,8 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
               details: {
                 email,
                 organization: org.name,
+                // ID des abweichenden Arbeitsorts, sonst null („wie Einrichtung“).
+                arbeitsortId: arbeitsortGespeichert,
                 questionnaireType,
                 // Der Name im Reiter „Persönliche Daten" sieht aus wie eine
                 // Angabe der Person — hier steht, dass HR ihn vorbelegt hat.
@@ -275,6 +302,8 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
 
           // Frische Zeile, noch kein Link: Das bedingte UPDATE trifft immer,
           // `statusAbgleichen` ergibt INVITED -> INVITED und schreibt nichts.
+          // Der Merker der Schrittliste (Ausstattung & Zugaenge, Regel 2) kommt
+          // aus dem Katalog am Arbeitsort — in DIESER Transaktion.
           const link = supervisorEmail
             ? await vorgesetztenLinkSetzen(tx, {
                 id: onboarding.id,
@@ -283,6 +312,13 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
                 bisherigeEmail: null,
                 userId: session.userId,
                 organizationName: org.name,
+                arbeitsortId: arbeitsortGespeichert,
+                ausstattungAngeboten: await ausstattungAngebotenIn(tx, {
+                  organizationId: org.id,
+                  arbeitsortId: arbeitsortGespeichert,
+                  questionnaireType,
+                  processType,
+                }),
               })
             : null;
 
@@ -314,13 +350,16 @@ export const POST = apiHandler<OnboardingAnlegenInput>(
       link && supervisorEmail
         ? triggerWebhooks(
             "supervisor-link-created",
-            vorgesetztenLinkMailFelder({
-              ...onboarding,
-              supervisorEmail,
-              supervisorToken: link.supervisorToken,
-              supervisorTokenExpiresAt: link.supervisorTokenExpiresAt,
-              organization: org,
-            }),
+            vorgesetztenLinkMailFelder(
+              {
+                ...onboarding,
+                supervisorEmail,
+                supervisorToken: link.supervisorToken,
+                supervisorTokenExpiresAt: link.supervisorTokenExpiresAt,
+                organization: org,
+              },
+              { ausstattungAngeboten: link.mitAusstattung },
+            ),
           )
         : null,
     ]);
@@ -444,8 +483,10 @@ export async function GET(request: NextRequest) {
               currentStep: true,
             },
           },
+          // `mitAusstattung`: Die Spalte „Modalitäten" zeigt sonst bei einem
+          // Formular mit Ausstattungsschritt „von 5" statt „von 6".
           supervisorData: {
-            select: { isComplete: true, currentStep: true },
+            select: { isComplete: true, currentStep: true, mitAusstattung: true },
           },
           _count: {
             select: { notes: true },

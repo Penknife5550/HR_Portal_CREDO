@@ -13,8 +13,11 @@
  * React-Module mitzieht.
  */
 import { getActionLabel } from "@/app/(portal)/audit-log/audit-log-content";
-import { ABTEILUNGS_AUDIT } from "@/lib/abteilungsaufgaben";
+import { ABTEILUNGS_AUDIT, ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 import { UNTERLAGEN_AUDIT, UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
+import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
+import { AUSSTATTUNG_AUDIT, AUSSTATTUNG_AUDIT_LABELS } from "@/lib/ausstattung";
+import { AUSGABEN_AUDIT, AUSGABEN_AUDIT_LABELS } from "@/lib/ausgaben";
 
 describe("Protokoll-Beschriftungen", () => {
   // Paket 1b: Die Abteilungsaufgaben schreiben neue Codes (ABTEILUNGS_AUDIT).
@@ -25,6 +28,10 @@ describe("Protokoll-Beschriftungen", () => {
     ["DEPARTMENT_REMINDER_SENT", "Abteilung erinnert"],
     ["OFFBOARDING_REMINDER_SENT", "Abteilung automatisch erinnert"],
     ["DEPARTMENT_LINK_RENEWED", "Abteilungs-Link erneuert"],
+    // Paket A3 (Ausstattung & Zugaenge, Regel 10)
+    ["DEPARTMENT_NACHTRAG_SENT", "Nachtrag an Abteilung gesendet"],
+    // Paket A3 (E-A20): Absage an die informierten Stellen nach EXPIRED
+    ["DEPARTMENT_ABSAGE_SENT", "Absage an Abteilungen gesendet"],
     ["ABTEILUNGSAUFGABE_ERLEDIGT", "Aufgabe per Link erledigt"],
     ["ABTEILUNGSAUFGABE_WIEDER_GEOEFFNET", "Aufgabe per Link wieder geöffnet"],
     ["ABTEILUNGSAUFGABE_KOMMENTIERT", "Kommentar der Abteilung"],
@@ -109,12 +116,88 @@ describe("Protokoll-Beschriftungen", () => {
     expect(getActionLabel("DOKUMENT_ABLAUF_ERINNERT")).toBe("Ablauf-Erinnerung gesendet");
   });
 
+  test("die Codes von Exit-Interview und Zeugnis-Bewertung (Offboarding) sind uebersetzt", () => {
+    // Geschrieben von /api/offboarding/:id/exit-interview[/send] und
+    // …/zeugnis-bewertung[/hr-review]; standen bis 10/2026 roh im Protokoll.
+    expect(getActionLabel("EXIT_INTERVIEW_CREATED")).toBe("Exit-Interview erstellt");
+    expect(getActionLabel("EXIT_INTERVIEW_INVITED")).toBe("Exit-Interview-Einladung versendet");
+    expect(getActionLabel("ZEUGNIS_BEWERTUNG_CREATED")).toBe("Zeugnis-Bewertung angelegt");
+    expect(getActionLabel("ZEUGNIS_BEWERTUNG_HR_REVIEWED")).toBe("Zeugnis-Bewertung von HR geprüft");
+    expect(getActionLabel("ZEUGNIS_BEWERTUNG_FINALIZED")).toBe("Zeugnis-Bewertung abgeschlossen");
+    expect(getActionLabel("DOCUMENT_UPLOADED")).toBe("Dokument hochgeladen");
+  });
+
   test("die Codes der individuellen E-Mail (Paket 3) sind uebersetzt", () => {
     expect(getActionLabel("INDIVIDUELLE_MAIL_SENT")).toBe("Individuelle E-Mail versendet");
     expect(getActionLabel("INDIVIDUELLE_MAIL_NACHWEIS_FEHLGESCHLAGEN")).toBe(
       "Individuelle E-Mail versendet, Nachweis fehlgeschlagen",
     );
     expect(getActionLabel("INDIVIDUELLE_MAIL_ANHANG_GEOEFFNET")).toBe("Anhang einer individuellen E-Mail geöffnet");
+  });
+
+  // Ausstattung & Zugaenge (Feinplan 1.15, Schritt S1): dieselbe Regel – jeder
+  // Code aus AUSSTATTUNG_AUDIT steht uebersetzt im Protokoll.
+  test.each(Object.entries(AUSSTATTUNG_AUDIT))(
+    "Ausstattung & Zugänge: %s ist übersetzt",
+    (_schluessel, code) => {
+      expect(getActionLabel(code)).toBe(AUSSTATTUNG_AUDIT_LABELS[code]);
+      expect(getActionLabel(code)).not.toBe(code);
+    },
+  );
+
+  test("die Ausstattungs-Beschriftungen ueberschreiben keinen bestehenden Code", () => {
+    // Per Spread angehaengt: Ein gleichnamiger Schluessel ersetzte die aeltere
+    // Beschriftung still.
+    const bestehend = [
+      ...Object.keys(ABTEILUNGS_AUDIT_LABELS),
+      ...Object.keys(UNTERLAGEN_AUDIT_LABELS),
+      ...Object.keys(INDIVIDUELLE_MAIL_AUDIT_LABELS),
+    ];
+    for (const code of Object.keys(AUSSTATTUNG_AUDIT_LABELS)) {
+      expect(bestehend).not.toContain(code);
+    }
+    expect(getActionLabel("STATUS_CHANGED")).toBe("Status geändert");
+  });
+
+  // Ausstattung & Zugaenge, Stufe 2 (Feinplan A4, 1.10, Schritt S21): dieselbe
+  // Regel – jeder Code aus AUSGABEN_AUDIT steht uebersetzt im Protokoll.
+  test.each(Object.entries(AUSGABEN_AUDIT))(
+    "Ausgaben (A4): %s ist übersetzt",
+    (_schluessel, code) => {
+      expect(getActionLabel(code)).toBe(AUSGABEN_AUDIT_LABELS[code]);
+      expect(getActionLabel(code)).not.toBe(code);
+    },
+  );
+
+  test("jede Ausgaben-Beschriftung hat einen Code, und keine ueberschreibt einen bestehenden", () => {
+    // Gegenrichtung wie bei den Unterlagen: Eine Beschriftung ohne Code waere
+    // ein Tippfehler im Schluessel.
+    expect(Object.keys(AUSGABEN_AUDIT_LABELS).sort()).toEqual([...new Set(Object.values(AUSGABEN_AUDIT))].sort());
+    // Per Spread angehaengt: Ein gleichnamiger Schluessel ersetzte die aeltere
+    // Beschriftung still.
+    const bestehend = [
+      ...Object.keys(ABTEILUNGS_AUDIT_LABELS),
+      ...Object.keys(UNTERLAGEN_AUDIT_LABELS),
+      ...Object.keys(INDIVIDUELLE_MAIL_AUDIT_LABELS),
+      ...Object.keys(AUSSTATTUNG_AUDIT_LABELS),
+      "RETURN_ITEM_CREATED",
+      "RETURN_ITEM_UPDATED",
+      "RETURN_ITEM_DELETED",
+      "STATUS_CHANGED",
+      "DOCUMENT_UPLOADED",
+    ];
+    for (const code of Object.keys(AUSGABEN_AUDIT_LABELS)) {
+      expect(bestehend).not.toContain(code);
+    }
+    expect(getActionLabel("RETURN_ITEM_UPDATED")).toBe("Rückgabe aktualisiert");
+    expect(getActionLabel("STATUS_CHANGED")).toBe("Status geändert");
+  });
+
+  test("die Codes des Reiters „Rückgaben“ (Offboarding) sind uebersetzt", () => {
+    // Schreibt /api/offboarding/:id/return-items (Anlegen, Bestaetigen, Loeschen).
+    expect(getActionLabel("RETURN_ITEM_CREATED")).toBe("Rückgabe-Gegenstand erfasst");
+    expect(getActionLabel("RETURN_ITEM_UPDATED")).toBe("Rückgabe aktualisiert");
+    expect(getActionLabel("RETURN_ITEM_DELETED")).toBe("Rückgabe-Gegenstand gelöscht");
   });
 
   test("ein unbekannter Code faellt auf sich selbst zurueck", () => {

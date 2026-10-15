@@ -3,7 +3,13 @@
  *
  * GET  - Alle Abteilungen, dazu die Verwendung je Schluessel in den
  *        Checklisten-Vorlagen und die Vorlagen, deren Link-Abteilung keine
- *        aktive Adresse hat
+ *        aktive Adresse hat. Je Eintrag `ausserhalbFreigabe`: Die Domain der
+ *        Adresse steht nicht auf der Freigabeliste (Einstellungen → SMTP,
+ *        `allowedRecipientDomains`). Nur ein Hinweis (E-A27): Aufgaben gehen
+ *        trotzdem dorthin. Leere Liste = nichts ausserhalb; reservierte
+ *        Altzeilen und deaktivierte Eintraege bekommen nie Post
+ *        (`empfaengerAufloesen` nimmt nur aktive) und deshalb nie den Hinweis —
+ *        wie die Warnung der Katalogseite (`freigabeWarnungen`).
  * POST - Neue Abteilung anlegen (zentral oder fuer eine Einrichtung)
  *
  * Berechtigung: SUPER_ADMIN, HR_LEITUNG (adminHandler)
@@ -26,6 +32,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { adminHandler } from "@/lib/api-handler";
+import { empfaengerFreigegeben, ladeErlaubteDomains } from "@/lib/empfaenger-allowlist";
 import {
   ABTEILUNGS_AUDIT,
   abteilungKonfigDto,
@@ -64,7 +71,7 @@ function meldungDuplikat(departmentKey: string, zentral: boolean): string {
 // GET /api/settings/departments
 // =============================================
 export const GET = adminHandler(async () => {
-  const [abteilungen, vorlagenPunkte] = await Promise.all([
+  const [abteilungen, vorlagenPunkte, domains] = await Promise.all([
     prisma.departmentConfig.findMany({
       include: MIT_EINRICHTUNG,
       orderBy: [
@@ -76,6 +83,7 @@ export const GET = adminHandler(async () => {
       where: { template: { isActive: true } },
       select: { templateId: true, defaultAssignee: true, template: { select: { name: true } } },
     }),
+    ladeErlaubteDomains(),
   ]);
 
   // Freitext der Onboarding-Vorlagen ("Verwaltung", "Vorgesetzter" — bis
@@ -88,7 +96,18 @@ export const GET = adminHandler(async () => {
   }));
 
   return NextResponse.json({
-    data: abteilungen.map(abteilungKonfigDto),
+    data: abteilungen.map((zeile) => {
+      const dto = abteilungKonfigDto(zeile);
+      return {
+        ...dto,
+        // Die Seite sagt dazu „Aufgaben gehen trotzdem an diese Adresse“ — an
+        // einen deaktivierten Eintrag geht aber nichts.
+        ausserhalbFreigabe:
+          dto.isActive &&
+          !dto.reserviert &&
+          !empfaengerFreigegeben({ empfaenger: zeile.email, empfaengerVorgang: "", domains }),
+      };
+    }),
     verwendung: verwendungZaehlen(punkte),
     fehlendeAdressen: fehlendeAdressen(punkte, abteilungen),
   });

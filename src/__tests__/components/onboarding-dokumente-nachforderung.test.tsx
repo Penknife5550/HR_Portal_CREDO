@@ -1024,3 +1024,47 @@ describe("Z1: Knopf „Unbefristet“ und Anzeige", () => {
     expect(ohne[0]).toMatchObject({ unbefristet: true });
   });
 });
+
+// =============================================
+// Ausstattung & Zugaenge (A4, S34): unterschriebenes Uebergabeprotokoll
+// =============================================
+
+describe("Karte „Unterschriebenes Übergabeprotokoll“ im Reiter „Dokumente“ (A4, S34)", () => {
+  const FEHLT = {
+    art: "UEBERGABE",
+    noetig: true,
+    hochgeladenAm: null,
+    text: "Unterschriebenes Übergabeprotokoll: fehlt",
+  };
+  const karte = () => document.querySelector('[data-block="protokoll-upload"]') as HTMLElement | null;
+
+  it("steht vor den hochgeladenen Dokumenten — nur mit Bearbeitungsrecht und nur mit Bedarf", () => {
+    tabDokumente({}, vorgang({ ausstattung: { protokoll: FEHLT } }));
+    expect(karte()).not.toBeNull();
+    expect(steht_vor(karte() as HTMLElement, screen.getByText("2 Dokumente hochgeladen"))).toBe(true);
+    expect(steht_vor(document.querySelector('[data-karte="unterlagen"]') as HTMLElement, karte() as HTMLElement)).toBe(true);
+
+    // Ohne Bearbeitungsrecht: keine Karte (die Route nimmt nur HR_EDIT_ROLES an).
+    document.body.innerHTML = "";
+    tabDokumente({ canEdit: false }, vorgang({ ausstattung: { protokoll: FEHLT } }));
+    expect(karte()).toBeNull();
+
+    // Ohne Ausgaben (A4 aus, G27): der Reiter bleibt, wie er war.
+    document.body.innerHTML = "";
+    tabDokumente({}, vorgang({ ausstattung: null }));
+    expect(karte()).toBeNull();
+  });
+
+  it("ein schon hochgeladenes Protokoll haelt die Karte sichtbar und steht beschriftet in der Liste", () => {
+    tabDokumente(
+      {},
+      vorgang({
+        ausstattung: null,
+        documents: [dokument({ id: "doc-uep", type: "UEBERGABEPROTOKOLL", status: "APPROVED", fileName: "protokoll-it.pdf" })],
+      }),
+    );
+    expect(karte()).not.toBeNull();
+    expect(screen.getByText("Übergabeprotokoll Ausstattung")).toBeTruthy();
+    expect(screen.getByText("protokoll-it.pdf")).toBeTruthy();
+  });
+});

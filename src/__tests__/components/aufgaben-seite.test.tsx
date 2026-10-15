@@ -22,11 +22,31 @@
  *  6. Onboarding (/onboarding-tasks/[token]): dieselbe Komponente mit den
  *     Onboarding-Begriffen, Countdown „Bis zum Dienstbeginn", die zusaetzliche
  *     Reihe „Nur für {Abteilung}" und der Hinweis aus der Vorlage.
+ *     Ausstattung & Zugaenge (Paket A3, S14, Mockup 6.5): Arbeitsort im Kopf,
+ *     Angaben und Hinweis im Block „Nur für …“, Bemerkung als eigener Kasten,
+ *     „Eilt“, „entfällt“ (eigener Abschnitt, kein Abhaken, Zaehler ohne sie).
+ *     Stufe 2 (A4, S25): der Block „Übergabe vermerken“ nur mit `ausgabe`,
+ *     nicht bei „nur lesen“ und nicht an einer entfallenen Aufgabe; POST bzw.
+ *     DELETE unter …/ausgaben, getrennt vom Abhaken; Fehlertext des Servers.
+ *  7. Offboarding, Stufe 2 (A4, S32): Rücknahme mit drei Knöpfen statt des
+ *     Hakens („Zurückerhalten“, „Beschädigt zurückerhalten“, „Fehlt“ →
+ *     `{ isCompleted: true, zustand }`), Sperraufgabe mit Haken, Kennung
+ *     sichtbar; die Folgeaufgabe zeigt die Kennung nur lesend mit normalem
+ *     Haken; kommt eine Aufgabe für diese Stelle hinzu, lädt die Seite neu.
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import OffboardingTasksPage from "@/app/offboarding-tasks/[token]/page";
 import OnboardingTasksPage from "@/app/onboarding-tasks/[token]/page";
 import type { AufgabenSeitenDaten, OeffentlicheAufgabe } from "@/components/abteilungsaufgaben/aufgaben-seite";
+import { MELDUNGEN as MELDUNGEN_ABT } from "@/lib/abteilungsaufgaben";
+import {
+  MELDUNGEN_AUSGABEN,
+  RUECKNAHME_AUSWAHL,
+  type LinkAusgabe,
+  type OffboardingFolgeAusgabe,
+  type OffboardingLinkAusgabe,
+} from "@/lib/ausgaben";
+import { RUECKNAHME_TEXTE } from "@/components/ausgaben/ruecknahme-auswahl";
 
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -99,6 +119,7 @@ function seitenDaten(teil: Partial<AufgabenSeitenDaten> = {}): AufgabenSeitenDat
   const aufgaben = teil.aufgaben ?? [A1, A2];
   const erledigt = aufgaben.filter((a) => a.isCompleted).length;
   return {
+    modul: "OFFBOARDING",
     abteilung: { key: "IT", name: "IT-Abteilung" },
     vorgang: {
       vorgangsnummer: "OFF-2027-GYM-014",
@@ -133,6 +154,8 @@ let anfragen: Anfrage[] = [];
 let getAntwort: { status: number; body: unknown };
 /** Antwort auf PATCH: Standard = Aufgabe mit den gesendeten Feldern zurueck. */
 let patchAntwort: ((a: Anfrage) => { status: number; body: unknown }) | null;
+/** Antwort auf POST/DELETE unter …/ausgaben (Stufe 2): Standard = kein Feld `ausgabe`. */
+let ausgabeAntwort: ((a: Anfrage) => { status: number; body: unknown }) | null;
 
 function aufgabeAusAnfrage(a: Anfrage): OeffentlicheAufgabe {
   const id = a.url.split("/").pop()!;
@@ -153,6 +176,7 @@ beforeEach(() => {
   anfragen = [];
   getAntwort = { status: 200, body: { data: seitenDaten() } };
   patchAntwort = null;
+  ausgabeAntwort = null;
   global.fetch = jest.fn((url: string, init?: RequestInit) => {
     const a: Anfrage = {
       url: String(url),
@@ -163,7 +187,9 @@ beforeEach(() => {
     const antwort =
       a.method === "PATCH"
         ? patchAntwort?.(a) ?? { status: 200, body: { data: { aufgabe: aufgabeAusAnfrage(a) } } }
-        : getAntwort;
+        : a.method === "POST" || a.method === "DELETE"
+          ? ausgabeAntwort?.(a) ?? { status: 200, body: { data: { ausgabe: null } } }
+          : getAntwort;
     return Promise.resolve({
       ok: antwort.status >= 200 && antwort.status < 300,
       status: antwort.status,
@@ -265,11 +291,21 @@ describe("Inhalt", () => {
     expect(within(karteVon("a1")).getByRole("button", { name: "Kommentar ändern" })).not.toBeNull();
   });
 
-  it("ohne Aufgaben: Hinweis", async () => {
+  it("ohne Aufgaben: Hinweis — der Fortschritt steht wie eh und je auf 100 %", async () => {
     uhrStellen();
     getAntwort = { status: 200, body: { data: seitenDaten({ aufgaben: [] }) } };
     await zeigeSeite();
     expect(seitentext()).toContain("Keine Aufgaben für diese Abteilung vorhanden.");
+    // Das Offboarding kennt kein „entfällt“ (F2) und bleibt Byte fuer Byte gleich.
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("100");
+    expect(seitentext()).toContain("100 %");
+
+    // Auch ohne `modul` in der Antwort (aelterer Stand): Offboarding-Rechnung.
+    cleanup();
+    const { modul: _modul, ...ohneModul } = seitenDaten({ aufgaben: [] });
+    getAntwort = { status: 200, body: { data: ohneModul } };
+    await zeigeSeite();
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("100");
   });
 });
 
@@ -520,6 +556,7 @@ describe("Onboarding-Seite", () => {
     const aufgaben = teil.aufgaben ?? [onbAufgabe()];
     const erledigt = aufgaben.filter((a) => a.isCompleted).length;
     return {
+      modul: "ONBOARDING",
       abteilung: { key: "IT", name: "IT-Abteilung" },
       vorgang: {
         vorgangsnummer: "ONB-2026-031",
@@ -663,5 +700,679 @@ describe("Onboarding-Seite", () => {
     expect(seitentext()).toContain(
       "Dieser Vorgang ist nicht mehr aktiv. Bitte keine weiteren Schritte unternehmen.",
     );
+  });
+
+  // ---- Paket A3 (S14): Ausstattung & Zugaenge (Mockup 6.5) ----
+
+  describe("Ausstattung & Zugänge", () => {
+    const IPAD = onbAufgabe({
+      id: "o-ipad",
+      title: "Dienst-iPad bereitstellen",
+      category: "Ausstattung & Zugänge",
+      orderIndex: -100000,
+      dueDate: "2026-09-27T00:00:00.000Z",
+      description: "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+      bemerkung: { text: "Mit Stift und Hülle,\nApps: WebUntis", label: "Bemerkung der Führungskraft" },
+      eilt: true,
+      entfaellt: false,
+    });
+    const PARKPLATZ = onbAufgabe({
+      id: "o-park",
+      title: "Parkplatz bereitstellen",
+      category: "Ausstattung & Zugänge",
+      orderIndex: -99900,
+      dueDate: null,
+      isCompleted: true,
+      completedAt: "2026-09-20T09:00:00.000Z",
+      bemerkung: null,
+      eilt: false,
+      entfaellt: true,
+    });
+
+    function mitAusstattung(teil: Partial<AufgabenSeitenDaten> = {}): AufgabenSeitenDaten {
+      return onbDaten({
+        aufgaben: [IPAD, PARKPLATZ, onbAufgabe({ bemerkung: null, eilt: false, entfaellt: false })],
+        arbeitsort: "Förderverein Minden",
+        angaben: [
+          { label: "Gewünschte Durchwahl", wert: "214" },
+          { label: "Unterrichtsfächer", wert: "Chemie, Sport" },
+        ],
+        hinweis: "Bitte den Laptop\nmit Dockingstation.",
+        ...teil,
+      });
+    }
+
+    it("Kopf: Arbeitsort neben der Einrichtung — ohne Abweichung keine Zeile", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      expect(document.querySelector("[data-arbeitsort]")?.textContent).toBe("Arbeitsort: Förderverein Minden");
+
+      cleanup();
+      getAntwort = { status: 200, body: { data: mitAusstattung({ arbeitsort: null }) } };
+      await zeigeOnboarding();
+      expect(document.querySelector("[data-arbeitsort]")).toBeNull();
+      expect(seitentext()).not.toContain("Arbeitsort");
+    });
+
+    it("Block „Nur für …“: Zusatzfelder, dann Angaben und der Hinweis an die Stelle", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      const reihe = document.querySelector("[data-zusatz]") as HTMLElement;
+      expect(reihe.textContent).toContain("Nur für IT-Abteilung");
+      expect(reihe.textContent).toContain("Lehrkraft Sek. I");
+      const angaben = reihe.querySelector("[data-angaben]") as HTMLElement;
+      expect(angaben.querySelector('[data-angabe="Unterrichtsfächer"]')?.textContent).toBe("UnterrichtsfächerChemie, Sport");
+      expect(angaben.querySelector('[data-angabe="Gewünschte Durchwahl"]')?.textContent).toBe("Gewünschte Durchwahl214");
+      const hinweis = angaben.querySelector("[data-stellen-hinweis]") as HTMLElement;
+      expect(hinweis.textContent).toBe("Hinweis der FührungskraftBitte den Laptop\nmit Dockingstation.");
+    });
+
+    it("Angaben ohne Zusatzfelder (z. B. Buchhaltung): der Block steht trotzdem", async () => {
+      uhrStellen(ONB_JETZT);
+      const d = mitAusstattung({ zusatz: {}, hinweis: null });
+      getAntwort = { status: 200, body: { data: { ...d, abteilung: { key: "BUCHHALTUNG", name: "Buchhaltung" } } } };
+      await zeigeOnboarding();
+      const reihe = document.querySelector("[data-zusatz]") as HTMLElement;
+      expect(reihe.textContent).toContain("Nur für Buchhaltung");
+      expect(reihe.querySelector("[data-stellen-hinweis]")).toBeNull();
+      expect(reihe.textContent).toContain("Chemie, Sport");
+    });
+
+    it("Bemerkung als eigener Kasten an der Aufgabe, getrennt vom festen Hinweis aus dem Katalog", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      const karte = karteVon("o-ipad");
+      expect(karte.querySelector('[data-hinweis="beschreibung"]')?.textContent).toBe(
+        "Erst nach Verpflichtung auf Vertraulichkeit freischalten.",
+      );
+      const kasten = karte.querySelector("[data-bemerkung]") as HTMLElement;
+      expect(kasten.textContent).toBe("Bemerkung der FührungskraftMit Stift und Hülle,\nApps: WebUntis");
+      // Aufgaben ohne Bemerkung bekommen keinen Kasten.
+      expect(karteVon("o1").querySelector("[data-bemerkung]")).toBeNull();
+    });
+
+    it("„Eilt“ neben der Fälligkeit einer offenen Aufgabe; Kategorie „Ausstattung & Zugänge“ oben", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      expect(karteVon("o-ipad").querySelector('[data-kennzeichen="eilt"]')?.textContent).toBe("Eilt");
+      expect(karteVon("o-ipad").textContent).toContain("Fällig 27.09.2026");
+      expect(karteVon("o1").querySelector('[data-kennzeichen="eilt"]')).toBeNull();
+      const offen = screen.getByRole("region", { name: "Offene Aufgaben (2)" });
+      expect(within(offen).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+        "Ausstattung & Zugänge",
+        "Vor dem ersten Tag",
+      ]);
+    });
+
+    it("„entfällt“: eigener Abschnitt, Kennzeichen, kein Abhaken, kein „Erledigt am“, Kommentar bleibt möglich", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      await zeigeOnboarding();
+      const entfallen = screen.getByRole("region", { name: "Entfallene Aufgaben (1)" });
+      const karte = within(entfallen).getByText("Parkplatz bereitstellen").closest("[data-aufgabe]") as HTMLElement;
+      expect(karte.querySelector('[data-kennzeichen="entfaellt"]')?.textContent).toBe("Entfällt");
+      expect(karte.textContent).toContain("Die Personalabteilung hat diese Aufgabe gestrichen.");
+      expect(karte.textContent).not.toContain("Erledigt am");
+      const box = within(karte).getByRole("button", { name: "Entfällt – kann nicht abgehakt werden" }) as HTMLButtonElement;
+      expect(box.disabled).toBe(true);
+      fireEvent.click(box);
+      expect(patches()).toHaveLength(0);
+      expect((within(karte).getByRole("button", { name: "Kommentar hinzufügen" }) as HTMLButtonElement).disabled).toBe(false);
+      // Nicht unter „Erledigte Aufgaben“, und im Zaehler nicht mitgezaehlt (F2): 0 von 2.
+      expect(screen.queryByRole("region", { name: /Erledigte Aufgaben/ })).toBeNull();
+      expect(seitentext()).toContain("0 / 2 erledigt");
+      expect(seitentext()).not.toContain("Alle Aufgaben erledigt");
+    });
+
+    it("nur entfallene Aufgaben: „nichts mehr zu tun“ statt „Alle Aufgaben erledigt“, 0 / 0", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung({ aufgaben: [PARKPLATZ] }) } };
+      await zeigeOnboarding();
+      const text = seitentext();
+      expect(text).toContain("Für Sie ist nichts mehr zu tun – alle Aufgaben sind entfallen.");
+      expect(text).toContain("0 / 0 erledigt");
+      // Onboarding: ohne zaehlende Aufgabe 0 % (checklistFortschritt), nicht 100 %.
+      expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("0");
+      expect(text).not.toContain("Alle Aufgaben erledigt");
+      expect(text).not.toContain("Keine Aufgaben für diese Abteilung vorhanden.");
+    });
+
+    it("409 „entfällt“ beim Abhaken: Meldung des Servers, die Aufgabe wandert zu den entfallenen", async () => {
+      uhrStellen(ONB_JETZT);
+      getAntwort = { status: 200, body: { data: mitAusstattung() } };
+      patchAntwort = () => ({ status: 409, body: { error: MELDUNGEN_ABT.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" } });
+      await zeigeOnboarding();
+      await act(async () => {
+        fireEvent.click(within(karteVon("o-ipad")).getByRole("button", { name: "Als erledigt markieren" }));
+      });
+      expect(screen.getByRole("alert").textContent).toBe(MELDUNGEN_ABT.AUFGABE_ENTFAELLT);
+      const entfallen = screen.getByRole("region", { name: "Entfallene Aufgaben (2)" });
+      expect(within(entfallen).getByText("Dienst-iPad bereitstellen")).not.toBeNull();
+      expect(seitentext()).toContain("Offene Aufgaben (1)");
+    });
+
+    it("Offboarding-Daten ohne die neuen Felder: kein Kasten, kein Kennzeichen, kein Abschnitt", async () => {
+      uhrStellen();
+      await zeigeSeite();
+      expect(document.querySelector("[data-bemerkung]")).toBeNull();
+      expect(document.querySelector("[data-kennzeichen]")).toBeNull();
+      expect(document.querySelector("[data-angaben]")).toBeNull();
+      expect(document.querySelector("[data-arbeitsort]")).toBeNull();
+      expect(screen.queryByRole("region", { name: /Entfallene Aufgaben/ })).toBeNull();
+      expect(seitentext()).toContain("0 / 2 erledigt");
+    });
+  });
+
+  // ---- Stufe 2 (A4, S25): Übergabe vermerken über den Link (G6, Mockup 6.5) ----
+
+  describe("Übergabe vermerken (Stufe 2)", () => {
+    const AUSGABE: LinkAusgabe = { moeglich: true, kennungLabel: "Inventarnummer", art: "RUECKGABE", stuecke: [] };
+    const STUECK = { id: "ag-1", kennung: "FES-IPAD-0412", uebergebenAm: "2026-09-21", entfernbar: true };
+    const IPAD = onbAufgabe({
+      id: "o-ipad",
+      title: "Dienst-iPad bereitstellen",
+      category: "Ausstattung & Zugänge",
+      orderIndex: -100000,
+      bemerkung: null,
+      eilt: false,
+      entfaellt: false,
+      ausgabe: AUSGABE,
+    });
+
+    function mitIpad(teil: Partial<OeffentlicheAufgabe> = {}, daten: Partial<AufgabenSeitenDaten> = {}) {
+      getAntwort = {
+        status: 200,
+        body: { data: onbDaten({ aufgaben: [{ ...IPAD, ...teil }, onbAufgabe({ bemerkung: null })], ...daten }) },
+      };
+    }
+
+    const block = (id = "o-ipad") => karteVon(id)?.querySelector("[data-ausgabe-vermerk]") as HTMLElement | null;
+    const ausgabeAnfragen = () => anfragen.filter((a) => a.method === "POST" || a.method === "DELETE");
+
+    it("Block nur an Aufgaben mit `ausgabe` — nicht bei „nur lesen“, nicht an einer entfallenen Aufgabe", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      await zeigeOnboarding();
+      expect(block()).not.toBeNull();
+      expect(block("o1")).toBeNull();
+      expect(within(block()!).getByRole("button", { name: "Übergabe vermerken" })).not.toBeNull();
+
+      cleanup();
+      mitIpad({}, { readOnly: true });
+      await zeigeOnboarding();
+      expect(block()).toBeNull();
+
+      cleanup();
+      mitIpad({ isCompleted: true, completedAt: "2026-09-21T09:00:00.000Z", entfaellt: true });
+      await zeigeOnboarding();
+      expect(block()).toBeNull();
+    });
+
+    it("vermerkte Stücke; „Entfernen“ nur an eigenen Link-Vermerken; ohne `moeglich` kein Formular", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad({
+        ausgabe: {
+          ...AUSGABE,
+          moeglich: false,
+          stuecke: [STUECK, { id: "ag-2", kennung: null, uebergebenAm: "2026-09-20", entfernbar: false }],
+        },
+      });
+      await zeigeOnboarding();
+      const b = block()!;
+      expect(b.querySelector('[data-ausgabe-stueck="ag-1"]')?.textContent).toContain("FES-IPAD-0412 · übergeben 21.09.2026");
+      expect(b.querySelector('[data-ausgabe-stueck="ag-2"]')?.textContent).toBe("übergeben 20.09.2026");
+      expect(within(b).getAllByRole("button", { name: /entfernen$/ })).toHaveLength(1);
+      expect(
+        within(b).getByRole("button", { name: "Vermerk „FES-IPAD-0412 · übergeben 21.09.2026“ entfernen" }),
+      ).not.toBeNull();
+      expect(within(b).queryByRole("button", { name: "Übergabe vermerken" })).toBeNull();
+      expect(b.textContent).not.toContain(MELDUNGEN_AUSGABEN.UEBERGABE_NOCH_NICHT_VERMERKT);
+    });
+
+    it("nach dem Abhaken ohne Vermerk: „Übergabe noch nicht vermerkt“ bzw. bei einem Zugang „Einrichtung …“", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad({ isCompleted: true, completedAt: "2026-09-21T09:00:00.000Z" });
+      await zeigeOnboarding();
+      expect(block()!.querySelector("[data-vermerk-fehlt]")?.textContent).toBe(
+        MELDUNGEN_AUSGABEN.UEBERGABE_NOCH_NICHT_VERMERKT,
+      );
+
+      cleanup();
+      mitIpad({ isCompleted: true, completedAt: "2026-09-21T09:00:00.000Z", ausgabe: { ...AUSGABE, art: "SPERREN" } });
+      await zeigeOnboarding();
+      expect(block()!.querySelector("[data-vermerk-fehlt]")?.textContent).toBe(
+        MELDUNGEN_AUSGABEN.EINRICHTUNG_NOCH_NICHT_VERMERKT,
+      );
+      expect(MELDUNGEN_AUSGABEN.EINRICHTUNG_NOCH_NICHT_VERMERKT).toBe("Einrichtung noch nicht vermerkt");
+      expect(within(block()!).getByRole("button", { name: "Einrichtung vermerken" })).not.toBeNull();
+
+      // Offen und ohne Vermerk: kein Hinweis (vermerkt wird getrennt vom Abhaken).
+      cleanup();
+      mitIpad();
+      await zeigeOnboarding();
+      expect(block()!.querySelector("[data-vermerk-fehlt]")).toBeNull();
+    });
+
+    it("zwei Stück vermerken: POST an die Route der Aufgabe, Datum mit Vorgabe heute, der frische Stand ersetzt den Block", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      const neu = { id: "ag-3", kennung: null, uebergebenAm: "2026-09-20", entfernbar: true };
+      ausgabeAntwort = () => ({ status: 201, body: { data: { ausgabe: { ...AUSGABE, stuecke: [neu, STUECK] } } } });
+      await zeigeOnboarding();
+
+      fireEvent.click(within(block()!).getByRole("button", { name: "Übergabe vermerken" }));
+      const formular = screen.getByRole("form", { name: "Übergabe vermerken" });
+      const datum = within(formular).getByLabelText("Übergeben am") as HTMLInputElement;
+      // Vorgabe heute (Berliner Tag), nie in der Zukunft.
+      expect(datum.value).toBe("2026-09-22");
+      expect(datum.max).toBe("2026-09-22");
+      fireEvent.change(within(formular).getByLabelText("Inventarnummer (optional)"), {
+        target: { value: " FES-IPAD-0412 " },
+      });
+      fireEvent.click(within(formular).getByRole("button", { name: "weiteres Stück" }));
+      fireEvent.change(within(formular).getByLabelText("Übergeben am – Stück 2"), { target: { value: "2026-09-20" } });
+      await act(async () => {
+        fireEvent.click(within(formular).getByRole("button", { name: "Übergabe speichern" }));
+      });
+
+      expect(ausgabeAnfragen()).toEqual([
+        {
+          url: "/api/onboarding-tasks/tok-it/o-ipad/ausgaben",
+          method: "POST",
+          body: {
+            stuecke: [
+              { kennung: "FES-IPAD-0412", uebergebenAm: "2026-09-22" },
+              { kennung: null, uebergebenAm: "2026-09-20" },
+            ],
+          },
+        },
+      ]);
+      // Getrennt vom Abhaken: kein PATCH, die Aufgabe bleibt offen.
+      expect(patches()).toHaveLength(0);
+      expect(screen.queryByRole("form", { name: "Übergabe vermerken" })).toBeNull();
+      const b = block()!;
+      expect(b.querySelector('[data-ausgabe-stueck="ag-3"]')?.textContent).toContain("übergeben 20.09.2026");
+      expect(b.querySelector('[data-ausgabe-stueck="ag-1"]')?.textContent).toContain("FES-IPAD-0412");
+      expect(within(karteVon("o-ipad")).getByRole("button", { name: "Als erledigt markieren" })).not.toBeNull();
+    });
+
+    it("Fehlertext des Servers steht im Block; das Formular bleibt offen", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      ausgabeAntwort = () => ({ status: 400, body: { error: MELDUNGEN_AUSGABEN.DATUM_IN_ZUKUNFT } });
+      await zeigeOnboarding();
+      fireEvent.click(within(block()!).getByRole("button", { name: "Übergabe vermerken" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Übergabe speichern" }));
+      });
+      expect(within(block()!).getByRole("alert").textContent).toBe(MELDUNGEN_AUSGABEN.DATUM_IN_ZUKUNFT);
+      expect(screen.getByRole("form", { name: "Übergabe vermerken" })).not.toBeNull();
+      // Der Fehler bekommt den Fokus (wie im Dialog der Karte) – der gesperrte Knopf hielte ihn nicht.
+      expect(document.activeElement).toBe(within(block()!).getByRole("alert"));
+    });
+
+    // ---- Fokus: Verschwindet der fokussierte Knopf, legt der Block ihn weiter (nie auf `body`) ----
+
+    const vermerkenKnopf = () => within(block()!).queryByRole("button", { name: "Übergabe vermerken" });
+
+    it("Fokus nach „Abbrechen“ und nach dem Speichern: auf „Übergabe vermerken“", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      ausgabeAntwort = () => ({ status: 201, body: { data: { ausgabe: { ...AUSGABE, stuecke: [STUECK] } } } });
+      await zeigeOnboarding();
+
+      fireEvent.click(vermerkenKnopf()!);
+      fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+      expect(document.activeElement).toBe(vermerkenKnopf());
+
+      fireEvent.click(vermerkenKnopf()!);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Übergabe speichern" }));
+      });
+      expect(screen.queryByRole("form", { name: "Übergabe vermerken" })).toBeNull();
+      expect(document.activeElement).toBe(vermerkenKnopf());
+    });
+
+    it("Fokus nach dem Speichern ohne weiteren Vermerk (`moeglich` falsch): auf den Block", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      ausgabeAntwort = () => ({ status: 201, body: { data: { ausgabe: { ...AUSGABE, moeglich: false, stuecke: [STUECK] } } } });
+      await zeigeOnboarding();
+      fireEvent.click(vermerkenKnopf()!);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Übergabe speichern" }));
+      });
+      expect(vermerkenKnopf()).toBeNull();
+      expect(document.activeElement).toBe(block());
+    });
+
+    it("Fokus nach „Entfernen“: auf den nächsten Entfernen-Knopf, nach dem letzten auf den Block", async () => {
+      uhrStellen(ONB_JETZT);
+      const ZWEITES = { id: "ag-2", kennung: "FES-IPAD-0413", uebergebenAm: "2026-09-21", entfernbar: true };
+      let stuecke = [STUECK, ZWEITES];
+      mitIpad({ ausgabe: { ...AUSGABE, moeglich: false, stuecke } });
+      ausgabeAntwort = (a) => {
+        stuecke = stuecke.filter((s) => !a.url.endsWith(`/${s.id}`));
+        return { status: 200, body: { data: { ausgabe: { ...AUSGABE, moeglich: false, stuecke } } } };
+      };
+      await zeigeOnboarding();
+      const entfernenKnopf = (kennung: string) =>
+        within(block()!).getByRole("button", { name: new RegExp(`^Vermerk „${kennung}`) });
+
+      await act(async () => {
+        fireEvent.click(entfernenKnopf("FES-IPAD-0412"));
+      });
+      expect(document.activeElement).toBe(entfernenKnopf("FES-IPAD-0413"));
+
+      await act(async () => {
+        fireEvent.click(entfernenKnopf("FES-IPAD-0413"));
+      });
+      expect(within(block()!).queryAllByRole("button")).toHaveLength(0);
+      expect(document.activeElement).toBe(block());
+    });
+
+    it("Fokus nach „Stück weglassen“: auf „weiteres Stück“; die übrige Zeile behält ihre Eingabe", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      await zeigeOnboarding();
+      fireEvent.click(vermerkenKnopf()!);
+      const formular = screen.getByRole("form", { name: "Übergabe vermerken" });
+      fireEvent.change(within(formular).getByLabelText("Inventarnummer (optional)"), { target: { value: "A-1" } });
+      fireEvent.click(within(formular).getByRole("button", { name: "weiteres Stück" }));
+      fireEvent.change(within(formular).getByLabelText("Inventarnummer – Stück 2 (optional)"), { target: { value: "B-2" } });
+      fireEvent.click(within(formular).getByRole("button", { name: "Stück 1 weglassen" }));
+      // Mit einer Zeile gibt es keinen Weglassen-Knopf mehr – der Fokus landet nicht auf `body`.
+      expect(within(formular).queryByRole("button", { name: /weglassen$/ })).toBeNull();
+      expect(document.activeElement).toBe(within(formular).getByRole("button", { name: "weiteres Stück" }));
+      expect((within(formular).getByLabelText("Inventarnummer (optional)") as HTMLInputElement).value).toBe("B-2");
+    });
+
+    // ---- Kontrast: keine vererbte Durchsichtigkeit über dem Block ----
+
+    it("eine erledigte Aufgabe dämpft nur den Titel – der Block darunter erbt keine Durchsichtigkeit (WCAG AA)", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad({ isCompleted: true, completedAt: "2026-09-21T09:00:00.000Z" });
+      await zeigeOnboarding();
+      // `opacity` an einem Vorfahren drückte Beschriftungen, Fehlertext und Knöpfe des Blocks unter 4,5:1.
+      for (let el: HTMLElement | null = block(); el; el = el.parentElement) {
+        expect(String(el.className)).not.toMatch(/(^|\s)opacity-/);
+      }
+      expect(within(karteVon("o-ipad")).getByRole("heading", { name: "Dienst-iPad bereitstellen" }).className).toContain(
+        "line-through",
+      );
+    });
+
+    it("„Abbrechen“ schließt das Formular ohne Anfrage", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      await zeigeOnboarding();
+      fireEvent.click(within(block()!).getByRole("button", { name: "Übergabe vermerken" }));
+      fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+      expect(screen.queryByRole("form", { name: "Übergabe vermerken" })).toBeNull();
+      expect(ausgabeAnfragen()).toHaveLength(0);
+    });
+
+    it("Entfernen schickt DELETE an die Ausgabe; der frische Stand ersetzt den Block", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad({ ausgabe: { ...AUSGABE, stuecke: [STUECK] } });
+      ausgabeAntwort = () => ({ status: 200, body: { data: { ausgabe: AUSGABE } } });
+      await zeigeOnboarding();
+      await act(async () => {
+        fireEvent.click(
+          within(block()!).getByRole("button", { name: "Vermerk „FES-IPAD-0412 · übergeben 21.09.2026“ entfernen" }),
+        );
+      });
+      expect(ausgabeAnfragen()).toEqual([
+        { url: "/api/onboarding-tasks/tok-it/o-ipad/ausgaben/ag-1", method: "DELETE", body: null },
+      ]);
+      expect(block()!.textContent).not.toContain("FES-IPAD-0412");
+    });
+
+    it("409 „entfällt“ beim Vermerken: die Aufgabe wandert zu den entfallenen, die Meldung steht oben", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      ausgabeAntwort = () => ({
+        status: 409,
+        body: { error: MELDUNGEN_AUSGABEN.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" },
+      });
+      await zeigeOnboarding();
+      fireEvent.click(within(block()!).getByRole("button", { name: "Übergabe vermerken" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Übergabe speichern" }));
+      });
+      const entfallen = screen.getByRole("region", { name: "Entfallene Aufgaben (1)" });
+      expect(within(entfallen).getByText("Dienst-iPad bereitstellen")).not.toBeNull();
+      expect(block()).toBeNull();
+      expect(screen.getByRole("alert").textContent).toBe(MELDUNGEN_AUSGABEN.AUFGABE_ENTFAELLT);
+    });
+
+    it("409 „abgeschlossen“: nur lesen, der Block verschwindet; 410: Fehlerseite", async () => {
+      uhrStellen(ONB_JETZT);
+      mitIpad();
+      ausgabeAntwort = () => ({ status: 409, body: { error: MELDUNGEN_ABT.VORGANG_ABGESCHLOSSEN_NUR_LESEN } });
+      await zeigeOnboarding();
+      fireEvent.click(within(block()!).getByRole("button", { name: "Übergabe vermerken" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Übergabe speichern" }));
+      });
+      expect(block()).toBeNull();
+      expect(seitentext()).toContain("Dieser Vorgang ist abgeschlossen.");
+
+      cleanup();
+      anfragen = [];
+      mitIpad();
+      ausgabeAntwort = () => ({ status: 410, body: { error: MELDUNGEN_ABT.VORGANG_NICHT_MEHR_AKTIV } });
+      await zeigeOnboarding();
+      fireEvent.click(within(block()!).getByRole("button", { name: "Übergabe vermerken" }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Übergabe speichern" }));
+      });
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Link nicht gültig");
+      expect(seitentext()).toContain(MELDUNGEN_ABT.VORGANG_NICHT_MEHR_AKTIV);
+    });
+  });
+});
+
+// =============================================
+// 7. Offboarding, Stufe 2: Rücknahme, Sperre, „Schließung prüfen“ (A4, S32)
+// =============================================
+
+describe("Rücknahme auf der Link-Seite (Offboarding, Ausstattung & Zugänge Stufe 2)", () => {
+  const RUECKNAHME: OffboardingLinkAusgabe = {
+    art: "RUECKGABE",
+    kennungLabel: "Inventarnummer",
+    kennung: "FES-IPAD-0412",
+    uebergebenAm: "2027-01-28",
+    zustand: null,
+    zustandLabel: "offen",
+    auswahl: RUECKNAHME_AUSWAHL,
+  };
+  const SPERRE: OffboardingLinkAusgabe = {
+    art: "SPERREN",
+    kennungLabel: "Kennung",
+    kennung: null,
+    uebergebenAm: "2027-01-28",
+    zustand: null,
+    zustandLabel: "offen",
+    auswahl: [],
+  };
+  const FOLGE: OffboardingFolgeAusgabe = { art: "RUECKGABE", kennungLabel: "Schlüsselnummer", kennung: "GS-114", zustandLabel: "fehlt" };
+
+  const R1 = aufgabe({ id: "r1", title: "Dienst-iPad (Lernmittel) zurücknehmen", category: "Ausstattung & Zugänge", ausgabe: RUECKNAHME });
+  const S1 = aufgabe({ id: "s1", title: "Zugänge (Portal, E-Mail) sperren", category: "Ausstattung & Zugänge", ausgabe: SPERRE });
+  const F1 = aufgabe({ id: "f1", title: "Schließung prüfen: Schlüssel: Haupteingang", category: "Ausstattung & Zugänge", ausgabe: FOLGE });
+
+  const ZUSTAND_WORT: Record<string, string> = { ZURUECK: "zurück", BESCHAEDIGT: "beschädigt zurück", FEHLT: "fehlt" };
+
+  function mitAufgaben(aufgaben: OeffentlicheAufgabe[], teil: Partial<AufgabenSeitenDaten> = {}) {
+    getAntwort = { status: 200, body: { data: seitenDaten({ aufgaben, ...teil }) } };
+  }
+
+  /** PATCH-Antwort wie der Server: die Aufgabe mit dem gewaehlten Zustand, dazu der Fortschritt. */
+  function zustandAntwort(extraGesamt = 0) {
+    patchAntwort = (a) => {
+      const basis = aufgabeAusAnfrage(a);
+      const zustand = typeof a.body?.zustand === "string" ? a.body.zustand : null;
+      const ausgabe =
+        basis.ausgabe && "auswahl" in basis.ausgabe && zustand
+          ? {
+              ...basis.ausgabe,
+              zustand: zustand as OffboardingLinkAusgabe["zustand"],
+              zustandLabel: ZUSTAND_WORT[zustand] ?? zustand,
+            }
+          : basis.ausgabe;
+      const alle = (getAntwort.body as { data: AufgabenSeitenDaten }).data.aufgaben;
+      return {
+        status: 200,
+        body: {
+          data: {
+            aufgabe: { ...basis, ausgabe },
+            fortschritt: { gesamt: alle.length + extraGesamt, erledigt: 1, prozent: 50 },
+          },
+        },
+      };
+    };
+  }
+
+  const ruecknahme = (id: string) => karteVon(id).querySelector("[data-ruecknahme]") as HTMLElement | null;
+
+  it("Rücknahme: Kennung und Übergabe sichtbar, statt des Hakens „Zurückerhalten“, „Beschädigt zurückerhalten“, „Fehlt“", async () => {
+    uhrStellen();
+    mitAufgaben([R1, A1]);
+    await zeigeSeite();
+    const k = karteVon("r1");
+    expect(within(k).queryByRole("button", { name: "Als erledigt markieren" })).toBeNull();
+    expect(k.querySelector("[data-ohne-haken]")).not.toBeNull();
+    expect(ruecknahme("r1")!.querySelector("[data-ruecknahme-stueck]")?.textContent).toBe(
+      "Inventarnummer: FES-IPAD-0412 · übergeben 28.01.2027",
+    );
+    const gruppe = within(k).getByRole("group", { name: RUECKNAHME_TEXTE.gruppe });
+    expect(within(gruppe).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Zurückerhalten",
+      "Beschädigt zurückerhalten",
+      "Fehlt",
+    ]);
+    // Die uebrigen Aufgaben behalten ihren Haken und kennen kein `ausgabe`.
+    expect(within(karteVon("a1")).getByRole("button", { name: "Als erledigt markieren" })).not.toBeNull();
+    expect(karteVon("a1").querySelector("[data-ruecknahme]")).toBeNull();
+  });
+
+  it("„Fehlt“ schickt { isCompleted: true, zustand: FEHLT } an den PATCH der Aufgabe; danach erledigt mit Zustand und „Als offen markieren“", async () => {
+    uhrStellen();
+    mitAufgaben([R1, A1]);
+    zustandAntwort();
+    await zeigeSeite();
+    await act(async () => {
+      fireEvent.click(within(karteVon("r1")).getByRole("button", { name: "Fehlt" }));
+    });
+    expect(patches()).toEqual([
+      { url: "/api/offboarding-tasks/tok-it/r1", method: "PATCH", body: { isCompleted: true, zustand: "FEHLT" } },
+    ]);
+    expect(seitentext()).toContain("Erledigte Aufgaben (1)");
+    const k = karteVon("r1");
+    expect(k.querySelector("[data-ruecknahme-zustand]")?.textContent).toBe("Zustand: fehlt");
+    expect(within(k).getByRole("button", { name: "Als offen markieren" })).not.toBeNull();
+    expect(within(k).getByRole("button", { name: "Fehlt" }).getAttribute("aria-pressed")).toBe("true");
+    // Ohne neue Aufgabe kein zweites Laden (jeder GET zaehlt als „geöffnet“).
+    expect(anfragen.filter((a) => a.method === "GET")).toHaveLength(1);
+  });
+
+  it("an einer erledigten Rücknahme wechselt ein anderer Knopf nur den Zustand", async () => {
+    uhrStellen();
+    mitAufgaben([
+      aufgabe({
+        ...R1,
+        isCompleted: true,
+        completedAt: "2027-07-18T08:00:00.000Z",
+        ausgabe: { ...RUECKNAHME, zustand: "ZURUECK", zustandLabel: "zurück" },
+      }),
+    ]);
+    zustandAntwort();
+    await zeigeSeite();
+    await act(async () => {
+      fireEvent.click(within(karteVon("r1")).getByRole("button", { name: "Beschädigt zurückerhalten" }));
+    });
+    expect(patches().map((p) => p.body)).toEqual([{ isCompleted: true, zustand: "BESCHAEDIGT" }]);
+    expect(karteVon("r1").querySelector("[data-ruecknahme-zustand]")?.textContent).toBe("Zustand: beschädigt zurück");
+  });
+
+  it("„Fehlt“ legt für diese Stelle eine Aufgabe an: die Seite lädt einmal neu und zeigt sie", async () => {
+    uhrStellen();
+    mitAufgaben([R1]);
+    zustandAntwort(1);
+    await zeigeSeite();
+    getAntwort = { status: 200, body: { data: seitenDaten({ aufgaben: [{ ...R1, isCompleted: true }, F1] }) } };
+    await act(async () => {
+      fireEvent.click(within(karteVon("r1")).getByRole("button", { name: "Fehlt" }));
+    });
+    expect(anfragen.filter((a) => a.method === "GET")).toHaveLength(2);
+    expect(karteVon("f1")).not.toBeNull();
+  });
+
+  it("Sperraufgabe: der Haken bleibt („Als gesperrt markieren“), keine Knöpfe; der Haken schickt nur { isCompleted: true }", async () => {
+    uhrStellen();
+    mitAufgaben([S1]);
+    await zeigeSeite();
+    const k = karteVon("s1");
+    expect(within(k).queryByRole("group", { name: RUECKNAHME_TEXTE.gruppe })).toBeNull();
+    expect(ruecknahme("s1")!.querySelector("[data-ruecknahme-stueck]")?.textContent).toBe("eingerichtet 28.01.2027");
+    await act(async () => {
+      fireEvent.click(within(k).getByRole("button", { name: RUECKNAHME_TEXTE.gesperrtHaken }));
+    });
+    expect(patches().map((p) => p.body)).toEqual([{ isCompleted: true }]);
+  });
+
+  it("Folgeaufgabe „Schließung prüfen“: Kennung nur lesend, „Zustand: fehlt“, normaler Haken", async () => {
+    uhrStellen();
+    mitAufgaben([F1], { abteilung: { key: "FACILITY", name: "Facility Management" } });
+    await zeigeSeite();
+    const k = karteVon("f1");
+    expect(ruecknahme("f1")?.getAttribute("data-ruecknahme")).toBe("FOLGE");
+    expect(ruecknahme("f1")!.querySelector("[data-ruecknahme-stueck]")?.textContent).toBe("Schlüsselnummer: GS-114");
+    expect(k.querySelector("[data-ruecknahme-zustand]")?.textContent).toBe("Zustand: fehlt");
+    expect(within(k).queryByRole("group")).toBeNull();
+    expect(within(k).getByRole("button", { name: "Als erledigt markieren" })).not.toBeNull();
+  });
+
+  it("nur lesen: keine Knöpfe, die Kennung bleibt sichtbar – und der Stand steht als Text da („Zustand: offen“, Review A4c)", async () => {
+    uhrStellen();
+    mitAufgaben([R1], { readOnly: true });
+    await zeigeSeite();
+    const k = karteVon("r1");
+    expect(within(k).queryByRole("group", { name: RUECKNAHME_TEXTE.gruppe })).toBeNull();
+    expect(k.textContent).toContain("FES-IPAD-0412");
+    // Weder Haken noch Knöpfe tragen den Stand – also der Text, auch für Screenreader.
+    expect(k.querySelector("[data-ohne-haken]")).not.toBeNull();
+    expect(k.querySelector("[data-ruecknahme-zustand]")?.textContent).toBe("Zustand: offen");
+    expect(k.textContent).not.toContain(RUECKNAHME_TEXTE.hilfe);
+  });
+
+  it("offen mit Knöpfen: kein doppelter Stand, darunter der neutrale Hinweis (nennt auch „fehlt“)", async () => {
+    uhrStellen();
+    mitAufgaben([R1]);
+    await zeigeSeite();
+    const k = karteVon("r1");
+    expect(k.querySelector("[data-ruecknahme-zustand]")).toBeNull();
+    expect(k.textContent).toContain(RUECKNAHME_TEXTE.hilfe);
+    expect(RUECKNAHME_TEXTE.hilfe).toBe("Bitte wählen Sie: zurückerhalten, beschädigt zurückerhalten oder fehlt.");
+  });
+
+  it("Fehler des Servers (409): Meldung oben, die Aufgabe bleibt offen", async () => {
+    uhrStellen();
+    mitAufgaben([R1]);
+    await zeigeSeite();
+    patchAntwort = () => ({
+      status: 409,
+      body: { error: MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT(null), grund: "AUSGABE_IM_AUSTRITT" },
+    });
+    await act(async () => {
+      fireEvent.click(within(karteVon("r1")).getByRole("button", { name: "Zurückerhalten" }));
+    });
+    expect(screen.getByRole("alert").textContent).toBe(MELDUNGEN_AUSGABEN.AUSGABE_IM_AUSTRITT(null));
+    expect(seitentext()).toContain("Offene Aufgaben (1)");
   });
 });

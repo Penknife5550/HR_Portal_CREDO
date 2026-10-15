@@ -1,5 +1,7 @@
 /**
- * Filterlogik der Vorlagenliste (Modul + Geltung).
+ * Filterlogik der Vorlagenliste (Modul + Geltung) und die Regel, dass das
+ * Modul einer System-Vorlage fest ist (`systemVorlageModulGesperrt`, fuer
+ * Route und Bearbeiten-Dialog).
  *
  * Bewusst als reine Funktion ausserhalb der Client-Komponente: Die Jest-Umgebung
  * des Projekts laeuft ohne Browser (testEnvironment "node"), inline in einem
@@ -54,4 +56,36 @@ export function filterVorlagen<T extends FilterbareVorlage>(
     if (filter.modul !== MODUL_ALLE && v.modul !== filter.modul) return false;
     return passtZurGeltung(v, filter.geltung);
   });
+}
+
+// =============================================
+// System-Vorlagen: das Modul ist fest (Review A4d, G19)
+// =============================================
+
+/**
+ * Text der 409 und Hinweis im Bearbeiten-Dialog — EINE Fassung fuer Route und
+ * Oberflaeche.
+ */
+export const SYSTEM_VORLAGE_MODUL_FEST =
+  "Das Modul einer System-Vorlage lässt sich nicht ändern – das Portal findet sie darüber wieder.";
+
+/**
+ * Will eine Aenderung das Modul einer System-Vorlage umstellen?
+ *
+ * System-Vorlagen (`isSystem`) findet der Seed-Check ueber
+ * `{ isSystem, modul, originalName }` (prisma/seed-check.js) und der Loeschlauf
+ * der Ausstattungsprotokolle ueber `PROTOKOLL_SYSTEM_VORLAGEN` samt Modul der
+ * erzeugten Dokumente. Ein umgestelltes Modul liesse den Seed beim naechsten
+ * Start eine zweite, eingeschaltete Zeile anlegen, und die erzeugten
+ * Protokolle fielen erst nach 12 Monaten statt mit der letzten Ausgabe.
+ * Name, Beschreibung, Aktiv-Schalter und Mandant pflegt HR weiter.
+ *
+ * Dasselbe Modul noch einmal zu schicken ist keine Aenderung (der Dialog
+ * schickt das Feld bei System-Vorlagen gar nicht erst).
+ */
+export function systemVorlageModulGesperrt(
+  vorlage: { isSystem?: boolean | null; modul: string },
+  neuesModul: string | undefined,
+): boolean {
+  return vorlage.isSystem === true && neuesModul !== undefined && neuesModul !== vorlage.modul;
 }

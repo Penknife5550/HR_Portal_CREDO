@@ -185,6 +185,122 @@ const ONBOARDING_ABTEILUNG_BEISPIEL = {
   mandantNumber: "01",
   contractStartDate: "2026-10-01T00:00:00.000Z",
   vertragsbeginn: "01.10.2026",
+  // Arbeitsort (F15): nur gefuellt, wenn er von der Einrichtung abweicht —
+  // im Beispiel arbeitet Anna an ihrer Einrichtung, also "".
+  arbeitsort: "",
+};
+
+/**
+ * Verbotene Betreff-Variablen der Mails an eine Stelle (Paket A3, Regel 17):
+ * Aufgabenliste, Angaben, Nachtrag und jeder Weg zum Link. Betreffzeilen
+ * stehen 90 Tage im Versandprotokoll; Liste und Angaben tragen Freitext
+ * (Bemerkungen, Hinweis der Fuehrungskraft), der Link ist ein Zugang ohne
+ * Anmeldung. Gilt beim SPEICHERN einer Vorlage (PUT
+ * /api/settings/email-templates/[id]), nicht beim Versand.
+ */
+const ONBOARDING_ABTEILUNG_BETREFF_OHNE = [
+  "aufgabenliste",
+  "aufgabenliste_html",
+  "angaben",
+  "angaben_html",
+  "nachtrag_liste",
+  "nachtrag_liste_html",
+  "link",
+  "magicLink",
+];
+
+/**
+ * Die HR-Meldung `onboarding-task-completed` sperrt dazu den Kommentar der
+ * Stelle (F19): Seit E-A17 geht sie auch allein wegen eines Kommentars hinaus,
+ * und der ist Freitext der Stelle. Seit Stufe 2 (A4, G9) ebenso den
+ * Uebergabevermerk – die Kennung (Inventar-, Schluessel-, Chipnummer) tippt
+ * die Stelle, und Betreffzeilen stehen 90 Tage im Versandprotokoll.
+ */
+const ONBOARDING_ERLEDIGT_BETREFF_OHNE = [
+  ...ONBOARDING_ABTEILUNG_BETREFF_OHNE,
+  "kommentar",
+  "kommentar_text",
+  "ausgabe_vermerk",
+  "ausgabe_vermerk_html",
+];
+
+/** HR-Postfach (SmtpConfig.replyToEmail) in den Beispielen der HR-Mails des Onboardings. */
+const ONBOARDING_HR_POSTFACH = "personal@example.org";
+
+/**
+ * Sammelmail „Ausstattung noch offen“ (E-A18): zwei offene Aufgaben des
+ * Beispiels (eine Ausstattungs-, eine Hinweis-Aufgabe), nur Titel und Stelle.
+ * Wie oben als fertiger Text abgeschrieben; src/__tests__/lib/ausstattung-lauf.test.ts
+ * laesst den echten Lauf genau diese Aufgaben senden und vergleicht die Payload
+ * mit dem Beispiel.
+ */
+export const ONBOARDING_AUSSTATTUNG_OFFEN_BEISPIEL_AUFGABEN: { title: string; assignee: string }[] = [
+  { title: "Dienst-iPad (Lernmittel) bereitstellen", assignee: "IT" },
+  { title: "Hinweis der Führungskraft beachten", assignee: "FACILITY" },
+];
+
+/** sammelmailListenFelder(Beispielaufgaben) bei zentralen Stellen ohne eigenen Namen, abgeschrieben. */
+const ONBOARDING_AUSSTATTUNG_OFFEN_LISTE = {
+  anzahl_offen: 2,
+  offene_liste:
+    "- Dienst-iPad (Lernmittel) bereitstellen – IT-Abteilung\n" +
+    "- Hinweis der Führungskraft beachten – Facility Management",
+  offene_liste_html:
+    '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+    '<li style="margin:0 0 4px;">Dienst-iPad (Lernmittel) bereitstellen – IT-Abteilung</li>' +
+    '<li style="margin:0 0 4px;">Hinweis der Führungskraft beachten – Facility Management</li>' +
+    "</ul>",
+};
+
+/**
+ * Angaben aus „Ausstattung & Zugänge“ fuer das Beispiel der Zuweisungsmail an
+ * die IT (Regel 7): die eigene Durchwahl und die Unterrichtsfaecher, die das
+ * Facility Management erfragt und fuer die IT freigegeben hat (`sichtbarFuer`).
+ * Wie oben als Daten abgeschrieben; src/__tests__/api/onboarding-abteilungs-mails.test.ts
+ * legt genau diese Zeilen an und prueft, dass angabenMailFelder(angabenFuer("IT", …))
+ * die Felder unten ergibt. Das „&“ zeigt die Maskierung im HTML-Teil.
+ */
+export const ONBOARDING_ABTEILUNG_BEISPIEL_ANGABEN: {
+  departmentKey: string;
+  art: string;
+  angabeSchluessel: string;
+  bezeichnung: string;
+  angabe: string;
+  sichtbarFuer: string[];
+  reihenfolge: number;
+}[] = [
+  {
+    departmentKey: "FACILITY",
+    art: "ANGABE",
+    angabeSchluessel: "UNTERRICHTSFAECHER",
+    bezeichnung: "Unterrichtsfächer",
+    angabe: "Chemie & Sport",
+    sichtbarFuer: ["IT"],
+    reihenfolge: 3,
+  },
+  {
+    departmentKey: "IT",
+    art: "ANGABE",
+    angabeSchluessel: "DURCHWAHL",
+    bezeichnung: "Gewünschte Durchwahl",
+    angabe: "214",
+    sichtbarFuer: [],
+    reihenfolge: 4,
+  },
+];
+
+/** angabenMailFelder(angabenFuer("IT", ONBOARDING_ABTEILUNG_BEISPIEL_ANGABEN, [])), abgeschrieben. */
+const ONBOARDING_ABTEILUNG_ANGABEN = {
+  angaben: "Gewünschte Durchwahl: 214\nUnterrichtsfächer: Chemie & Sport",
+  angaben_html:
+    '<tr><td style="padding:0 16px 16px;">' +
+    '<p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Gewünschte Durchwahl</p>' +
+    '<p style="margin:0;color:#374151;font-size:14px;">214</p>' +
+    "</td></tr>" +
+    '<tr><td style="padding:0 16px 16px;">' +
+    '<p style="margin:0 0 4px;color:#6b7280;font-size:12px;">Unterrichtsfächer</p>' +
+    '<p style="margin:0;color:#374151;font-size:14px;">Chemie &amp; Sport</p>' +
+    "</td></tr>",
 };
 
 /**
@@ -228,6 +344,58 @@ export const ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN: {
     description: null,
   },
 ];
+
+/**
+ * Absage (Paket A3, E-A20, F17): Der Vorgang von Anna Beispiel wird abgesagt
+ * (EXPIRED), nachdem die IT die ersten beiden Aufgaben des Beispiels schon
+ * erledigt hat — genau diese nennt die Absage, damit Konto und Notebook
+ * zurueckgebaut werden. Nur Titel. src/__tests__/api/onboarding-abteilungs-mails.test.ts
+ * laesst den echten Aufrufer mit diesen erledigten Aufgaben senden und
+ * vergleicht die Payload mit dem Beispiel.
+ */
+export const ONBOARDING_ABSAGE_BEISPIEL_ERLEDIGT: { title: string }[] = ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN.slice(
+  0,
+  2,
+).map((a) => ({ title: a.title }));
+
+/** erledigteListeMailFelder(ONBOARDING_ABSAGE_BEISPIEL_ERLEDIGT), abgeschrieben. */
+const ONBOARDING_ABSAGE_ERLEDIGT = {
+  erledigte_liste: "- Benutzerkonto und E-Mail-Adresse anlegen\n- Notebook & Zubehör bereitstellen",
+  erledigte_liste_html:
+    '<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.6;">' +
+    '<li style="margin:0 0 4px;">Benutzerkonto und E-Mail-Adresse anlegen</li>' +
+    '<li style="margin:0 0 4px;">Notebook &amp; Zubehör bereitstellen</li>' +
+    "</ul>",
+  anzahl_erledigt: 2,
+  hat_erledigte: "ja",
+};
+
+/**
+ * Absage, Stufe 2 (A4, G10): Bis zur Absage hatte die IT laut Portal den
+ * Zugang eingerichtet und das Notebook uebergeben (Vermerke ueber ihren
+ * Link) — die Absage nennt beide Stuecke samt Kennung, damit die IT sie
+ * zuruecknimmt bzw. sperrt. Als Daten abgeschrieben:
+ * src/__tests__/api/onboarding-abteilungs-mails.test.ts legt genau diese
+ * Ausgaben an und vergleicht die echte Payload mit dem Beispiel.
+ */
+export const ONBOARDING_ABSAGE_BEISPIEL_AUSGABEN: {
+  bezeichnung: string;
+  kennung: string | null;
+  uebergebenAm: string;
+  beiAustritt: string;
+}[] = [
+  { bezeichnung: "Zugänge: Dienst-E-Mail", kennung: null, uebergebenAm: "2026-09-25", beiAustritt: "SPERREN" },
+  { bezeichnung: "Dienst-Laptop/PC", kennung: "FES-NB-0412", uebergebenAm: "2026-09-28", beiAustritt: "RUECKGABE" },
+];
+
+/** ausgabenListeMailFelder(ONBOARDING_ABSAGE_BEISPIEL_AUSGABEN), abgeschrieben. */
+const ONBOARDING_ABSAGE_AUSGABEN = {
+  ausgaben_liste:
+    "Zugänge: Dienst-E-Mail · eingerichtet 25.09.2026\n" + "Dienst-Laptop/PC · FES-NB-0412 · übergeben 28.09.2026",
+  ausgaben_liste_html:
+    "Zugänge: Dienst-E-Mail · eingerichtet 25.09.2026<br>" + "Dienst-Laptop/PC · FES-NB-0412 · übergeben 28.09.2026",
+  hat_ausgaben: "ja",
+};
 
 /**
  * Kommentar der IT beim Abhaken von "Benutzerkonto …" (Rohtext, mit
@@ -572,6 +740,8 @@ export const EVENT_CATALOG: EventDefinition[] = [
     defaultRecipients: { to: "{{supervisorEmail}}" },
     // Kein Feld `email`: Der Name der Person faellt nie auf ihre Adresse
     // zurueck (vorgesetztenLinkMailFelder in src/lib/onboarding-einladung.ts).
+    // `ausstattung_angeboten`: Merker "ja"/"" — das Formular zeigt den Schritt
+    // „Ausstattung & Zugänge“ (Regel 2, SupervisorData.mitAusstattung).
     samplePayload: {
       onboardingId: "00000000-0000-0000-0000-000000000001",
       displayId: "2026-GYM-001",
@@ -582,6 +752,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       organization: "FES Minden",
       mandantNumber: "01",
       supervisorTokenExpiresAt: "2026-07-15T12:00:00.000Z",
+      ausstattung_angeboten: "ja",
     },
     wired: true,
   },
@@ -593,6 +764,8 @@ export const EVENT_CATALOG: EventDefinition[] = [
     defaultRecipients: { to: "" },
     // Die beiden Merker schliessen einander aus (Paket 2): Entweder liegt der
     // Fragebogen schon vor („bereit zur Prüfung") oder er steht noch aus.
+    // `ausstattung_kurz` (Paket A2): nur gezaehlt, nie Bemerkungstexte; ""
+    // ohne Wahl bzw. ohne den Schritt im Formular.
     samplePayload: {
       onboardingId: "00000000-0000-0000-0000-000000000001",
       displayId: "2026-GYM-001",
@@ -602,6 +775,7 @@ export const EVENT_CATALOG: EventDefinition[] = [
       organization: "FES Minden",
       fragebogen_eingereicht: "",
       fragebogen_offen: "ja",
+      ausstattung_kurz: "6 Positionen für 3 Stellen",
     },
     wired: true,
   },
@@ -686,12 +860,26 @@ export const EVENT_CATALOG: EventDefinition[] = [
   //   - Zusatzangaben je Schluessel (Stellenbezeichnung, Betriebsstaette,
   //     Adresse der Fuehrungskraft) nur in der Zuweisungsmail und nur, wenn
   //     ONBOARDING_ZUSATZFELDER sie dem Schluessel erlaubt. Nicht erlaubte
-  //     Felder fehlen ganz — auch im Webhook.
+  //     Felder fehlen ganz.
+  //
+  // Paket A3 (Ausstattung & Zugaenge): Bemerkung und „(eilt)“ stehen in der
+  // Aufgabenliste (aufgabenlisteMailFelder), die Zuweisungsmail traegt dazu
+  // `angaben`/`angaben_html` (Regel 7), `nachtrag*` und `hat_offene_aufgaben`
+  // (Regel 10, F7), alle vier `arbeitsort` (F15). Keines
+  // der vier Ereignisse geht an Webhooks (EVENTS_OHNE_WEBHOOK, E-A16), und
+  // Zuweisung und Erinnerung sperren Liste, Angaben und Link im Betreff
+  // (ONBOARDING_ABTEILUNG_BETREFF_OHNE, Regel 17). Seit S18 geht die
+  // HR-Meldung onboarding-task-completed an `{{hr_postfach}}`, auch bei einem
+  // reinen Kommentar (E-A17), und sperrt zusaetzlich den Kommentar im Betreff
+  // (F19); dazu kommt die Sammelmail onboarding-ausstattung-offen (E-A18).
+  // Seit S19 die Absage onboarding-department-abgesagt (E-A20): per Knopf nach
+  // EXPIRED, ohne Link, mit den erledigten Aufgaben; ebenfalls ohne Webhook.
   // =============================================
   {
-    // Ausloeser: "Abteilungen informieren", "Erneut senden", "Link erneuern"
-    // und "Erinnern" nach einer Adressaenderung — immer per HR-Knopf. Das
-    // Beispiel ist die Erstmail an die IT (ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN).
+    // Ausloeser: "Abteilungen informieren", "Erneut senden", "Link erneuern",
+    // "Nachtrag senden" (Paket A3) und "Erinnern" nach einer Adressaenderung —
+    // immer per HR-Knopf. Das Beispiel ist die Erstmail an die IT
+    // (ONBOARDING_ABTEILUNG_BEISPIEL_AUFGABEN).
     event: "onboarding-department-assigned",
     name: "Onboarding-Aufgaben für Abteilung zugewiesen",
     group: "Onboarding",
@@ -711,8 +899,18 @@ export const EVENT_CATALOG: EventDefinition[] = [
       neuer_link: "",
       ist_fuehrungskraft: "",
       ...ONBOARDING_ABTEILUNG_ZUSATZ,
+      ...ONBOARDING_ABTEILUNG_ANGABEN,
+      // Nachtrag (Regel 10, F7): Die Erstmail hat nichts nachzutragen — die
+      // Felder stehen trotzdem da (nachtragMailFelder liefert ""), ebenso der
+      // Merker der Aufgabenliste. „Nachtrag senden“ fuellt sie mit
+      // „Neu: …“/„Geändert: …“/„Entfällt: …“.
+      nachtrag: "",
+      nachtrag_liste: "",
+      nachtrag_liste_html: "",
+      hat_offene_aufgaben: "ja",
     },
     wired: true,
+    betreffOhne: ONBOARDING_ABTEILUNG_BETREFF_OHNE,
   },
   {
     // Knopf "Erinnern" und Abschnitt 3 des taeglichen Laufs
@@ -749,18 +947,29 @@ export const EVENT_CATALOG: EventDefinition[] = [
       ist_fuehrungskraft: "",
     },
     wired: true,
+    betreffOhne: ONBOARDING_ABTEILUNG_BETREFF_OHNE,
   },
   {
     // NUR ueber den Link der Abteilung — das HR-Haekchen im Portal loest im
-    // Onboarding nichts aus (Entscheidung Paket 5). Kein `email`-Feld:
-    // Empfaenger ist das An-Feld der Vorlage (ohne An-Feld SKIPPED).
+    // Onboarding nichts aus (Entscheidung Paket 5). Kein `email`-Feld.
+    // Paket A3 (E-A17): Auch ein reiner Kommentar der Stelle (geaendert, nicht
+    // leer) loest die Mail aus; abhaken und kommentieren zugleich gibt genau
+    // eine. Empfaenger ist das HR-Postfach (`hr_postfach` =
+    // SmtpConfig.replyToEmail) — ein An-Feld der gespeicherten Vorlage geht vor.
+    // Merker `ist_erledigt`/`nur_kommentar` (genau einer "ja"), `meldung_kurz`
+    // fuer den Betreff („erledigt“, „erledigt, mit Kommentar“, „kommentiert“).
     // `kommentar` ist schon maskiert (fuer das HTML), `kommentar_text` der
-    // Rohtext (nur Textteil).
+    // Rohtext (nur Textteil); beide nie im Betreff (F19).
+    // Stufe 2 (A4, G9): `ausgabe_vermerk` (Rohtext, Zeilen „FES-IPAD-0412 ·
+    // übergeben 28.01.2027“, nur Textteil) und `ausgabe_vermerk_html`
+    // (maskiert, mit <br>) – die noch ausgegebenen Stuecke der Aufgabe, nach
+    // dem Commit frisch gelesen; ohne Stueck beide "". Ein Vermerk allein loest
+    // die Mail nie aus. Beide nie im Betreff.
     event: "onboarding-task-completed",
     name: "Onboarding-Aufgabe erledigt",
     group: "Onboarding",
-    recipientHint: "HR intern — Empfaenger in der Vorlage konfigurieren",
-    defaultRecipients: { to: "" },
+    recipientHint: "HR-Postfach (Antwortadresse in den SMTP-Einstellungen)",
+    defaultRecipients: { to: "{{hr_postfach}}" },
     samplePayload: {
       ...ONBOARDING_ABTEILUNG_BEISPIEL,
       ...ONBOARDING_ABTEILUNG_IT,
@@ -772,8 +981,18 @@ export const EVENT_CATALOG: EventDefinition[] = [
       erledigt_ueber: "Link der Abteilung",
       kommentar: "Konto angelegt &amp; Postfach eingerichtet.<br>Das Notebook kommt nächste Woche.",
       kommentar_text: ONBOARDING_ABTEILUNG_BEISPIEL_KOMMENTAR,
+      hr_postfach: ONBOARDING_HR_POSTFACH,
+      ist_erledigt: "ja",
+      nur_kommentar: "",
+      meldung_kurz: "erledigt, mit Kommentar",
+      // A4 (G9): Die Beispielaufgabe „Benutzerkonto …“ ist ein Vorlagenpunkt
+      // ohne Uebergabe – wie im echten Ablauf beide "" (der Block faellt weg).
+      // Wie eine Zeile aussieht, haelt onboarding-abteilungs-mails.test.ts fest.
+      ausgabe_vermerk: "",
+      ausgabe_vermerk_html: "",
     },
     wired: true,
+    betreffOhne: ONBOARDING_ERLEDIGT_BETREFF_OHNE,
   },
   {
     // Genau einmal beim Uebergang der Abteilung auf "fertig" ueber ihren Link.
@@ -791,6 +1010,64 @@ export const EVENT_CATALOG: EventDefinition[] = [
       ist_fuehrungskraft: "",
     },
     wired: true,
+  },
+  {
+    // Paket A3 (E-A20): NUR per HR-Knopf „Stellen über die Absage
+    // informieren…“ nach EXPIRED (Aktion `absage`, abteilungsaufgaben-dienst.ts)
+    // — je informierter Stelle EINE Mail, einmal (`abgesagtAm`, F13), an die
+    // Adresse, die informiert wurde (F16), mit den schon erledigten,
+    // nicht entfallenen Aufgaben aus Vorlage und Ausstattung (F17). BEWUSST
+    // ohne Link, Token und Gueltigkeit: Der Vorgang ist abgelaufen, der Link
+    // antwortet 410. Nicht an Webhooks (EVENTS_OHNE_WEBHOOK, F18); die Liste
+    // nie im Betreff.
+    // Stufe 2 (A4, G10): dazu die Stuecke, die die Stelle laut Portal noch
+    // ausgegeben hat (AUSGEGEBEN, VERBLEIBT), samt Kennung — `ausgaben_liste`
+    // (Rohtext, nur Textteil), `ausgaben_liste_html` (maskiert, mit <br>) und
+    // der Merker `hat_ausgaben` ("ja"/""); ohne Stueck alle drei "". Neue
+    // Aufgaben gibt es dafuer nicht (der Link antwortet 410), die Ruecknahme
+    // vermerkt HR in der Karte. Beide Listen nie im Betreff (Kennungen).
+    event: "onboarding-department-abgesagt",
+    name: "Onboarding: Absage an Abteilung",
+    group: "Onboarding",
+    recipientHint: "Abteilung bzw. Führungskraft (die informierte Adresse, ohne Link)",
+    defaultRecipients: { to: "{{email}}" },
+    samplePayload: {
+      ...ONBOARDING_ABTEILUNG_BEISPIEL,
+      ...ONBOARDING_ABTEILUNG_IT,
+      email: "it@example.org",
+      ...ONBOARDING_ABSAGE_ERLEDIGT,
+      ...ONBOARDING_ABSAGE_AUSGABEN,
+      ist_fuehrungskraft: "",
+    },
+    wired: true,
+    betreffOhne: [
+      ...ONBOARDING_ABTEILUNG_BETREFF_OHNE,
+      "erledigte_liste",
+      "erledigte_liste_html",
+      "ausgaben_liste",
+      "ausgaben_liste_html",
+    ],
+  },
+  {
+    // Paket A3 (E-A18): Lauf „Onboarding-Erinnerungen“, Abschnitt 4
+    // (src/lib/ausstattung-lauf.ts) — am Werktag vor Dienstbeginn je Vorgang
+    // EINE Mail an das HR-Postfach mit allen noch offenen Ausstattungs- und
+    // Hinweis-Aufgaben: nur Titel und Stelle, nie Bemerkung, Angabe oder
+    // Hinweistext; die Fuehrungskraft nicht in Kopie. Nicht an Webhooks
+    // (EVENTS_OHNE_WEBHOOK, F18). Liste und Portal-Link nie im Betreff.
+    event: "onboarding-ausstattung-offen",
+    name: "Onboarding: Ausstattung noch offen (HR)",
+    group: "Onboarding",
+    recipientHint: "HR-Postfach (Antwortadresse in den SMTP-Einstellungen)",
+    defaultRecipients: { to: "{{hr_postfach}}" },
+    samplePayload: {
+      ...ONBOARDING_ABTEILUNG_BEISPIEL,
+      hr_postfach: ONBOARDING_HR_POSTFACH,
+      ...ONBOARDING_AUSSTATTUNG_OFFEN_LISTE,
+      portalLink: BEISPIEL_LINK,
+    },
+    wired: true,
+    betreffOhne: ["offene_liste", "offene_liste_html", "portalLink"],
   },
 
   // =============================================

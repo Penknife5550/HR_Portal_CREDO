@@ -1,46 +1,35 @@
 /**
- * API: /api/offboarding/:id/notes
+ * API: /api/offboarding/:id/notes — Reiter „Notizen"
  *
- * GET  – Alle Notizen eines Offboarding-Vorgangs laden
- * POST – Neue Notiz erstellen
+ * GET  – Alle Notizen eines Offboarding-Vorgangs laden (PORTAL_ROLES)
+ * POST – Neue Notiz erstellen (PORTAL_ROLES — Notizen darf laut
+ *        `permissions.ts` auch die Fuehrungskraft schreiben)
+ *
+ * Mandant per canAccessProcess: unbekannt und fremd = dieselbe 404. Der
+ * n8n-Schluessel (SERVICE) steht nicht in PORTAL_ROLES → 403. Im AuditLog
+ * steht nur die Laenge der Notiz, nie ihr Text.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { z } from "zod";
+import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { PORTAL_ROLES } from "@/lib/permissions";
+import { nichtGefunden, offboardingZugaenglich } from "@/lib/offboarding-zugriff";
+import { offboardingNotizSchema } from "@/lib/validations/offboarding";
+
+const LOG_LABEL = "Offboarding/Notizen";
 
 // =============================================
 // GET /api/offboarding/:id/notes
 // =============================================
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
-
-    const { id } = await params;
-
-    // Pruefen ob Offboarding existiert
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!offboarding) {
-      return NextResponse.json(
-        { error: "Vorgang nicht gefunden" },
-        { status: 404 }
-      );
-    }
+export const GET = apiHandler(
+  { roles: PORTAL_ROLES, logLabel: LOG_LABEL },
+  async ({ params, session }) => {
+    if (!(await offboardingZugaenglich(session!, params.id))) return nichtGefunden();
 
     const notes = await prisma.offboardingNote.findMany({
-      where: { offboardingId: id },
+      where: { offboardingId: params.id },
       include: {
         createdBy: {
           select: { firstName: true, lastName: true },
@@ -50,89 +39,43 @@ export async function GET(
     });
 
     return NextResponse.json({ data: notes });
-  } catch (error) {
-    console.error("Fehler beim Laden der Offboarding-Notizen:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
   }
-}
+);
 
 // =============================================
 // POST /api/offboarding/:id/notes – Neue Notiz erstellen
 // =============================================
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
+export const POST = apiHandler<z.infer<typeof offboardingNotizSchema>>(
+  { roles: PORTAL_ROLES, bodySchema: offboardingNotizSchema, logLabel: LOG_LABEL },
+  async ({ params, session, body }) => {
+    if (!(await offboardingZugaenglich(session!, params.id))) return nichtGefunden();
 
-    const { id } = await params;
-    const body = await request.json();
-    const { content } = body;
-
-    // Validierung
-    if (!content || typeof content !== "string" || content.trim().length === 0) {
-      return NextResponse.json(
-        { error: "content ist ein Pflichtfeld" },
-        { status: 400 }
-      );
-    }
-
-    // Pruefen ob Offboarding existiert
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!offboarding) {
-      return NextResponse.json(
-        { error: "Vorgang nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    // Notiz erstellen
-    const note = await prisma.offboardingNote.create({
-      data: {
-        offboardingId: id,
-        content: content.trim(),
-        createdById: session.userId,
-      },
-      include: {
-        createdBy: {
-          select: { firstName: true, lastName: true },
+    // Notiz und Protokoll in EINER Transaktion.
+    const note = await prisma.$transaction(async (tx) => {
+      const neu = await tx.offboardingNote.create({
+        data: {
+          offboardingId: params.id,
+          content: body.content,
+          createdById: session!.userId,
         },
-      },
-    });
-
-    // Audit-Log
-    await prisma.auditLog.create({
-      data: {
-        offboardingId: id,
-        userId: session.userId,
-        processType: "OFFBOARDING",
-        action: "NOTE_CREATED",
-        details: {
-          noteId: note.id,
-          contentPreview: content.trim().substring(0, 100),
+        include: {
+          createdBy: {
+            select: { firstName: true, lastName: true },
+          },
         },
-      },
+      });
+      await tx.auditLog.create({
+        data: {
+          offboardingId: params.id,
+          userId: session!.userId,
+          processType: "OFFBOARDING",
+          action: "NOTE_CREATED",
+          details: { noteId: neu.id, laenge: body.content.length },
+        },
+      });
+      return neu;
     });
 
     return NextResponse.json({ data: note }, { status: 201 });
-  } catch (error) {
-    console.error("Fehler beim Erstellen der Offboarding-Notiz:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
   }
-}
+);

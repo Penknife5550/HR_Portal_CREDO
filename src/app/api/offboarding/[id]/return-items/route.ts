@@ -1,292 +1,167 @@
 /**
- * API: /api/offboarding/:id/return-items
+ * API: /api/offboarding/:id/return-items — Reiter „Rückgaben“
  *
- * GET   – Alle Rueckgabe-Items auflisten
- * POST  – Neues Rueckgabe-Item hinzufuegen
- * PATCH – Rueckgabe-Item aktualisieren (itemId im Body)
+ * GET    – Gegenstaende auflisten (PORTAL_ROLES)
+ * POST   – Gegenstand erfassen (HR_EDIT_ROLES)
+ * PATCH  – Gegenstand aendern, etwa die Rueckgabe bestaetigen
+ *          (HR_EDIT_ROLES, `itemId` im Body) – duenn um `rueckgabeAendern`
+ *          (src/lib/offboarding-ausgaben.ts)
+ * DELETE – Gegenstand loeschen (HR_EDIT_ROLES, `itemId` als Query-Parameter
+ *          oder im Body)
+ *
+ * Mandant per canAccessProcess (`offboardingZugaenglich`): Ein Vorgang eines
+ * fremden Mandanten bekommt dieselbe 404 mit demselben Text wie ein
+ * unbekannter, ein Gegenstand aus einem anderen Vorgang dieselbe wie ein
+ * unbekannter Gegenstand — die Antwort verraet nicht, dass es ihn gibt. Jede
+ * Aenderung schreibt ihr AuditLog im selben Commit; dort stehen nur ID,
+ * Kategorie, die Namen der geaenderten Felder und der Zustand, nie Freitext
+ * (Gegenstand, Seriennummer, Zustandstext, Notiz).
+ *
+ * Seit A4 (S30, G15, G16): `zustand` (einer der fuenf Rueckgabezustaende,
+ * `null` = wieder offen) neben der Altform `isReturned`. Eine Zeile aus der
+ * Einstellung (`ausgabeId`) laeuft mit ihrer Ausgabe und der Ruecknahmeaufgabe
+ * gleich, ihre Kennung muss `kennungSchema` bestehen (400) und zieht die
+ * Ausgabe mit; ist das Stueck an einen anderen Austritt gebunden, 409. Ein
+ * abgebrochener Austritt nimmt keine Aenderung mehr an (409). Loeschen laesst
+ * sich eine vorgeschlagene Zeile nie (409 – stattdessen „entfällt“).
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { HR_EDIT_ROLES, PORTAL_ROLES } from "@/lib/permissions";
+import { MELDUNGEN_AUSGABEN } from "@/lib/ausgaben";
+import { rueckgabeAendern } from "@/lib/offboarding-ausgaben";
+import { nichtGefunden, offboardingZugaenglich } from "@/lib/offboarding-zugriff";
+import {
+  rueckgabeAendernSchema,
+  rueckgabeAnlegenSchema,
+  type RueckgabeAendernInput,
+} from "@/lib/validations/offboarding";
+import type { z } from "zod";
 
-const VALID_RETURN_CATEGORIES = [
-  "IT_HARDWARE",
-  "SCHLUESSEL",
-  "FAHRZEUG",
-  "DOKUMENTE",
-  "KLEIDUNG",
-  "SPEICHERMEDIEN",
-  "SONSTIGES",
-];
+const LOG_LABEL = "Offboarding/Rückgaben";
 
 // =============================================
 // GET /api/offboarding/:id/return-items
 // =============================================
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
-
-    const { id } = await params;
-
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!offboarding) {
-      return NextResponse.json(
-        { error: "Offboarding-Vorgang nicht gefunden" },
-        { status: 404 }
-      );
-    }
+export const GET = apiHandler(
+  { roles: PORTAL_ROLES, logLabel: LOG_LABEL },
+  async ({ params, session }) => {
+    if (!(await offboardingZugaenglich(session!, params.id))) return nichtGefunden();
 
     const items = await prisma.returnItem.findMany({
-      where: { offboardingId: id },
+      where: { offboardingId: params.id },
       orderBy: [{ category: "asc" }, { createdAt: "asc" }],
     });
-
     return NextResponse.json({ items });
-  } catch (error) {
-    console.error("Fehler beim Laden der Rueckgabe-Items:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
   }
-}
+);
 
 // =============================================
 // POST /api/offboarding/:id/return-items
 // =============================================
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
+export const POST = apiHandler<z.infer<typeof rueckgabeAnlegenSchema>>(
+  { roles: HR_EDIT_ROLES, bodySchema: rueckgabeAnlegenSchema, logLabel: LOG_LABEL },
+  async ({ params, session, body }) => {
+    if (!(await offboardingZugaenglich(session!, params.id))) return nichtGefunden();
 
-    const { id } = await params;
-    const body = await request.json();
-    const { category, itemName, serialNumber, notes } = body;
-
-    // Validierung
-    if (!category || !itemName) {
-      return NextResponse.json(
-        { error: "category und itemName sind Pflichtfelder" },
-        { status: 400 }
-      );
-    }
-
-    if (!VALID_RETURN_CATEGORIES.includes(category)) {
-      return NextResponse.json(
-        { error: `Ungueltige Kategorie. Erlaubt: ${VALID_RETURN_CATEGORIES.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    // Pruefen ob Offboarding existiert
-    const offboarding = await prisma.offboardingProcess.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!offboarding) {
-      return NextResponse.json(
-        { error: "Offboarding-Vorgang nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    const item = await prisma.returnItem.create({
-      data: {
-        offboardingId: id,
-        category: category as never,
-        itemName,
-        serialNumber: serialNumber || null,
-        notes: notes || null,
-      },
+    const item = await prisma.$transaction(async (tx) => {
+      const neu = await tx.returnItem.create({
+        data: {
+          offboardingId: params.id,
+          category: body.category,
+          itemName: body.itemName,
+          serialNumber: body.serialNumber ?? null,
+          notes: body.notes ?? null,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          offboardingId: params.id,
+          userId: session!.userId,
+          processType: "OFFBOARDING",
+          action: "RETURN_ITEM_CREATED",
+          details: { returnItemId: neu.id, category: neu.category },
+        },
+      });
+      return neu;
     });
 
     return NextResponse.json({ item }, { status: 201 });
-  } catch (error) {
-    console.error("Fehler beim Erstellen des Rueckgabe-Items:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
   }
-}
+);
 
 // =============================================
 // PATCH /api/offboarding/:id/return-items
 // =============================================
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
-
-    const { id } = await params;
-    const body = await request.json();
-    const { itemId, isReturned, condition, notes, serialNumber } = body;
-
-    if (!itemId) {
-      return NextResponse.json(
-        { error: "itemId ist erforderlich" },
-        { status: 400 }
-      );
-    }
-
-    // Pruefen ob das Item existiert und zum Offboarding gehoert
-    const existing = await prisma.returnItem.findUnique({
-      where: { id: itemId },
-    });
-
-    if (!existing) {
-      return NextResponse.json(
-        { error: "Rückgabe-Item nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    if (existing.offboardingId !== id) {
-      return NextResponse.json(
-        { error: "Item gehoert nicht zu diesem Offboarding" },
-        { status: 403 }
-      );
-    }
-
-    // Update-Daten zusammenbauen
-    const updateData: Record<string, unknown> = {};
-
-    if (typeof isReturned === "boolean") {
-      updateData.isReturned = isReturned;
-      if (isReturned) {
-        updateData.returnedAt = new Date();
-        updateData.returnedToId = session.userId;
-      } else {
-        updateData.returnedAt = null;
-        updateData.returnedToId = null;
-      }
-    }
-
-    if (condition !== undefined) {
-      updateData.condition = condition;
-    }
-
-    if (notes !== undefined) {
-      updateData.notes = notes;
-    }
-
-    if (serialNumber !== undefined) {
-      updateData.serialNumber = serialNumber;
-    }
-
-    const updated = await prisma.returnItem.update({
-      where: { id: itemId },
-      data: updateData,
-    });
-
-    return NextResponse.json({ item: updated });
-  } catch (error) {
-    console.error("Fehler beim Aktualisieren des Rueckgabe-Items:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
+export const PATCH = apiHandler<RueckgabeAendernInput>(
+  { roles: HR_EDIT_ROLES, bodySchema: rueckgabeAendernSchema, logLabel: LOG_LABEL },
+  async ({ params, session, body }) => {
+    const antwort = await rueckgabeAendern({ offboardingId: params.id, eingabe: body, session: session! });
+    return NextResponse.json(antwort.body, { status: antwort.status });
   }
-}
+);
 
 // =============================================
 // DELETE /api/offboarding/:id/return-items
 // =============================================
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Nicht authentifiziert" },
-        { status: 401 }
-      );
-    }
 
-    const { id } = await params;
-
-    // itemId aus Query-Parameter oder Body lesen
-    const { searchParams } = new URL(request.url);
-    let itemId = searchParams.get("itemId");
-
-    if (!itemId) {
-      try {
-        const body = await request.json();
-        itemId = body.itemId || null;
-      } catch {
-        // Kein Body vorhanden
-      }
-    }
-
-    if (!itemId) {
-      return NextResponse.json(
-        { error: "itemId ist erforderlich (als Query-Parameter oder im Body)" },
-        { status: 400 }
-      );
-    }
-
-    // Pruefen ob das Item existiert und zum Offboarding gehoert
-    const existing = await prisma.returnItem.findUnique({
-      where: { id: itemId },
-    });
-
-    if (!existing) {
-      return NextResponse.json(
-        { error: "Rückgabe-Item nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    if (existing.offboardingId !== id) {
-      return NextResponse.json(
-        { error: "Item gehoert nicht zu diesem Offboarding" },
-        { status: 403 }
-      );
-    }
-
-    await prisma.returnItem.delete({
-      where: { id: itemId },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Fehler beim Löschen des Rueckgabe-Items:", error);
-    return NextResponse.json(
-      { error: "Interner Serverfehler" },
-      { status: 500 }
-    );
-  }
+/** `itemId` aus dem Query-Parameter, sonst aus dem Body. */
+async function itemIdLesen(request: NextRequest): Promise<string | null> {
+  const ausQuery = request.nextUrl.searchParams.get("itemId");
+  if (ausQuery) return ausQuery;
+  const roh: unknown = await request.json().catch(() => null);
+  const id = roh && typeof roh === "object" ? (roh as { itemId?: unknown }).itemId : undefined;
+  return typeof id === "string" && id.length > 0 ? id : null;
 }
+
+export const DELETE = apiHandler(
+  { roles: HR_EDIT_ROLES, logLabel: LOG_LABEL },
+  async ({ request, params, session }) => {
+    const itemId = await itemIdLesen(request);
+    if (!itemId) {
+      return NextResponse.json({ error: "Rückgabe-Gegenstand fehlt" }, { status: 400 });
+    }
+    if (!(await offboardingZugaenglich(session!, params.id))) return nichtGefunden();
+
+    const vorhanden = await prisma.returnItem.findFirst({
+      where: { id: itemId, offboardingId: params.id },
+      select: { id: true, category: true, isReturned: true, ausgabeId: true },
+    });
+    if (!vorhanden) return nichtGefunden(MELDUNGEN_AUSGABEN.GEGENSTAND_NICHT_GEFUNDEN);
+    // Aus der Einstellung vorgeschlagen (G15): Die Zeile gehoert zu einer
+    // Ausgabe und einer Ruecknahmeaufgabe – stattdessen „entfällt“ waehlen.
+    if (vorhanden.ausgabeId) {
+      return NextResponse.json(
+        { error: MELDUNGEN_AUSGABEN.VORGESCHLAGEN_NICHT_LOESCHEN, grund: "VORGESCHLAGEN_NICHT_LOESCHEN" },
+        { status: 409 }
+      );
+    }
+
+    const geloescht = await prisma.$transaction(async (tx) => {
+      // `ausgabeId` setzt nur die Anlage einer Zeile – eine von HR erfasste bekommt nie nachtraeglich eine.
+      const { count } = await tx.returnItem.deleteMany({
+        where: { id: vorhanden.id, offboardingId: params.id },
+      });
+      if (count === 0) return false;
+      await tx.auditLog.create({
+        data: {
+          offboardingId: params.id,
+          userId: session!.userId,
+          processType: "OFFBOARDING",
+          action: "RETURN_ITEM_DELETED",
+          details: {
+            returnItemId: vorhanden.id,
+            category: vorhanden.category,
+            warZurueckgegeben: vorhanden.isReturned,
+          },
+        },
+      });
+      return true;
+    });
+
+    if (!geloescht) return nichtGefunden(MELDUNGEN_AUSGABEN.GEGENSTAND_NICHT_GEFUNDEN);
+    return NextResponse.json({ success: true });
+  }
+);

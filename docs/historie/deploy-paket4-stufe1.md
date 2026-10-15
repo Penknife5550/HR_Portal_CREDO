@@ -1,6 +1,10 @@
 # Deploy Paket 4 Stufe 1 — Unterlagen nachfordern (Ablaufplan)
 
-> **Stand:** Ablaufplan vom 25.09.2026, **noch nicht ausgeführt**. Ergänzt am 28. und 29.09.2026:
+> **Stand:** Ablaufplan vom 25.09.2026. **Ausgeführt am 30.09.2026** (nicht protokolliert;
+> nachträglich belegt am 14.10.2026 auf dem Server: `git reflog` zeigt den Pull von `f6d3daf` am
+> 30.09. um 13:38 UTC, der Entrypoint legte `vor-schema-abgleich-20260930-134318.sql` an — siehe
+> Vorgeschichte im [Protokoll vom 14.10.2026](deploy-main-2026-10.md)). Am 01.10. folgte Paket 3
+> (`da5c743`), am 02.10. `b6e1c8a`, beide ebenfalls nur dort belegt. Ergänzt am 28. und 29.09.2026:
 > Code-Review erledigt (Fix-Commit `4875fba`), Prüfbefehle in 1.3, 1.4 und 1.9 überarbeitet und
 > lokal geprobt, Serverprüfung V-1/V-5 ohne Befund, V-9 Entscheidung vertagt (1.9), V-4 erledigt
 > (Datenschutzhinweise des DSB im Code, 1.8). Am 29.09. außerdem: 1.7 (V-7) als Prüfskript mit

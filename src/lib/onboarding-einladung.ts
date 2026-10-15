@@ -54,6 +54,28 @@ export function modalitaetenLinkZu(token: string): string {
  * Die Mail geht NICHT hier hinaus, sondern erst nach dem Commit beim Aufrufer:
  * Nach einem Rollback ginge sonst ein toter Link hinaus, und die Zeilensperre
  * bliebe fuer die Dauer des SMTP-Versands liegen.
+ *
+ * Merker `SupervisorData.mitAusstattung` (Ausstattung & Zugaenge, Regel 2):
+ * Die Schrittliste des Formulars steht fest, sobald der Link entsteht. Der
+ * Aufrufer rechnet `ausstattungAngeboten` (`ausstattungAngebotenIn`) in
+ * DERSELBEN Transaktion vorher aus — Pflichtfeld, damit kein Weg ihn vergisst.
+ * Gerechnet wird mit dem Arbeitsort, den der Aufrufer gelesen hat
+ * (`arbeitsortId`, ebenfalls Pflicht); die Sperre unten trifft nur, wenn der
+ * Vorgang noch auf DIESEM Arbeitsort steht. Sonst koennte ein gleichzeitiger
+ * Arbeitsort-PATCH (bedingt auf `supervisorToken: null`) zwischen dem Lesen
+ * und der Sperre committen: Der Merker kaeme aus dem Katalog des alten Orts,
+ * und weil der Arbeitsort ab dem Link eingefroren ist, korrigierte ihn
+ * niemand mehr. So endet dieser Wettlauf als `LinkGeaendert` (Route: 409
+ * „Vorgang wurde gerade geändert“), und der naechste Versuch liest den neuen
+ * Ort.
+ *   - Neue Zeile: Der Merker kommt mit dem Anlegen (`create`).
+ *   - Bestehende Zeile (Erneuern, andere Adresse): Er wird nur gesetzt, solange
+ *     er leer ist UND `currentStep` 0 ist — bedingtes `updateMany`. Sonst
+ *     spraenge ein halb ausgefuelltes Formular, weil `currentStep` ein Index ist.
+ *     Ein einmal gesetzter Wert (auch `false`) bleibt, selbst wenn der Katalog
+ *     inzwischen etwas anbietet.
+ * Zurueck kommt der WIRKSAME Wert (`null` gilt als `false`); er steuert den
+ * Satz in der Einladungsmail (`vorgesetztenLinkMailFelder`).
  */
 export async function vorgesetztenLinkSetzen(
   tx: Prisma.TransactionClient,
@@ -66,8 +88,22 @@ export async function vorgesetztenLinkSetzen(
     bisherigeEmail: string | null;
     userId: string;
     organizationName: string;
+    /** Bietet der Katalog diesem Vorgang etwas an? (`ausstattungAngebotenIn`, dieselbe Transaktion) */
+    ausstattungAngeboten: boolean;
+    /**
+     * Der Arbeitsort, mit dem `ausstattungAngeboten` gerechnet wurde — so, wie
+     * der Aufrufer ihn gelesen hat (null = Einrichtung des Vorgangs). Steht im
+     * WHERE der Sperre.
+     */
+    arbeitsortId: string | null;
   },
-): Promise<{ supervisorToken: string; supervisorTokenExpiresAt: Date; abgleich: StatusAbgleich }> {
+): Promise<{
+  supervisorToken: string;
+  supervisorTokenExpiresAt: Date;
+  abgleich: StatusAbgleich;
+  /** Wirksamer Merker der Schrittliste nach diesem Aufruf. */
+  mitAusstattung: boolean;
+}> {
   const supervisorToken = generateToken();
   const supervisorTokenExpiresAt = getTokenExpiryDate();
 
@@ -77,12 +113,16 @@ export async function vorgesetztenLinkSetzen(
   // abgeschlossen hat. Ein zweiter, gleichzeitiger Aufruf (Doppelklick)
   // wartet auf unsere Zeilensperre, findet danach einen anderen Token
   // vor und bekommt count 0 — statt unseren frischen Link zu ersetzen.
+  // Ebenso, wenn der Arbeitsort nicht mehr der ist, aus dem der Merker
+  // stammt (Kopfkommentar). `?? null`: Fehlte der Wert, fiele die Bedingung
+  // in Prisma still weg — so trifft die Sperre dann nur ohne Arbeitsort.
   const gesetzt = await tx.onboardingProcess.updateMany({
     where: {
       id: e.id,
       supervisorToken: e.bisherigerToken,
       supervisorSubmittedAt: null,
       status: { notIn: [...HR_STATUS] },
+      arbeitsortId: e.arbeitsortId ?? null,
     },
     data: {
       supervisorEmail: e.supervisorEmail,
@@ -98,12 +138,28 @@ export async function vorgesetztenLinkSetzen(
 
   // Leerer Datensatz fuer das Formular. Beim Ersetzen bleibt alles
   // stehen, was schon eingetragen wurde — die richtige Person soll dort
-  // weitermachen koennen.
-  await tx.supervisorData.upsert({
+  // weitermachen koennen. Eine neue Zeile bekommt den Merker der
+  // Schrittliste gleich mit.
+  const zeile = await tx.supervisorData.upsert({
     where: { onboardingId: e.id },
     update: {},
-    create: { onboardingId: e.id },
+    create: { onboardingId: e.id, mitAusstattung: e.ausstattungAngeboten },
+    select: { mitAusstattung: true, currentStep: true },
   });
+
+  // Bestehende Zeile ohne Merker (Altbestand, den die Migration
+  // SUPERVISOR_MIT_AUSSTATTUNG_V1 noch nicht erreicht hat): nur, solange das
+  // Formular nie gespeichert wurde. Bedingt, damit ein gleichzeitiges
+  // Speichern des Formulars (currentStep > 0) gewinnt; dann bleibt er leer
+  // und gilt als false.
+  let mitAusstattung = zeile.mitAusstattung ?? false;
+  if (zeile.mitAusstattung === null && zeile.currentStep === 0) {
+    const merker = await tx.supervisorData.updateMany({
+      where: { onboardingId: e.id, mitAusstattung: null, currentStep: 0 },
+      data: { mitAusstattung: e.ausstattungAngeboten },
+    });
+    mitAusstattung = merker.count > 0 ? e.ausstattungAngeboten : false;
+  }
 
   const abgleich = await statusAbgleichen(tx, e.id);
 
@@ -123,7 +179,7 @@ export async function vorgesetztenLinkSetzen(
     },
   });
 
-  return { supervisorToken, supervisorTokenExpiresAt, abgleich };
+  return { supervisorToken, supervisorTokenExpiresAt, abgleich, mitAusstattung };
 }
 
 /**
@@ -169,18 +225,28 @@ export function einladungMailFelder(v: {
  * DSGVO). Deshalb auch KEIN Feld `email` oder `employeeEmail`: Der Mailer
  * (`extractVariables`) faellt fuer `{{mitarbeiter_name}}` auf genau diese
  * Felder zurueck, und jeder Webhook bekaeme die Adresse mit.
+ *
+ * `ausstattung_angeboten` (Regel 2) ist der WIRKSAME Merker aus
+ * `vorgesetztenLinkSetzen` (`mitAusstattung`), nicht der Katalog von heute —
+ * die Mail verspricht nur den Schritt, den das Formular auch zeigt. Als
+ * Zeichenkette `"ja"`/`""`: `renderTemplate` kennt nur „nicht leer“, und
+ * `String(false)` waere nicht leer. Der Schluessel steht immer da (Payload =
+ * Katalogbeispiel).
  */
-export function vorgesetztenLinkMailFelder(v: {
-  id: string;
-  displayId: string | null;
-  supervisorEmail: string;
-  supervisorToken: string;
-  supervisorTokenExpiresAt: Date;
-  organization: { name: string; mandantNumber: string };
-  firstName?: string | null;
-  lastName?: string | null;
-  personalData?: { firstName?: string | null; lastName?: string | null } | null;
-}): Record<string, string> {
+export function vorgesetztenLinkMailFelder(
+  v: {
+    id: string;
+    displayId: string | null;
+    supervisorEmail: string;
+    supervisorToken: string;
+    supervisorTokenExpiresAt: Date;
+    organization: { name: string; mandantNumber: string };
+    firstName?: string | null;
+    lastName?: string | null;
+    personalData?: { firstName?: string | null; lastName?: string | null } | null;
+  },
+  opts: { ausstattungAngeboten: boolean },
+): Record<string, string> {
   const name = mitarbeiterName(v) ?? MITARBEITER_NEUTRAL;
   return {
     onboardingId: v.id,
@@ -192,5 +258,6 @@ export function vorgesetztenLinkMailFelder(v: {
     organization: v.organization.name,
     mandantNumber: v.organization.mandantNumber,
     supervisorTokenExpiresAt: v.supervisorTokenExpiresAt.toISOString(),
+    ausstattung_angeboten: opts.ausstattungAngeboten ? "ja" : "",
   };
 }

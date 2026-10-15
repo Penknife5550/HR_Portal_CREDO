@@ -13,6 +13,7 @@ import { orgFilter, PORTAL_ROLES, PROCESS_CREATE_ROLES, HR_EDIT_ROLES, canAccess
 import { createOffboardingProcess } from "@/lib/offboarding";
 import { fuehrungskraftAdresseFreigegeben } from "@/lib/abteilungsaufgaben-dienst";
 import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { rueckgabeOffen } from "@/lib/ausgaben";
 
 // =============================================
 // GET /api/offboarding – Alle Vorgaenge auflisten
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
             select: { isCompleted: true },
           },
           returnItems: {
-            select: { id: true, isReturned: true },
+            select: { id: true, isReturned: true, zustand: true },
           },
         },
         orderBy,
@@ -112,8 +113,11 @@ export async function GET(request: NextRequest) {
         completed: checklistItems.filter((item) => item.isCompleted).length,
         total: checklistItems.length,
       },
+      // Seit A4 (G16) zaehlt „erledigt“ (ein Zustand ist gesetzt, auch „fehlt“,
+      // „verbleibt“, „entfällt“), nicht „zurückgegeben“ – sonst bliebe der
+      // Fortschritt fuer immer unter 100 %. Der Feldname bleibt (Verträglichkeit).
       returnProgress: {
-        returned: returnItems.filter((item) => item.isReturned).length,
+        returned: returnItems.filter((item) => !rueckgabeOffen(item)).length,
         total: returnItems.length,
       },
     }));

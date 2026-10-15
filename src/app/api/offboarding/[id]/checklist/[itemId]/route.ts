@@ -9,7 +9,8 @@
  * Zustaendigkeit, abgebrochener Vorgang (409), gesperrte Transaktion mit
  * Neuberechnung BEIDER Abteilungen beim Umhaengen, Protokoll und die Mail
  * "Aufgabe erledigt" — nur bei Aufgaben einer Link-Abteilung und nur bei einem
- * echten Wechsel.
+ * echten Wechsel. Seit A4 (S30) dazu `zustand` an Ruecknahme- und
+ * Sperraufgaben samt Gleichlauf mit Ausgabe und Rueckgabe-Zeile.
  *
  * Antwort 200: { item: <Eintrag + erledigtVon>, progress: { total, completed, allCompleted } }
  */

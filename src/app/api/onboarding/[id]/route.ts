@@ -5,8 +5,17 @@
  *         Abteilungsuebersicht (Karte „Aufgaben für Abteilungen", Stepper,
  *         Urheber der Haekchen, Faelligkeiten) aus
  *         onboardingAbteilungsUebersichtLaden und die Nachforderungen von
- *         Unterlagen (`unterlagen`, Paket 4) aus unterlagenUebersichtLaden
- * PATCH – Status aendern
+ *         Unterlagen (`unterlagen`, Paket 4) aus unterlagenUebersichtLaden,
+ *         dazu Ausstattung & Zugaenge (`ausstattung`, Paket A2) aus
+ *         ausstattungUebersichtLaden — nur fuer HR_EDIT_ROLES, sonst `null`
+ * PATCH – Status aendern. Seit Paket A3 (Ausstattung & Zugaenge):
+ *         COMPLETED mit offenen Ausstattungs- oder Hinweis-Aufgaben nur mit
+ *         `bestaetigt: true`, sonst 409 `{ error, grund: "AUSSTATTUNG_OFFEN",
+ *         offen: [{ titel, stelle }] }` (E-A19); EXPIRED setzt `expiredAt`
+ *         (F12, Grundlage der Loeschfrist E-A22) und — seit Paket A4 (G10) —
+ *         in derselben Transaktion die Loeschfrist der noch ausgegebenen
+ *         Stuecke ohne Austrittsbezug (`ausgabenFristBeiAbsageIn`, Protokoll
+ *         `ausgabenMitFrist`)
  *
  * Mandant: Ein Vorgang eines fremden Mandanten bekommt in BEIDEN Methoden
  * dieselbe 404 mit demselben Text wie ein unbekannter.
@@ -20,10 +29,18 @@ import { decrypt } from "@/lib/encryption";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
 import { LINK_STATUS, pruefungNichtMoeglichGrund } from "@/lib/onboarding-spuren";
 import { statusAenderungSchema } from "@/lib/validations/onboarding";
-import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import { MELDUNGEN, onboardingEmpfaengerEinrichtung } from "@/lib/abteilungsaufgaben";
 import { onboardingAbteilungsUebersichtLaden } from "@/lib/abteilungsaufgaben-onboarding";
+import { konfigsLaden } from "@/lib/abteilungsaufgaben-dienst";
+import {
+  ABSCHLUSS_AUSSTATTUNG_OFFEN,
+  abschlussOffeneAufgaben,
+  abschlussOffenMeldung,
+} from "@/lib/ausstattung";
 import { pflichtDokumenteAusVorlage } from "@/lib/required-documents";
 import { unterlagenUebersichtLaden } from "@/lib/unterlagen-dienst";
+import { ausstattungUebersichtLaden } from "@/lib/ausstattung-dienst";
+import { ausgabenFristBeiAbsageIn } from "@/lib/ausgaben-schreiben";
 import {
   ladeVorlagenKonfigurationen,
   fortschrittFuerVorgang,
@@ -55,6 +72,9 @@ export async function GET(
       where: { id },
       include: {
         organization: true,
+        // Arbeitsort (E-A10): Kopfzeile und Karte „Person“ der Detailseite.
+        // `null` = wie Einrichtung. Zugriff prueft weiter organizationId.
+        arbeitsort: { select: { id: true, name: true, type: true } },
         personalData: { include: { children: true } },
         // Ohne dieses `include` zeigt die Vorgangsansicht bei einem neuen
         // Vorgang gar keine Kostenstelle und bei einem migrierten den
@@ -161,6 +181,11 @@ export async function GET(
       fragebogenFortschritt: fortschrittFuerVorgang(onboarding, vorlagen),
       ...(await onboardingAbteilungsUebersichtLaden(onboarding)),
       ...(await unterlagenUebersichtLaden(onboarding, session, { requiredDocuments })),
+      // Ausstattung & Zugaenge (Paket A2): Bemerkungen, Angaben und Hinweise
+      // der Fuehrungskraft sieht nur HR (Regel 16) — fuer alle anderen
+      // PORTAL_ROLES `null`, ohne Abfrage. Die Tabellen stehen deshalb NICHT
+      // im `include` oben (`...safeOnboarding` gaebe sie an alle weiter).
+      ausstattung: await ausstattungUebersichtLaden(onboarding, session),
     });
   } catch (error) {
     console.error("Fehler beim Laden des Vorgangs:", error);
@@ -179,6 +204,17 @@ export async function GET(
  * weil nur eine Ausnahme die Transaktion zurueckrollt.
  */
 class VorgangGeaendert extends Error {}
+
+/**
+ * Abschluss ohne Bestaetigung, obwohl Ausstattungs- oder Hinweis-Aufgaben
+ * offen sind (E-A19). Eigene Klasse: Die Ausnahme rollt den schon
+ * geschriebenen Statuswechsel zurueck und traegt die gelesene Liste hinaus.
+ */
+class AusstattungOffen extends Error {
+  constructor(readonly offen: { title: string; assignee: string | null }[]) {
+    super(ABSCHLUSS_AUSSTATTUNG_OFFEN);
+  }
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -206,7 +242,7 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    const { status } = parsed.data;
+    const { status, bestaetigt } = parsed.data;
 
     // Die Link-Status (INVITED bis SUPERVISOR_SUBMITTED) ergeben sich aus den
     // beiden Spuren und werden per `statusAbgleichen` abgeleitet. Von Hand
@@ -248,8 +284,12 @@ export async function PATCH(
     //             die Modalitaeten. Frueher liess der Server jeden Uebergang
     //             zu; nur die Oberflaeche schraenkte den Knopf ein, und im
     //             festhaengenden Fall zeigte sie ihn trotz fehlendem Fragebogen.
-    //   COMPLETED nur aus REVIEWED.
-    //   EXPIRED   jederzeit (HR zieht einen Vorgang zurueck).
+    //   COMPLETED nur aus REVIEWED — und bei offenen Ausstattungs- oder
+    //             Hinweis-Aufgaben nur mit `bestaetigt` (E-A19, unten in der
+    //             Transaktion).
+    //   EXPIRED   jederzeit (HR zieht einen Vorgang zurueck); setzt
+    //             `expiredAt` (F12: die Loeschfrist der Freitexte zaehlt ab
+    //             dort — `updatedAt` bewegt sich, das AuditLog wird aufgeraeumt).
     const jetzt = new Date();
     let data: Prisma.OnboardingProcessUncheckedUpdateManyInput;
     if (status === "REVIEWED") {
@@ -276,7 +316,7 @@ export async function PATCH(
           { status: 409 }
         );
       }
-      data = { status };
+      data = { status, expiredAt: jetzt };
     }
 
     // Bedingt schreiben statt `update`: Zwischen dem Lesen oben und hier kann
@@ -299,6 +339,39 @@ export async function PATCH(
         });
         if (geschrieben.count === 0) throw new VorgangGeaendert();
 
+        // E-A19: Offene Ausstattungs- und Hinweis-Aufgaben frieren mit dem
+        // Abschluss ein (der Link ist danach nur lesbar). Gezaehlt wird NACH
+        // dem bedingten Update: Es sperrt den Vorgang, und jeder Anleger von
+        // Ausstattungsaufgaben (F4) wie der Link-PATCH der Stelle (Abhaken,
+        // Wiederoeffnen; `oeffentlichAendern`) sperrt ihn zuerst, bedingt auf
+        // „laufend“ — zwischen Zaehlen und Commit kommt also keine neue und
+        // keine wieder geoeffnete hinzu, und danach scheitern beide am
+        // Endstatus. Entfallene sind `isCompleted` (F2) und zaehlen nicht.
+        // Ohne Bestaetigung rollt die Ausnahme den Statuswechsel zurueck.
+        let offeneAusstattung = 0;
+        if (status === "COMPLETED") {
+          const offen = await tx.checklistItem.findMany({
+            where: { onboardingId: id, herkunft: { not: null }, isCompleted: false },
+            select: { title: true, assignee: true },
+            orderBy: [{ orderIndex: "asc" }, { category: "asc" }],
+          });
+          if (offen.length > 0 && bestaetigt !== true) throw new AusstattungOffen(offen);
+          offeneAusstattung = offen.length;
+        }
+
+        // A4, G10: Mit der Absage bekommt jedes noch ausgegebene Stueck ohne
+        // Austrittsbezug die Loeschfrist „drei Jahre ab Ende des Jahres von
+        // `expiredAt`“ — sonst bliebe ein nie als zurueckgenommen vermerktes
+        // Stueck unbegrenzt mit Kennung gespeichert (E-A37). NACH dem
+        // bedingten Update: Es sperrt den Vorgang (G24: Vorgang → Ausgaben),
+        // und jeder Onboarding-Schreiber von Ausgaben sperrt ihn zuerst.
+        // Im selben Commit wie Status und Protokoll; ohne Ausgaben nur eine
+        // Zaehlung.
+        let ausgabenMitFrist = 0;
+        if (status === "EXPIRED") {
+          ausgabenMitFrist = await ausgabenFristBeiAbsageIn(tx, { onboardingId: id, vorgangEingestelltAm: jetzt });
+        }
+
         await tx.auditLog.create({
           data: {
             onboardingId: id,
@@ -307,11 +380,28 @@ export async function PATCH(
             details: {
               from: existing.status,
               to: status,
+              // Mit Bestaetigung abgeschlossen: wie viele Ausstattungsaufgaben offen blieben.
+              ...(offeneAusstattung > 0 ? { offeneAusstattung } : {}),
+              // Absage (G10): wie viele ausgegebene Stuecke eine Loeschfrist bekamen — nur die Zahl.
+              ...(ausgabenMitFrist > 0 ? { ausgabenMitFrist } : {}),
             },
           },
         });
       });
     } catch (error) {
+      if (error instanceof AusstattungOffen) {
+        // Titel und Stelle wie in der Karte (Stelle am Arbeitsort) — nie
+        // Bemerkung, Angabe oder Hinweistext.
+        const offen = abschlussOffeneAufgaben({
+          aufgaben: error.offen,
+          arbeitsortId: onboardingEmpfaengerEinrichtung(existing),
+          konfigs: await konfigsLaden(),
+        });
+        return NextResponse.json(
+          { error: abschlussOffenMeldung(offen.length), grund: ABSCHLUSS_AUSSTATTUNG_OFFEN, offen },
+          { status: 409 },
+        );
+      }
       if (!(error instanceof VorgangGeaendert)) throw error;
       return NextResponse.json(
         {

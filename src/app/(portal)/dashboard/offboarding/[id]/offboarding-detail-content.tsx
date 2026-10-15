@@ -5,6 +5,18 @@
  *
  * Tabs: Uebersicht | Checkliste | Rueckgaben | Dokumente | Notizen | Exit-Interview | Zeugnis
  * Der Kopf kommt aus dem Portal-Layout; nutzt das CREDO Corporate Design.
+ *
+ * Ausstattung & Zugaenge Stufe 2 (Feinplan A4, S32): Der Reiter „Rückgaben“
+ * ist die Karte src/components/ausgaben/rueckgaben-karte.tsx (Feld
+ * `rueckgaben`, nur HR_EDIT_ROLES); ihre Aufrufe sendet die Seite
+ * (`rueckgabenAufrufSenden`) und laedt danach leise neu. Den Dialog
+ * „Einstellung zuordnen …“ haelt die Seite, weil er aus drei Orten aufgeht
+ * (Reiter, Schritt „Rückgaben einsammeln“, Abteilungskarte); nach dem
+ * Zuordnen zeigt der Reiter „Rückgaben“ das Ergebnis. „Vorgang abschließen“
+ * laeuft ueber den verallgemeinerten Abschluss-Dialog (Rueckfrage mit der
+ * Liste offener Rueckgaben, G18; fehlendes Rueckgabeprotokoll als
+ * Hinweiszeile, G19) statt ueber `window.confirm`. Der Zaehler am Reiter
+ * zaehlt „erledigt“ (ein Zustand ist gesetzt, G16).
  */
 
 import { vorgangslistePfad } from "@/lib/adressen";
@@ -26,7 +38,7 @@ import type {
   ZeugnisBewertungData,
   TabId,
 } from "./types";
-import { TABS } from "./types";
+import { NUR_HR_TABS, TABS } from "./types";
 import { STATUS_TRANSITIONS, formatDate, daysUntilLabel } from "./helpers";
 import { ArrowLeftIcon, ChevronDownIcon } from "./icons";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
@@ -37,6 +49,24 @@ import {
   type AktionsMeldung,
 } from "@/components/abteilungsaufgaben/abteilungen-karte";
 import {
+  AUSTRITT_ABSCHLUSS_TEXTE,
+  AbschlussDialog,
+  austrittAbschlussSenden,
+} from "@/components/ausstattung/abschluss-dialog";
+import {
+  EinstellungZuordnenDialog,
+  type EinstellungAktionBody,
+} from "@/components/ausgaben/einstellung-zuordnen-dialog";
+import {
+  RUECKGABEN_KARTE_TITEL_ID,
+  einstellungAktionSenden,
+  rueckgabenAufrufSenden,
+  type KartenMeldung,
+  type RueckgabenAufruf,
+  type RueckgabenAusgang,
+} from "@/components/ausgaben/rueckgaben-karte";
+import { rueckgabeOffen, type OffeneRueckgabe } from "@/lib/ausgaben";
+import {
   TabOverview,
   TabChecklist,
   TabReturns,
@@ -45,6 +75,11 @@ import {
   TabExitInterview,
   TabZeugnis,
 } from "./tabs";
+
+/** Id des Knopfs „Status ändern“ – Ersatzziel des Fokus nach dem Abschluss-Dialog (A4, Review A4c). */
+export const STATUS_KNOPF_ID = "offboarding-status-aendern";
+/** Id der Vorgangsnummer im Kopf (`tabIndex={-1}`) – Fokusziel, wenn „Status ändern“ nach dem Abschluss fehlt. */
+export const KOPF_ID = "offboarding-kopf";
 
 // =============================================
 // Main Component
@@ -81,11 +116,23 @@ export function OffboardingDetailContent({
   const [checklistNoteText, setChecklistNoteText] = useState("");
   const [savingChecklistNote, setSavingChecklistNote] = useState(false);
 
-  // Return items
+  // Return items (A4: Erfassen, Zustand und Kennung laufen ueber die Karte des Reiters)
   const [returnItems, setReturnItems] = useState<ReturnItemData[]>([]);
-  const [showAddReturn, setShowAddReturn] = useState(false);
-  const [newReturn, setNewReturn] = useState({ category: "IT_HARDWARE", itemName: "", serialNumber: "", notes: "" });
-  const [savingReturn, setSavingReturn] = useState(false);
+  const [rueckgabenMeldung, setRueckgabenMeldung] = useState<KartenMeldung | null>(null);
+
+  // „Einstellung zuordnen …“ (A4, G11 bis G13) – oeffnet aus Reiter, Stepper und Abteilungskarte.
+  const [zuordnenOffen, setZuordnenOffen] = useState(false);
+  const [zuordnenSendet, setZuordnenSendet] = useState(false);
+  const [zuordnenFehler, setZuordnenFehler] = useState<string | null>(null);
+
+  // „Vorgang abschließen“ mit Rueckfrage (A4, G18): `offen` = Liste der 409.
+  const [abschluss, setAbschluss] = useState<{ offen: OffeneRueckgabe[] | null; fehler: string | null } | null>(null);
+  const [schliesstAb, setSchliesstAb] = useState(false);
+  // Zaehler der Abschluesse, nach deren Neuladen der Fokus gesetzt wird: Der
+  // Dialog gibt ihn beim Schliessen an „Status ändern“ (`fokusZiel`); nach dem
+  // Abschluss verschwindet der Knopf aber mit dem neuen Stand – dann die
+  // Vorgangsnummer im Kopf statt `body`.
+  const [abschlussFokus, setAbschlussFokus] = useState(0);
 
   // Documents
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -132,6 +179,11 @@ export function OffboardingDetailContent({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showStatusDropdown]);
+
+  useEffect(() => {
+    if (abschlussFokus === 0) return;
+    (document.getElementById(STATUS_KNOPF_ID) ?? document.getElementById(KOPF_ID))?.focus();
+  }, [abschlussFokus]);
 
   const isAdmin = user.role === "SUPER_ADMIN" || user.role === "HR_LEITUNG";
 
@@ -189,18 +241,26 @@ export function OffboardingDetailContent({
 
   useEffect(() => {
     loadData();
-    loadExitInterview();
-    loadZeugnisBewertung();
-  }, [loadData, loadExitInterview, loadZeugnisBewertung]);
+    // Exit-Interview und Zeugnis-Bewertung liefern ihre Routen nur an
+    // HR_EDIT_ROLES (Magic Links in der Antwort) — ohne das Recht gibt es
+    // auch die Reiter nicht (NUR_HR_TABS).
+    if (canEdit) {
+      loadExitInterview();
+      loadZeugnisBewertung();
+    }
+  }, [loadData, loadExitInterview, loadZeugnisBewertung, canEdit]);
 
   // ---- Status change ----
   const handleStatusChange = async (newStatus: string) => {
     if (!data) return;
-    if (newStatus === "COMPLETED" || newStatus === "CANCELLED") {
-      const msg = newStatus === "COMPLETED"
-        ? "Moechten Sie diesen Offboarding-Vorgang wirklich als abgeschlossen markieren?"
-        : "Moechten Sie diesen Offboarding-Vorgang wirklich abbrechen?";
-      if (!window.confirm(msg)) return;
+    // Abschluss (A4, G18): eigener Dialog mit der Liste offener Rueckgaben.
+    if (newStatus === "COMPLETED") {
+      setShowStatusDropdown(false);
+      setAbschluss({ offen: null, fehler: null });
+      return;
+    }
+    if (newStatus === "CANCELLED") {
+      if (!window.confirm("Moechten Sie diesen Offboarding-Vorgang wirklich abbrechen?")) return;
     }
     setChangingStatus(true);
     setShowStatusDropdown(false);
@@ -282,7 +342,8 @@ export function OffboardingDetailContent({
         setNotes((prev) => [result.data || result, ...prev]);
         setNewNote("");
       } else {
-        setActionError("Notiz konnte nicht gespeichert werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Notiz konnte nicht gespeichert werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Speichern der Notiz.");
@@ -305,7 +366,8 @@ export function OffboardingDetailContent({
         setEditingNoteId(null);
         setEditingNoteText("");
       } else {
-        setActionError("Notiz konnte nicht aktualisiert werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Notiz konnte nicht aktualisiert werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Aktualisieren der Notiz.");
@@ -321,7 +383,8 @@ export function OffboardingDetailContent({
       if (res.ok) {
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
       } else {
-        setActionError("Notiz konnte nicht gelöscht werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Notiz konnte nicht gelöscht werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Löschen der Notiz.");
@@ -382,47 +445,72 @@ export function OffboardingDetailContent({
     }
   };
 
-  // ---- Return item actions ----
-  const addReturnItem = async () => {
-    if (!newReturn.itemName.trim()) return;
-    setSavingReturn(true);
+  // ---- Rueckgaben (A4, S32) ----
+  // Die Karte des Reiters baut den Aufruf (Zustand, Kennung, Loeschen,
+  // Erfassen, Einstellung aktualisieren/loesen/uebernehmen), die Seite sendet
+  // und laedt danach leise neu – auch nach einem 409, der den Stand geaendert
+  // haben kann. Ohne Verbindung (status null) bleibt der Stand.
+  const rueckgabenAufruf = async (aufruf: RueckgabenAufruf): Promise<RueckgabenAusgang> => {
+    const ausgang = await rueckgabenAufrufSenden(offboardingId, aufruf);
+    if (ausgang.status !== null) await loadData(true);
+    return ausgang;
+  };
+
+  const zuordnenOeffnen = () => {
+    setZuordnenFehler(null);
+    setZuordnenOffen(true);
+  };
+  const zuordnenSchliessen = () => {
+    if (zuordnenSendet) return;
+    setZuordnenFehler(null);
+    setZuordnenOffen(false);
+  };
+  // Zuordnen: erst neu laden, dann in einem Zug Dialog zu und Reiter
+  // „Rückgaben“ auf – dort steht das Ergebnis samt Meldung; der Fokus geht auf
+  // den Titel der Karte (der Ausloeser ist dann weg oder in einem anderen Reiter).
+  const zuordnenSenden = async (body: EinstellungAktionBody) => {
+    if (zuordnenSendet) return;
+    setZuordnenSendet(true);
+    setZuordnenFehler(null);
     try {
-      const res = await fetch(`/api/offboarding/${offboardingId}/returns`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newReturn),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        setReturnItems((prev) => [...prev, result.data || result]);
-        setNewReturn({ category: "IT_HARDWARE", itemName: "", serialNumber: "", notes: "" });
-        setShowAddReturn(false);
+      const ausgang = await einstellungAktionSenden(offboardingId, body);
+      if (ausgang.status !== null) await loadData(true);
+      if (ausgang.ok) {
+        setRueckgabenMeldung({ art: "ok", text: ausgang.meldung });
+        setActiveTab("returns");
+        setZuordnenOffen(false);
       } else {
-        setActionError("Rückgabe-Gegenstand konnte nicht angelegt werden.");
+        setZuordnenFehler(ausgang.meldung);
       }
-    } catch {
-      setActionError("Verbindungsfehler beim Anlegen des Gegenstands.");
     } finally {
-      setSavingReturn(false);
+      setZuordnenSendet(false);
     }
   };
 
-  const confirmReturn = async (itemId: string) => {
-    if (!window.confirm("Rückgabe des Gegenstands bestätigen?")) return;
+  // ---- Abschluss (A4, G18) ----
+  // Erster Klick ohne Bestaetigung; die 409 RUECKGABEN_OFFEN bringt die Liste,
+  // erst „Trotzdem abschließen“ schickt `bestaetigt`. Hat sich der Status
+  // inzwischen bewegt (409 INZWISCHEN_GEAENDERT), laedt die Seite neu und der
+  // Dialog faengt wieder ohne Liste an.
+  const abschliessen = async (bestaetigt: boolean) => {
+    if (!data || schliesstAb) return;
+    setSchliesstAb(true);
     try {
-      const res = await fetch(`/api/offboarding/${offboardingId}/returns/${itemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isReturned: true, returnedAt: new Date().toISOString() }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setReturnItems((prev) => prev.map((item) => (item.id === itemId ? (updated.data || updated) : item)));
+      const ausgang = await austrittAbschlussSenden(data.id, bestaetigt);
+      if (ausgang.art === "ok") {
+        setAbschluss(null);
+        await loadData(true);
+        setAbschlussFokus((n) => n + 1);
+      } else if (ausgang.art === "offen") {
+        setAbschluss({ offen: ausgang.offen, fehler: ausgang.meldung });
+      } else if (ausgang.grund === "INZWISCHEN_GEAENDERT") {
+        setAbschluss({ offen: null, fehler: ausgang.meldung });
+        await loadData(true);
       } else {
-        setActionError("Rückgabe konnte nicht bestätigt werden.");
+        setAbschluss((bisher) => ({ offen: bisher?.offen ?? null, fehler: ausgang.meldung }));
       }
-    } catch {
-      setActionError("Verbindungsfehler bei Rückgabe-Bestätigung.");
+    } finally {
+      setSchliesstAb(false);
     }
   };
 
@@ -440,7 +528,9 @@ export function OffboardingDetailContent({
       if (res.ok) {
         await loadData();
       } else {
-        setActionError("Dokument konnte nicht hochgeladen werden.");
+        // Den Text des Servers zeigen (zu groß, falscher Typ, …).
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Dokument konnte nicht hochgeladen werden.");
       }
     } catch {
       setActionError("Verbindungsfehler beim Dokument-Upload.");
@@ -486,8 +576,8 @@ export function OffboardingDetailContent({
       if (res.ok) {
         await loadExitInterview();
       } else {
-        const err = await res.json();
-        setActionError(err.error || "Exit-Interview konnte nicht erstellt werden.");
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Exit-Interview konnte nicht erstellt werden.");
       }
     } catch {
       setActionError("Verbindungsfehler.");
@@ -499,8 +589,19 @@ export function OffboardingDetailContent({
   const sendExitInterviewLink = async () => {
     try {
       const res = await fetch(`/api/offboarding/${offboardingId}/exit-interview/send`, { method: "POST" });
-      if (res.ok) await loadExitInterview();
-      else setActionError("Link konnte nicht gesendet werden.");
+      if (res.ok) {
+        const result: { mailStatus?: string | null } = await res.json().catch(() => ({}));
+        // SKIPPED: Die Mailvorlage ist aus oder hat keinen Empfänger — dann
+        // ging keine E-Mail hinaus (allenfalls ein Webhook).
+        if (result.mailStatus === "SKIPPED") {
+          setActionError("Die Einladung wurde nicht per E-Mail versendet: Die Mailvorlage „Exit-Interview: Einladung“ ist deaktiviert oder hat keinen Empfänger.");
+        }
+        await loadExitInterview();
+      } else {
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Link konnte nicht gesendet werden.");
+        if (res.status === 409) await loadExitInterview();
+      }
     } catch {
       setActionError("Verbindungsfehler.");
     }
@@ -517,8 +618,10 @@ export function OffboardingDetailContent({
       if (res.ok) {
         await loadZeugnisBewertung();
       } else {
-        const err = await res.json();
-        setActionError(err.error || "Zeugnis-Bewertung konnte nicht erstellt werden.");
+        // Etwa 409 „Die Adresse der Führungskraft liegt in keiner freigegebenen
+        // Domain …" — den Text des Servers zeigen.
+        const err = await res.json().catch(() => null);
+        setActionError(err?.error || "Zeugnis-Bewertung konnte nicht erstellt werden.");
       }
     } catch {
       setActionError("Verbindungsfehler.");
@@ -539,6 +642,12 @@ export function OffboardingDetailContent({
   const exitTypeLabel = data ? (EXIT_TYPE_LABELS[data.exitType] || data.exitType) : "";
 
   const validTransitions = data ? (STATUS_TRANSITIONS[data.status] || []) : [];
+
+  // A4: Zuordnen nur mit Recht und solange der Server es anbietet (laufender Austritt ohne Zuordnung).
+  const zuordnenMoeglich = canEdit && data?.rueckgaben?.aktionen.zuordnen === true;
+  // G19: Hinweiszeile im Abschluss-Dialog, wenn das unterschriebene Rueckgabeprotokoll fehlt (ohne Sperre).
+  const protokoll = data?.rueckgaben?.protokoll ?? null;
+  const protokollHinweis = protokoll?.noetig && !protokoll.hochgeladenAm ? protokoll.text : null;
 
   // ---- Render ----
   if (loading) {
@@ -595,7 +704,11 @@ export function OffboardingDetailContent({
 
             <div className="h-5 w-px bg-border" />
 
-            <span className="inline-flex rounded-md bg-muted px-3 py-1 font-mono text-sm font-bold text-foreground">
+            <span
+              id={KOPF_ID}
+              tabIndex={-1}
+              className="inline-flex rounded-md bg-muted px-3 py-1 font-mono text-sm font-bold text-foreground"
+            >
               {data.displayId}
             </span>
 
@@ -611,6 +724,7 @@ export function OffboardingDetailContent({
             {isAdmin && validTransitions.length > 0 && (
               <div className="relative ml-auto" data-status-dropdown>
                 <button
+                  id={STATUS_KNOPF_ID}
                   onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                   disabled={changingStatus}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-credo-gruen px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#5a9420] disabled:opacity-50"
@@ -683,7 +797,7 @@ export function OffboardingDetailContent({
       <div className="border-b bg-card">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <nav className="-mb-px flex gap-1 overflow-x-auto" aria-label="Tabs">
-            {TABS.filter((tab) => tab.id !== "mails" || canEdit).map((tab) => {
+            {TABS.filter((tab) => canEdit || !NUR_HR_TABS.has(tab.id)).map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
@@ -703,7 +817,7 @@ export function OffboardingDetailContent({
                   )}
                   {tab.id === "returns" && returnItems.length > 0 && (
                     <span className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
-                      {returnItems.filter((i) => i.isReturned).length}/{returnItems.length}
+                      {returnItems.filter((i) => !rueckgabeOffen(i)).length}/{returnItems.length}
                     </span>
                   )}
                   {tab.id === "documents" && data.documents.length > 0 && (
@@ -738,6 +852,8 @@ export function OffboardingDetailContent({
             setEditingValue={setEditingValue}
             handleFieldSave={handleFieldSave}
             onNavigateTab={(tab) => setActiveTab(tab as TabId)}
+            hrReiterSichtbar={canEdit}
+            onZuordnen={zuordnenMoeglich ? zuordnenOeffnen : undefined}
           />
         )}
 
@@ -761,20 +877,24 @@ export function OffboardingDetailContent({
             abteilungsMeldung={actionInfo}
             onAbteilungsMeldungSchliessen={() => setActionInfo(null)}
             onFuehrungskraftEintragen={fuehrungskraftEintragen}
+            returnItems={returnItems}
+            onZumReiterRueckgaben={() => setActiveTab("returns")}
+            zuordnungEmpfohlen={canEdit && data.rueckgaben?.zuordnungEmpfohlen === true}
+            onZuordnen={zuordnenMoeglich ? zuordnenOeffnen : undefined}
           />
         )}
 
-        {/* Tab 3: Rueckgaben */}
+        {/* Tab 3: Rueckgaben (A4: Karte mit `rueckgaben`, sonst die Liste nur lesend) */}
         {activeTab === "returns" && (
           <TabReturns
             returnItems={returnItems}
-            confirmReturn={confirmReturn}
-            showAddReturn={showAddReturn}
-            setShowAddReturn={setShowAddReturn}
-            newReturn={newReturn}
-            setNewReturn={setNewReturn}
-            addReturnItem={addReturnItem}
-            savingReturn={savingReturn}
+            rueckgaben={data.rueckgaben}
+            canEdit={canEdit}
+            abgebrochen={data.status === "CANCELLED"}
+            onAufruf={canEdit ? rueckgabenAufruf : undefined}
+            onZuordnen={zuordnenMoeglich ? zuordnenOeffnen : undefined}
+            meldung={rueckgabenMeldung}
+            onMeldung={setRueckgabenMeldung}
           />
         )}
 
@@ -814,7 +934,7 @@ export function OffboardingDetailContent({
         )}
 
         {/* Tab 6: Exit-Interview */}
-        {activeTab === "exit-interview" && (
+        {activeTab === "exit-interview" && canEdit && (
           <TabExitInterview
             exitInterview={exitInterview}
             creatingExitInterview={creatingExitInterview}
@@ -825,7 +945,7 @@ export function OffboardingDetailContent({
         )}
 
         {/* Tab 7: Zeugnis */}
-        {activeTab === "zeugnis" && (
+        {activeTab === "zeugnis" && canEdit && (
           <TabZeugnis
             zeugnisBewertung={zeugnisBewertung}
             creatingZeugnis={creatingZeugnis}
@@ -836,6 +956,34 @@ export function OffboardingDetailContent({
         {/* Tab 8: E-Mails (Mailprotokoll) */}
         {activeTab === "mails" && canEdit && <MailProtokoll modul="offboarding" vorgangId={offboardingId} />}
       </main>
+
+      {/* „Einstellung zuordnen …“ (A4) – aus Reiter, Stepper und Abteilungskarte. */}
+      {zuordnenOffen && (
+        <EinstellungZuordnenDialog
+          offboardingId={offboardingId}
+          untertitel={[data.displayId, displayName].filter(Boolean).join(" · ") || null}
+          sendet={zuordnenSendet}
+          fehler={zuordnenFehler}
+          fokusZiel={RUECKGABEN_KARTE_TITEL_ID}
+          onAbbrechen={zuordnenSchliessen}
+          onZuordnen={(body) => void zuordnenSenden(body)}
+        />
+      )}
+
+      {/* „Vorgang abschließen“ (A4, G18) – Rueckfrage mit der Liste offener Rueckgaben. */}
+      {abschluss && (
+        <AbschlussDialog
+          offen={abschluss.offen}
+          fehler={abschluss.fehler}
+          sendet={schliesstAb}
+          texte={AUSTRITT_ABSCHLUSS_TEXTE}
+          hinweis={protokollHinweis}
+          untertitel={[data.displayId, displayName].filter(Boolean).join(" · ") || null}
+          fokusZiel={STATUS_KNOPF_ID}
+          onAbbrechen={() => setAbschluss(null)}
+          onAbschliessen={(bestaetigt) => void abschliessen(bestaetigt)}
+        />
+      )}
     </div>
   );
 }

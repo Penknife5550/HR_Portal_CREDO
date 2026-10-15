@@ -26,6 +26,15 @@ import {
   kostenstellenAnzeige,
   summeText,
 } from "@/lib/kostenstellen-anzeige";
+import {
+  AUSSTATTUNG_KATEGORIE,
+  ausstattungsGruppen,
+  checklistFortschritt,
+  namenAufzaehlen,
+  type AusstattungsZeile,
+  type UebersichtHinweisDaten,
+  type UebersichtZeileDaten,
+} from "@/lib/ausstattung";
 
 // =============================================
 // Typen
@@ -54,6 +63,17 @@ export interface OnboardingExportContext {
    * bleibt es beim bisherigen Verhalten.
    */
   abteilungsNamen?: Record<string, string>;
+  /**
+   * Ausstattung & Zugaenge (Paket A2): Zeilen und Hinweise des Vorgangs, wie
+   * `src/lib/ausstattung-dienst.ts` sie auswaehlt (`UEBERSICHT_ZEILEN_AUSWAHL`).
+   * Gedruckt im PDF der Modalitaeten samt Bemerkungen — den Export erzeugen
+   * nur HR-Rollen. Fehlt das Feld oder ist nichts gewaehlt, entfaellt der
+   * Abschnitt.
+   */
+  ausstattung?: {
+    zeilen: UebersichtZeileDaten[];
+    hinweise: UebersichtHinweisDaten[];
+  };
 }
 
 interface PersonalDataExport {
@@ -204,7 +224,16 @@ interface ChecklistExport {
   assignee: string | null;
   notes: string | null;
   dueDate: string | null;
+  /**
+   * Von HR gestrichen (Ausstattung & Zugaenge, F2; ISO). Druckt „entfällt“
+   * statt ✓ und ohne Erledigt-Datum, zaehlt nicht im Fortschritt. Optional:
+   * aeltere Aufrufer liefern das Feld nicht.
+   */
+  entfaelltAm?: string | null;
 }
+
+/** Wie eine entfallene Aufgabe im PDF heisst (rechte Spalte, statt des Erledigt-Datums). */
+export const PDF_ENTFAELLT = "entfällt";
 
 // =============================================
 // Farben + Helpers
@@ -338,6 +367,17 @@ function dataRow(doc: PDFKit.PDFDocument, label: string, value: string, y: numbe
   const labelEnde = doc.y;
   doc.font("Helvetica").fontSize(9).fillColor(C.black).text(value, 225, y, { width: 340 });
   return Math.max(labelEnde, doc.y, y + 14) + 4;
+}
+
+/**
+ * Wie hoch `dataRow` wird — dieselbe Schrift, dieselben Breiten, dieselbe
+ * Mindesthoehe und derselbe Abstand. Zum Reservieren vor dem Setzen langer
+ * Freitexte (Seitenwechsel mit Kopfzeile statt des automatischen Umbruchs von
+ * pdfkit mitten im Text).
+ */
+function dataRowHoehe(doc: PDFKit.PDFDocument, label: string, value: string): number {
+  doc.font("Helvetica").fontSize(9);
+  return Math.max(doc.heightOfString(label, { width: 170 }), doc.heightOfString(value, { width: 340 }), 14) + 4;
 }
 
 // =============================================
@@ -709,6 +749,78 @@ async function addModalitaetenPages(doc: PDFKit.PDFDocument, ctx: OnboardingExpo
   if (sd.zusatzvereinbarungen) {
     y = dataRow(doc, "Zusatzvereinbarungen", str(sd.zusatzvereinbarungen), y);
   }
+
+  ausstattungAbschnitt(doc, ctx);
+}
+
+/** Der Wert einer Ausstattungszeile in der rechten Spalte. */
+function ausstattungsWert(z: AusstattungsZeile): string {
+  let wert: string;
+  if (z.art === "ANGABE") {
+    wert = z.angabe
+      ? z.angabe.sichtbarFuer.length > 1
+        ? `${z.angabe.wert} (sehen ${namenAufzaehlen(z.angabe.sichtbarFuer)})`
+        : z.angabe.wert
+      : "—";
+  } else if (z.art === "AUSWAHL") {
+    wert = z.auswahl.length > 0 ? z.auswahl.join(", ") : "—";
+  } else {
+    wert = "Ja";
+  }
+  if (z.gestrichen) wert += " (gestrichen)";
+  if (z.erfasst) wert += ` – ${z.erfasst}`;
+  return wert;
+}
+
+/**
+ * Abschnitt „Ausstattung & Zugänge“ im PDF der Modalitaeten (Paket A2): je
+ * Stelle die gewaehlten Positionen, ihre Bemerkungen mit Herkunft und der
+ * Hinweis an die Stelle. Gruppen, Reihenfolge und Beschriftungen aus
+ * `ausstattungsGruppen` — dieselben wie in der Karte im Reiter
+ * „Vorgesetzter“. Die Stellen heissen wie in der Checkliste
+ * (`abteilungsNamen`, sonst `abteilungLabel`). Ohne Zeilen und Hinweise kein
+ * Abschnitt.
+ */
+function ausstattungAbschnitt(doc: PDFKit.PDFDocument, ctx: OnboardingExportContext): void {
+  const daten = ctx.ausstattung;
+  if (!daten) return;
+  const gruppen = ausstattungsGruppen({
+    zeilen: daten.zeilen,
+    hinweise: daten.hinweise,
+    stelleName: (key) => ctx.abteilungsNamen?.[key] ?? abteilungLabel(key),
+  });
+  if (gruppen.length === 0) return;
+
+  const titel = "Modalitaeten";
+  // Seitenwechsel mit Blick auf die laufende Zeile `y` (checkBreak sieht nur
+  // doc.y, das nach einem Wert nicht am Ende der Zeile steht).
+  const platz = (y: number, noetig: number): number => {
+    if (y + noetig <= 720) return y;
+    doc.addPage();
+    pageHeader(doc, ctx, titel);
+    return 55;
+  };
+  // Eine Zeile mit ihrer ECHTEN Hoehe: Bemerkung (bis 500 Zeichen) und Hinweis
+  // (bis 1000) laufen ueber viele Zeilen. Mit einer festen Reserve begaenne ein
+  // langer Text kurz vor dem Seitenende, pdfkit braeche ihn dann selbst auf
+  // eine neue Seite um — ohne Kopfzeile, und die naechste Zeile legte gleich
+  // noch eine an.
+  const zeileSetzen = (y: number, label: string, wert: string): number =>
+    dataRow(doc, label, wert, platz(y, dataRowHoehe(doc, label, wert)));
+
+  checkBreak(doc, 80, ctx, titel);
+  let y = section(doc, AUSSTATTUNG_KATEGORIE);
+  for (const gruppe of gruppen) {
+    y = platz(y, 40);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(C.black).text(gruppe.stelleName, 50, y, { width: 515 });
+    y = doc.y + 4;
+    for (const zeile of gruppe.zeilen) {
+      y = zeileSetzen(y, zeile.angabe?.label ?? zeile.bezeichnung, ausstattungsWert(zeile));
+      if (zeile.bemerkung) y = zeileSetzen(y, zeile.bemerkung.label, zeile.bemerkung.text);
+    }
+    if (gruppe.hinweis) y = zeileSetzen(y, gruppe.hinweis.quelleLabel, gruppe.hinweis.text);
+    y += 4;
+  }
 }
 
 // =============================================
@@ -783,8 +895,9 @@ async function addChecklistePages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
   doc.addPage();
   pageHeader(doc, ctx, "Checkliste");
 
-  const completed = ctx.checklistItems.filter((i) => i.isCompleted).length;
-  let y = section(doc, `Checkliste (${completed}/${ctx.checklistItems.length})`, 55);
+  // Ohne entfallene Aufgaben (F2) — dieselbe Rechnung wie Portal und Link-Seite.
+  const stand = checklistFortschritt(ctx.checklistItems);
+  let y = section(doc, `Checkliste (${stand.erledigt}/${stand.gesamt})`, 55);
 
   // Nach Kategorie gruppieren
   const byCategory: Record<string, ChecklistExport[]> = {};
@@ -798,20 +911,23 @@ async function addChecklistePages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
     checkBreak(doc, 30, ctx, "Checkliste");
     y = doc.y;
 
-    const catDone = items.filter((i) => i.isCompleted).length;
+    const kat = checklistFortschritt(items);
     doc.rect(50, y, 515, 20).fill("#F0F0F0");
     doc.font("Helvetica-Bold").fontSize(9).fillColor(C.primary).text(category, 58, y + 4, { width: 380 });
     doc.font("Helvetica-Bold").fontSize(9)
-      .fillColor(catDone === items.length ? C.gruen : C.gray)
-      .text(`${catDone}/${items.length}`, 460, y + 4, { width: 100, align: "right" });
+      .fillColor(kat.alleErledigt ? C.gruen : C.gray)
+      .text(`${kat.erledigt}/${kat.gesamt}`, 460, y + 4, { width: 100, align: "right" });
     doc.y = y + 26;
 
     for (const item of items) {
       checkBreak(doc, item.notes ? 35 : 20, ctx, "Checkliste");
       const iy = doc.y;
 
-      const icon = item.isCompleted ? "\u2713" : "\u2610";
-      const iconColor = item.isCompleted ? C.gruen : C.gray;
+      // Entfallen (F2): zugleich `isCompleted`, aber nie mit \u2713 \u2014 ein Strich
+      // links, rechts \u201eentf\u00e4llt\u201c statt des Erledigt-Datums.
+      const entfaellt = item.entfaelltAm != null;
+      const icon = entfaellt ? "\u2013" : item.isCompleted ? "\u2713" : "\u2610";
+      const iconColor = item.isCompleted && !entfaellt ? C.gruen : C.gray;
       doc.font("Helvetica-Bold").fontSize(9).fillColor(iconColor).text(icon, 55, iy);
 
       const titleColor = item.isCompleted ? C.gray : C.black;
@@ -827,7 +943,9 @@ async function addChecklistePages(doc: PDFKit.PDFDocument, ctx: OnboardingExport
       if (zustaendig) {
         doc.font("Helvetica").fontSize(7).fillColor(C.blau).text(zustaendig, 410, iy, { width: 70 });
       }
-      if (item.isCompleted && item.completedAt) {
+      if (entfaellt) {
+        doc.font("Helvetica").fontSize(7).fillColor(C.gray).text(PDF_ENTFAELLT, 485, iy, { width: 80, align: "right" });
+      } else if (item.isCompleted && item.completedAt) {
         doc.font("Helvetica").fontSize(7).fillColor(C.gray).text(fmt(item.completedAt), 485, iy, { width: 80, align: "right" });
       }
 

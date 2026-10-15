@@ -6,7 +6,8 @@
  *   format: "docx" | "pdf" | "mail"
  *   organizationId?  Mandant fuer Platzhalter/Scope
  *   refId?           Bezug (z.B. bemFallId)
- *   values?          manuelle Platzhalter-Werte (ueberschreiben Resolver)
+ *   values?          manuelle Platzhalter-Werte (ueberschreiben Resolver —
+ *                    nie eine Liste, `handwerteOhneListen`)
  *   withDeckblatt?   DMS-Deckblatt vor PDF (Default true)
  *   email?           { to, subject?, message? } — nur bei format=mail
  *
@@ -17,7 +18,6 @@
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { readFile } from "fs/promises";
 import { apiHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/db";
 import { HR_EDIT_ROLES, canAccessOrg } from "@/lib/permissions";
@@ -26,6 +26,8 @@ import {
   type GenerateInput,
 } from "@/lib/validations/brief-vorlagen";
 import { getResolver } from "@/lib/doc-template-resolvers";
+import { handwerteOhneListen } from "@/lib/placeholder-catalog";
+import { leseVorlagenDatei } from "@/lib/dokumentenpaket";
 import { generateFromTemplate } from "@/lib/doc-generation";
 import { asciiFilename, saveUploadedFile, sha256Hex } from "@/lib/file-upload";
 import { sendEmail } from "@/lib/mailer";
@@ -146,10 +148,14 @@ export const POST = apiHandler<GenerateInput>(
       }
     }
 
-    // Vorlagendatei laden
+    // Vorlagendatei laden — NUR aus uploads/brief-vorlagen und
+    // public/system-dokumente (CLAUDE.md, Dokumentenpaket Regel 4). `dateipfad`
+    // steht in der Datenbank; ein ungeprueftes readFile laese jede Datei des
+    // Servers, auch die BEM-Anlagen unter uploads/bem. Ein Pfad ausserhalb der
+    // Wurzeln und eine fehlende Datei bekommen dieselbe Antwort.
     let templateBuffer: Buffer;
     try {
-      templateBuffer = await readFile(template.dateipfad);
+      templateBuffer = await leseVorlagenDatei(template.dateipfad);
     } catch {
       return NextResponse.json(
         { error: "Vorlagendatei nicht gefunden (Speicher)" },
@@ -168,9 +174,13 @@ export const POST = apiHandler<GenerateInput>(
       session,
       ipAddress: getClientIpOrNull(request),
     });
+    // Handwerte ueberschreiben Resolver-Werte, aber nie eine Liste: Was der
+    // Resolver als Array liefert (z.B. `ausgaben_je_stelle` fuer das
+    // Uebergabeprotokoll), bleibt, und Listenschluessel und innere Namen
+    // nehmen gar keinen Handwert an (A4, S33).
     const data: Record<string, unknown> = {
       ...resolverData,
-      ...(body.values || {}),
+      ...handwerteOhneListen(body.values, resolverData),
     };
 
     // Deckblatt-Metadaten

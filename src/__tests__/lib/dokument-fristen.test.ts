@@ -284,6 +284,36 @@ describe("Lage je Nachweisart", () => {
   });
 });
 
+/**
+ * Ausstattung & Zugaenge (A4, S34): Das unterschriebene Uebergabeprotokoll
+ * liegt als `Document` am Vorgang. Weder Ampel, Warnbalken noch Lauf
+ * `dokument-ablauf` duerfen es fuer einen Nachweis halten — auch nicht mit
+ * einem (versehentlich gesetzten) Datum oder dem Kennzeichen „unbefristet".
+ */
+describe("Uebergabeprotokoll (A4) loest keinen Nachweisbalken aus", () => {
+  it("ist nicht fristpflichtig", () => {
+    expect(istFristpflichtig("UEBERGABEPROTOKOLL")).toBe(false);
+    expect(FRISTPFLICHTIGE_DOKUMENTTYPEN).not.toContain("UEBERGABEPROTOKOLL");
+  });
+
+  it("ergibt weder eine Lage noch einen Warnbalken", () => {
+    const dokumente = [dok("UEBERGABEPROTOKOLL", null), dok("UEBERGABEPROTOKOLL", ablaufIn(-3))];
+    expect(nachweisLagen(dokumente, JETZT)).toEqual([]);
+    expect(dringendeNachweisLagen(dokumente, JETZT)).toEqual([]);
+  });
+
+  it("erledigt keinen abgelaufenen Titel, auch nicht als „unbefristet“", () => {
+    const lagen = dringendeNachweisLagen(
+      [
+        { type: "UEBERGABEPROTOKOLL", gueltigBis: null, unbefristet: true },
+        dok("AUFENTHALTSTITEL", ablaufIn(-2)),
+      ],
+      JETZT,
+    );
+    expect(lagen.map((l) => l.typ)).toEqual(["AUFENTHALTSTITEL"]);
+  });
+});
+
 describe("Lage je Nachweisart: Kennzeichen „unbefristet“ (Paket 4, Z1)", () => {
   /** Ein ausdruecklich unbefristetes Papier, etwa die Niederlassungserlaubnis. */
   const unbefristet = (type: string) => ({ type, gueltigBis: null, unbefristet: true });

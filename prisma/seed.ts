@@ -37,6 +37,7 @@ import { hashSync } from "bcryptjs";
 import crypto from "crypto";
 import { ALL_DEFAULT_BEURTEILUNG_TEMPLATES } from "../src/lib/beurteilung-defaults";
 import { generateFullStepsConfig } from "../src/lib/field-definitions";
+import { mitSperrpunktHinweisen } from "../src/lib/offboarding-sperrpunkte";
 
 const prisma = new PrismaClient();
 
@@ -640,9 +641,18 @@ async function main() {
     },
   ];
 
+  // Ausstattung & Zugaenge (A4, G25): Die pauschalen Sperrpunkte („Rueckgabe
+  // aller Arbeitsmittel", „IT-Zugaenge … sperren", „Physische Zugaenge
+  // entziehen" …) behalten ihren Titel und bekommen einen Hinweis fuer die
+  // Stelle — was das Portal als ausgegeben kennt, bekommt beim Austritt eine
+  // eigene Ruecknahme- bzw. Sperraufgabe. Tabelle und Regel:
+  // src/lib/offboarding-sperrpunkte.ts; den Bestand stellt die Migration
+  // OFFBOARDING_SPERRPUNKTE_V1 (prisma/seed-check.js) um.
   let offboardingChecklistenAngelegt = 0;
   for (const { vorlage, punkte } of offboardingChecklisten) {
-    if (await checklisteAnlegen(vorlage, punkte)) offboardingChecklistenAngelegt++;
+    if (await checklisteAnlegen(vorlage, mitSperrpunktHinweisen(vorlage.name, punkte))) {
+      offboardingChecklistenAngelegt++;
+    }
   }
 
   bilanzMelden("Offboarding Checklisten-Vorlagen", offboardingChecklistenAngelegt, offboardingChecklisten.length);

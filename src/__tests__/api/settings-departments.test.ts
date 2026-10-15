@@ -22,6 +22,8 @@ const mockPrisma = {
   },
   checklistTemplateItem: { findMany: jest.fn() },
   organization: { findUnique: jest.fn() },
+  // Freigabeliste (ladeErlaubteDomains) fuer `ausserhalbFreigabe` im GET
+  smtpConfig: { findUnique: jest.fn() },
   auditLog: { create: jest.fn() },
   // Interaktive Transaktion: tx ist dasselbe Mock-Objekt (Umsetzung im beforeEach).
   $transaction: jest.fn(),
@@ -96,6 +98,7 @@ beforeEach(() => {
   mockPrisma.departmentConfig.delete.mockResolvedValue({});
   mockPrisma.checklistTemplateItem.findMany.mockResolvedValue([]);
   mockPrisma.organization.findUnique.mockResolvedValue(null);
+  mockPrisma.smtpConfig.findUnique.mockResolvedValue(null);
   mockPrisma.auditLog.create.mockResolvedValue({});
 });
 
@@ -494,5 +497,42 @@ describe("GET /api/settings/departments", () => {
       { vorlage: "Offboarding: Standard", departmentKey: "FACILITY", label: "Facility Management" },
       { vorlage: "Offboarding: Standard", departmentKey: "DSB", label: "Datenschutzbeauftragte/r" },
     ]);
+  });
+
+  // E-A27: Adressen ausserhalb der Freigabeliste werden nur markiert, nicht gesperrt.
+  it("ausserhalbFreigabe je Eintrag: Domain nicht auf der Liste; reservierte Altzeilen und deaktivierte Eintraege nie", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "credo.de, fes-minden.de" });
+    const { body } = await antwort(await GET(anfrage("GET"), OHNE_PARAMS));
+    expect(body.data.map((d: { id: string; ausserhalbFreigabe: boolean }) => [d.id, d.ausserhalbFreigabe])).toEqual([
+      ["d-it", false], // it@credo.de
+      ["d-fac", false], // it@credo.de (inaktiv, Adresse trotzdem freigegeben)
+      ["d-sek", false], // it@credo.de
+      ["d-alt", false], // chef@credo.de, reserviert
+    ]);
+
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "fes-minden.de" });
+    const nurFes = await antwort(await GET(anfrage("GET"), OHNE_PARAMS));
+    expect(
+      nurFes.body.data.map((d: { id: string; ausserhalbFreigabe: boolean }) => [d.id, d.ausserhalbFreigabe]),
+    ).toEqual([
+      ["d-it", true],
+      // Deaktiviert: Der Satz „Aufgaben gehen trotzdem an diese Adresse“ waere falsch —
+      // empfaengerAufloesen nimmt nur aktive Eintraege (wie freigabeWarnungen der Katalogseite).
+      ["d-fac", false],
+      ["d-sek", true],
+      ["d-alt", false], // VORGESETZTER bekommt nie Post
+    ]);
+    expect(mockPrisma.smtpConfig.findUnique).toHaveBeenCalledWith({
+      where: { id: "default" },
+      select: { allowedRecipientDomains: true },
+    });
+  });
+
+  it("ohne Freigabeliste (leer oder keine SMTP-Zeile) ist nichts ausserhalb", async () => {
+    for (const config of [null, { allowedRecipientDomains: "" }]) {
+      mockPrisma.smtpConfig.findUnique.mockResolvedValue(config);
+      const { body } = await antwort(await GET(anfrage("GET"), OHNE_PARAMS));
+      expect(body.data.every((d: { ausserhalbFreigabe: boolean }) => d.ausserhalbFreigabe === false)).toBe(true);
+    }
   });
 });

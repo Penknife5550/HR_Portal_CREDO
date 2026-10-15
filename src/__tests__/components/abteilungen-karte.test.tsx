@@ -18,11 +18,21 @@
  *  2. Lücken sind sichtbar: Führungskraft ohne Adresse (gelb, „Eintragen"),
  *     übersprungene Abteilung (gelb, mit Grund).
  *  3. Die Sperrzeit graut „Erinnern"/„Erneut senden" aus, mit Uhrzeit im Tooltip.
+ * 3a. Onboarding, Ausstattung & Zugänge (Paket A3, S17): Knopf „Nachtrag
+ *     senden" (auch nur mit „Entfällt“, in der Sperrzeit grau), Zeile „Nach
+ *     der Information geändert …“ und der rote Wächter — auch in den
+ *     Sonderzeilen; im Offboarding nichts davon.
+ * 3b. Offboarding, Ausstattung & Zugänge Stufe 2 (Paket A4, S29): gelber
+ *     Hinweis „n Aufgaben nach der Information hinzugekommen – bitte „Erneut
+ *     senden““ (Rücknahme- und Sperraufgaben aus „Einstellung zuordnen …“),
+ *     gezählt mit der echten Regel `nachInfoNeuZaehlen`.
  *  4. „Link kopieren" nimmt die Adresse vom Server, nie window.location.
  *  5. „Link erneuern…" fragt nach, und erst die Bestätigung löst aus.
  *  6. Nach einer Aktion: grüne bzw. rote Leiste mit der Meldung des Servers,
  *     gelbe mit dem Hinweis.
  *  7. Abgeschlossener Vorgang: nur lesen.
+ * 7a. Onboarding, abgelaufen (Paket A3, S19, E-A20): Block „Absage an die
+ *     Stellen“ mit Rückfrage; nur mit Stand vom Server, Knopf nur mit Recht.
  *  8. Aufgabenkarte der Checkliste: Urheber (Link/Portal), blaue Box mit dem
  *     Kommentar der Abteilung GETRENNT von der gelben internen Notiz.
  *  9. Tab Übersicht: Schritt 2 aus den Zeilen, Hinweis zur Führungskraft.
@@ -31,6 +41,18 @@
  *     `faelligAm`, Hinweis aus der Vorlage, Fehler statt stillem Nichtstun.
  * 12. Onboarding, Stepper-Schritt „Checkliste abarbeiten": Stand der
  *     Abteilungen, Aktion und Sperre.
+ * 11a. Ausstattung & Zugänge im Tab Checkliste (Paket A3, S16): beide Karten
+ *     VOR dem Leerzustand (Regel 20), Kopfzeile und Balken ohne entfallene
+ *     Aufgaben (F2), gesperrter Haken und „Entfällt“ statt „erledigt von“,
+ *     die Bemerkung (nur HR) unter der Aufgabe.
+ *
+ * 13. Offboarding, Ausstattung & Zugänge Stufe 2 (Paket A4, S32): Hinweis
+ *     „Einstellung zuordnen, bevor Sie die Abteilungen informieren“ in
+ *     Abteilungskarte und Stepper nur mit `zuordnungEmpfohlen` (ohne die
+ *     Eigenschaft gleiche Ausgabe wie bisher); Rücknahme-, Sperr- und
+ *     Folgeaufgaben im Tab Checkliste ohne Bearbeitungsrecht ohne Haken, an der
+ *     Rücknahme der Zustand und der Verweis auf den Reiter Rückgaben; Stepper
+ *     mit Kategorie-Namen statt Rohwert.
  *
  * Umgebung wie in dokumentenpaket-dialog.test.tsx: jsdom im Docblock, ohne
  * @testing-library/jest-dom.
@@ -38,6 +60,7 @@
 import { useState } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
+  ABTEILUNGEN_KARTE_TITEL_ID,
   AbteilungenKarte,
   abteilungsAktionSenden,
   type AbteilungenKarteDaten,
@@ -46,11 +69,13 @@ import {
 import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
 import {
   abteilungsZeilenBauen,
+  nachInfoNeuZaehlen,
   type AbteilungsKonfig,
   type AbteilungsModul,
   type AufgabeFuerZeile,
   type FuehrungskraftDaten,
   type LinkFuerZeile,
+  type NachtragListe,
   type VersandSperre,
 } from "@/lib/abteilungsaufgaben";
 import { TabChecklist } from "@/app/(portal)/dashboard/offboarding/[id]/tabs/tab-checklist";
@@ -65,6 +90,11 @@ import {
   type ChecklistItemData as OnboardingChecklistItem,
 } from "@/app/(portal)/dashboard/[id]/detail-content";
 import { NeuerAustrittModal } from "@/components/neuer-austritt-modal";
+import { ZUSATZ_TEXTE } from "@/components/ausstattung/aufgabe-zusatz";
+import { ABSAGE_TEXTE } from "@/components/ausstattung/absage-block";
+import { ausstattungsUebersichtBauen, bemerkungLabel } from "@/lib/ausstattung";
+import { GEDAECHTNISSTUETZE, LAGE_TEXTE } from "@/lib/ausgaben";
+import type { RueckgabenUebersicht } from "@/lib/offboarding-ausgaben";
 
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -381,6 +411,178 @@ describe("Sperrzeit nach einem Versand", () => {
 });
 
 // =============================================
+// 3a. Nachtrag und Waechter (Paket A3, S17 — nur Onboarding)
+// =============================================
+
+describe("Nachtrag senden und Wächter (Ausstattung & Zugänge)", () => {
+  /** Onboarding-Zeilen mit den beiden Optionen — wie onboardingAbteilungsUebersichtLaden sie baut. */
+  function onboardingDaten(opts: {
+    links?: LinkFuerZeile[];
+    aufgaben?: AufgabeFuerZeile[];
+    nachtraege?: Record<string, NachtragListe>;
+    abgeschlossen?: boolean;
+  } = {}): AbteilungenKarteDaten {
+    const abgeschlossen = opts.abgeschlossen ?? false;
+    const r = abteilungsZeilenBauen({
+      // IT faellig 24.07. — vier Tage nach JETZT (20.07.): Der Waechter greift.
+      aufgaben: opts.aufgaben ?? [{ assigneeDepartment: "IT", isCompleted: false, dueDate: "2027-07-24T00:00:00.000Z" }],
+      links: opts.links ?? [linkIt()],
+      konfigs: KONFIGS,
+      organizationId: ORG,
+      fuehrungskraft: null,
+      vorgangAbgeschlossen: abgeschlossen,
+      linkUrl: (t) => `https://hr.fes-credo.de/onboarding-tasks/${t}`,
+      jetzt: JETZT,
+      waechter: true,
+      nachtraege: opts.nachtraege ?? {},
+    });
+    return {
+      ...r,
+      modul: "ONBOARDING",
+      vorgangAbgeschlossen: abgeschlossen,
+      vorgangAbgebrochen: false,
+      bezugsdatum: BEZUG,
+      gesperrt: null,
+    };
+  }
+
+  const LAPTOP: Record<string, NachtragListe> = {
+    IT: { neu: ["Dienst-Laptop/PC bereitstellen"], geaendert: [], entfaellt: [] },
+  };
+
+  it("offener Nachtrag: Knopf „Nachtrag senden“, Zeile „Nach der Information geändert“, roter Wächter", async () => {
+    const { onAktion } = karte(onboardingDaten({ nachtraege: LAPTOP }));
+    const z = zeile("IT");
+
+    expect(z.querySelector('[data-hinweis="nachtrag"]')?.textContent).toBe(
+      "Nach der Information geändert: „Dienst-Laptop/PC bereitstellen“ hinzugefügt. Die Stelle erfährt davon erst mit „Nachtrag senden“.",
+    );
+    expect(z.querySelector('[data-hinweis="rot"]')?.textContent).toBe(
+      "Früheste Fälligkeit 24.07.2027 – Nachtrag noch nicht gesendet",
+    );
+    // Die neue Zeile bringt keine Palettenfarbe mit (nur Tokens).
+    expect(z.querySelector('[data-hinweis="nachtrag"]')?.className).not.toMatch(/amber|yellow|gray-/);
+
+    const knopfNachtrag = within(z).getByRole("button", { name: "Nachtrag senden" }) as HTMLButtonElement;
+    expect(knopfNachtrag.disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(knopfNachtrag);
+    });
+    expect(onAktion).toHaveBeenCalledWith("nachtrag", "IT");
+  });
+
+  it("Sperrzeit: Knopf sichtbar, aber grau — mit Uhrzeit im Tooltip", () => {
+    const { onAktion } = karte(
+      onboardingDaten({ links: [linkIt({ lastSentAt: "2027-07-20T09:58:00.000Z" })], nachtraege: LAPTOP }),
+    );
+    const knopfNachtrag = within(zeile("IT")).getByRole("button", { name: "Nachtrag senden" }) as HTMLButtonElement;
+    expect(knopfNachtrag.disabled).toBe(true);
+    expect(knopfNachtrag.title).toBe("Bitte kurz warten (bis 12:08 Uhr).");
+    fireEvent.click(knopfNachtrag);
+    expect(onAktion).not.toHaveBeenCalled();
+  });
+
+  it("auch ohne offene Aufgabe (nur „Entfällt“) — „Erinnern“ und „Erneut senden“ gibt es dann nicht", () => {
+    karte(
+      onboardingDaten({
+        aufgaben: [{ assigneeDepartment: "IT", isCompleted: true, dueDate: null, entfaellt: true }],
+        links: [linkIt({ allTasksComplete: true, completedAt: "2027-07-19T08:00:00.000Z" })],
+        nachtraege: { IT: { neu: [], geaendert: [], entfaellt: ["Spind bereitstellen"] } },
+      }),
+    );
+    const z = zeile("IT");
+    expect(within(z).queryByRole("button", { name: "Nachtrag senden" })).not.toBeNull();
+    expect(within(z).queryByRole("button", { name: "Erinnern" })).toBeNull();
+    expect(within(z).queryByRole("button", { name: "Erneut senden" })).toBeNull();
+  });
+
+  it("ohne Änderungen kein Knopf; im Offboarding (ohne die Felder) ebenso — und kein Wächter", () => {
+    karte(onboardingDaten());
+    expect(within(zeile("IT")).queryByRole("button", { name: "Nachtrag senden" })).toBeNull();
+    expect(zeile("IT").querySelector('[data-hinweis="nachtrag"]')).toBeNull();
+    document.body.innerHTML = "";
+
+    karte(daten({ links: [linkIt()] }));
+    expect(within(zeile("IT")).queryByRole("button", { name: "Nachtrag senden" })).toBeNull();
+    expect(seitentext()).not.toContain("Früheste Fälligkeit");
+  });
+
+  it("nur lesen (Rolle ohne Bearbeitungsrecht): kein Knopf, die Zeile bleibt sichtbar", () => {
+    karte(onboardingDaten({ nachtraege: LAPTOP }), { darfAktionen: false });
+    expect(within(zeile("IT")).queryByRole("button", { name: "Nachtrag senden" })).toBeNull();
+    expect(zeile("IT").querySelector('[data-hinweis="nachtrag"]')).not.toBeNull();
+  });
+
+  it("Wächter in den Sonderzeilen: übersprungene Stelle und fehlende Führungskraft werden rot ergänzt", () => {
+    karte(
+      onboardingDaten({
+        links: [],
+        aufgaben: [
+          { assigneeDepartment: "VERWALTUNG", isCompleted: false, dueDate: "2027-07-22T00:00:00.000Z" },
+          { assigneeDepartment: "VORGESETZTER", isCompleted: false, dueDate: "2027-07-21T00:00:00.000Z" },
+        ],
+      }),
+    );
+    expect(zeile("VERWALTUNG").getAttribute("data-art")).toBe("uebersprungen");
+    expect(zeile("VERWALTUNG").querySelector('[data-hinweis="waechter"]')?.textContent).toBe(
+      "Früheste Fälligkeit 22.07.2027 – Stelle noch nicht informiert",
+    );
+    expect(zeile("VORGESETZTER").getAttribute("data-art")).toBe("fuehrungskraft-fehlt");
+    expect(zeile("VORGESETZTER").querySelector('[data-hinweis="waechter"]')?.textContent).toBe(
+      "Früheste Fälligkeit 21.07.2027 – Stelle noch nicht informiert",
+    );
+  });
+});
+
+// =============================================
+// 3b. Offboarding: nach der Information hinzugekommen (A4, S29, G14)
+// =============================================
+
+describe("Nach der Information hinzugekommen (Offboarding, Ausstattung & Zugänge Stufe 2)", () => {
+  /** Offboarding-Zeilen mit `nachInfoNeu` aus der echten Zaehlung des Servers. */
+  function offboardingDaten(aufgaben: AufgabeFuerZeile[], links: LinkFuerZeile[]): AbteilungenKarteDaten {
+    const r = abteilungsZeilenBauen({
+      aufgaben,
+      links,
+      konfigs: KONFIGS,
+      organizationId: ORG,
+      fuehrungskraft: null,
+      vorgangAbgeschlossen: false,
+      linkUrl: (t) => `${URL_BASIS}${t}`,
+      jetzt: JETZT,
+      nachInfoNeu: nachInfoNeuZaehlen(aufgaben, links),
+    });
+    return { ...r, modul: "OFFBOARDING", vorgangAbgeschlossen: false, vorgangAbgebrochen: false, bezugsdatum: BEZUG, gesperrt: null };
+  }
+
+  // Die IT ist am 12.07. informiert; am 18.07. kamen zwei Ruecknahme- bzw. Sperraufgaben dazu.
+  const AUFGABEN_NEU = [
+    { assigneeDepartment: "IT", isCompleted: false, dueDate: "2027-07-31T00:00:00.000Z", createdAt: "2027-07-01T08:00:00.000Z" },
+    { assigneeDepartment: "IT", isCompleted: false, dueDate: "2027-07-31T00:00:00.000Z", createdAt: "2027-07-18T08:00:00.000Z", herkunft: "AUSGABE" },
+    { assigneeDepartment: "IT", isCompleted: false, dueDate: "2027-07-31T00:00:00.000Z", createdAt: "2027-07-18T08:00:00.000Z", herkunft: "AUSGABE" },
+  ];
+
+  it("gelber Hinweis „2 Aufgaben nach der Information hinzugekommen – bitte „Erneut senden““ mit dem Knopf „Erneut senden“", () => {
+    karte(offboardingDaten(AUFGABEN_NEU, [linkIt()]));
+    const z = zeile("IT");
+    expect(z.querySelector('[data-hinweis="gelb"]')?.textContent).toBe(
+      "2 Aufgaben nach der Information hinzugekommen – bitte „Erneut senden“",
+    );
+    expect(within(z).queryByRole("button", { name: "Erneut senden" })).not.toBeNull();
+  });
+
+  it("nach „Erneut senden“ (lastSentAt danach) und ohne neue Aufgabe: kein Hinweis", () => {
+    karte(offboardingDaten(AUFGABEN_NEU, [linkIt({ lastSentAt: "2027-07-19T08:00:00.000Z" })]));
+    expect(zeile("IT").querySelector("[data-hinweis]")).toBeNull();
+  });
+
+  it("noch nicht informierte Stelle: kein Hinweis (sie bekommt alles mit der ersten Mail)", () => {
+    karte(offboardingDaten(AUFGABEN_NEU, []));
+    expect(zeile("IT").textContent).not.toContain("nach der Information hinzugekommen");
+  });
+});
+
+// =============================================
 // 4. Link kopieren
 // =============================================
 
@@ -583,6 +785,135 @@ describe("nur lesen", () => {
   it("Gegenprobe: mit Recht oeffnet `dialogOffen` den Dialog wie bisher", () => {
     karte(daten(), { dialogOffen: true, setDialogOffen: jest.fn() });
     expect(screen.queryByRole("dialog")).not.toBeNull();
+  });
+});
+
+// =============================================
+// 7a. Absage an die Stellen (Onboarding, Paket A3, S19, E-A20)
+// =============================================
+
+describe("Absage an die Stellen (Onboarding, E-A20)", () => {
+  /** Abgelaufener Onboarding-Vorgang mit dem Stand, den `absageStand` liefert. */
+  function abgelaufen(absage: AbteilungenKarteDaten["absage"]): AbteilungenKarteDaten {
+    return {
+      ...daten({ modul: "ONBOARDING", links: [linkIt()], abgeschlossen: true, abgebrochen: true }),
+      ...(absage ? { absage } : {}),
+    };
+  }
+  const block = () => document.querySelector('[data-block="absage"]') as HTMLElement | null;
+  const OFFEN = { moeglich: true, stellen: ["IT-Abteilung", "Facility Management"], gesendetAm: null };
+
+  it("Knopf öffnet die Rückfrage mit den Empfängern; erst „… senden“ löst `absage` aus", async () => {
+    let fertig!: () => void;
+    const onAktion = jest.fn(() => new Promise<void>((r) => (fertig = r)));
+    karte(abgelaufen(OFFEN), { onAktion });
+
+    expect(block()!.textContent).toContain(ABSAGE_TEXTE.satz);
+    expect(block()!.textContent).toContain("Noch ohne Absage: IT-Abteilung, Facility Management.");
+    // Der Vorgang ist zu — die Karte bleibt nur lesend, die Absage ist die eine Aktion danach.
+    expect(knopf(/Abteilungen informieren/)).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(knopf(ABSAGE_TEXTE.knopf)!);
+    });
+    expect(onAktion).not.toHaveBeenCalled();
+    const dlg = screen.getByRole("dialog");
+    expect(dlg.textContent).toContain(ABSAGE_TEXTE.dialogTitel);
+    expect([...dlg.querySelectorAll('[data-liste="absage-empfaenger"] li')].map((li) => li.textContent)).toEqual([
+      "IT-Abteilung",
+      "Facility Management",
+    ]);
+
+    await act(async () => {
+      fireEvent.click(within(dlg).getByRole("button", { name: "2 Absagen senden" }));
+    });
+    expect(onAktion).toHaveBeenCalledWith("absage", undefined);
+    expect(within(screen.getByRole("dialog")).getAllByRole("button", { name: "Wird gesendet…" }).length).toBeGreaterThan(0);
+    await act(async () => fertig());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("nach der letzten Absage ist der Knopf weg — der Fokus geht auf den Kartentitel, nicht auf `body`", async () => {
+    let fertig!: () => void;
+    const onAktion = jest.fn(() => new Promise<void>((r) => (fertig = r)));
+    const props = { onAktion, onFuehrungskraftEintragen: jest.fn(), jetzt: JETZT };
+    const { rerender } = render(<AbteilungenKarte abteilungen={abgelaufen(OFFEN)} {...props} />);
+
+    const ausloeser = knopf(ABSAGE_TEXTE.knopf)!;
+    ausloeser.focus();
+    await act(async () => {
+      fireEvent.click(ausloeser);
+    });
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "2 Absagen senden" }));
+    });
+    // Neu geladen: Alle haben die Absage — Knopf und Dialog verschwinden.
+    rerender(
+      <AbteilungenKarte abteilungen={abgelaufen({ moeglich: false, stellen: [], gesendetAm: JETZT.toISOString() })} {...props} />,
+    );
+    await act(async () => fertig());
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(knopf(ABSAGE_TEXTE.knopf)).toBeNull();
+    expect(document.activeElement?.id).toBe(ABTEILUNGEN_KARTE_TITEL_ID);
+    expect(document.getElementById(ABTEILUNGEN_KARTE_TITEL_ID)?.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("„Abbrechen“ schickt nichts", async () => {
+    const { onAktion } = karte(abgelaufen({ moeglich: true, stellen: ["IT-Abteilung"], gesendetAm: null }));
+    await act(async () => {
+      fireEvent.click(knopf(ABSAGE_TEXTE.knopf)!);
+    });
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Absage senden" })).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Abbrechen" }));
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onAktion).not.toHaveBeenCalled();
+  });
+
+  it("teilweise gesendet: nennt die übrigen Stellen und den letzten Versand", () => {
+    karte(abgelaufen({ moeglich: true, stellen: ["Facility Management"], gesendetAm: "2027-07-18T08:00:00.000Z" }));
+    expect(block()!.textContent).toContain("Noch ohne Absage: Facility Management. Zuletzt gesendet am 18.07.2027.");
+    expect(knopf(ABSAGE_TEXTE.knopf)).not.toBeNull();
+  });
+
+  it("alle haben die Absage: nur die Zeile „gesendet“, kein Knopf", () => {
+    karte(abgelaufen({ moeglich: false, stellen: [], gesendetAm: "2027-07-18T08:00:00.000Z" }));
+    expect(block()!.textContent).toContain("Absage an alle informierten Stellen gesendet (zuletzt am 18.07.2027).");
+    expect(knopf(ABSAGE_TEXTE.knopf)).toBeNull();
+  });
+
+  it("ohne Bearbeitungsrecht: Stand sichtbar, kein Knopf", () => {
+    karte(abgelaufen(OFFEN), { darfAktionen: false });
+    expect(block()!.textContent).toContain("Noch ohne Absage: IT-Abteilung, Facility Management.");
+    expect(knopf(ABSAGE_TEXTE.knopf)).toBeNull();
+  });
+
+  it("ohne Stand vom Server (laufend, Offboarding, niemand informiert): kein Block", () => {
+    karte(abgelaufen(undefined));
+    expect(block()).toBeNull();
+    expect(knopf(ABSAGE_TEXTE.knopf)).toBeNull();
+  });
+
+  // A4, S27 (G10): Die Absage nennt die Ausgaben; die Ruecknahme vermerkt HR in der Karte.
+  it.each([
+    ["offen", OFFEN, true],
+    ["alle gesendet", { moeglich: false, stellen: [], gesendetAm: "2027-07-18T08:00:00.000Z" }, true],
+    ["ohne Bearbeitungsrecht", OFFEN, false],
+  ] as const)("nennt, wo HR die Rücknahme vermerkt (%s)", (_name, stand, darfAktionen) => {
+    expect(ABSAGE_TEXTE.rueckbau).toBe("Ausgegebenes vermerken Sie nach der Rücknahme in der Karte (‚zurückgenommen‘).");
+    karte(abgelaufen({ ...stand, stellen: [...stand.stellen] }), { darfAktionen });
+    expect(block()!.querySelector('[data-zeile="absage-rueckbau"]')?.textContent).toBe(ABSAGE_TEXTE.rueckbau);
+  });
+
+  it("Satz und Rückfrage sagen, dass die Mail auch die laut Portal ausgegebenen Stücke nennt", async () => {
+    karte(abgelaufen(OFFEN));
+    expect(block()!.textContent).toContain("und dem, was sie laut Portal ausgegeben haben.");
+    await act(async () => {
+      fireEvent.click(knopf(ABSAGE_TEXTE.knopf)!);
+    });
+    expect(screen.getByRole("dialog").textContent).toContain("und was sie laut Portal ausgegeben hat");
   });
 });
 
@@ -1042,6 +1373,127 @@ describe("Onboarding: Tab Checkliste", () => {
     expect(screen.getByRole("dialog")).not.toBeNull();
     expect(screen.getByRole("button", { name: "2 E-Mails senden" })).not.toBeNull();
   });
+
+  // ---- 11a. Ausstattung & Zugänge (Paket A3, Feinplan S16) ----
+
+  /** Eine kleine Übersicht von HR: das Dienst-iPad mit Bemerkung der Führungskraft, Aufgabe `ipad`. */
+  function ausstattung() {
+    return ausstattungsUebersichtBauen({
+      vorgang: {
+        status: "SUPERVISOR_SUBMITTED",
+        supervisorSubmittedAt: "2027-07-01T09:00:00.000Z",
+        supervisorData: { isComplete: true, mitAusstattung: true },
+      },
+      darfBearbeiten: true,
+      zeilen: [
+        {
+          id: "z-ipad",
+          positionId: "pos-ipad",
+          departmentKey: "IT",
+          art: "JA_NEIN",
+          angabeSchluessel: null,
+          bezeichnung: "Dienst-iPad (Lernmittel)",
+          sichtbarFuer: [],
+          reihenfolge: 0,
+          auswahl: [],
+          angabe: null,
+          bemerkung: "Mit Stift und Hülle",
+          bemerkungQuelle: "FUEHRUNGSKRAFT",
+          quelle: "FUEHRUNGSKRAFT",
+        },
+      ],
+      hinweise: [],
+      arbeitsortId: ORG,
+      konfigs: KONFIGS,
+      katalog: null,
+      aufgaben: [{ id: "ipad", title: "Dienst-iPad (Lernmittel) bereitstellen", isCompleted: false }],
+      verknuepfungen: [{ ausstattungId: "z-ipad", option: "", checklistItemId: "ipad" }],
+      jetzt: JETZT,
+    });
+  }
+
+  it("ohne Checklistenpunkte: Ausstattungs- und Abteilungskarte stehen VOR dem Leerzustand (Regel 20)", () => {
+    onboarding([], { ausstattung: ausstattung(), darfAusstattungBearbeiten: true, onAusstattungAktion: jest.fn() });
+    const ausstattungsKarte = document.querySelector('[data-karte="ausstattung-checkliste"]') as HTMLElement;
+    const abteilungsKarte = document.querySelector('section[aria-labelledby="abteilungen-karte-titel"]') as HTMLElement;
+    const leer = document.querySelector('[data-leer="checkliste"]') as HTMLElement;
+    expect(ausstattungsKarte).not.toBeNull();
+    expect(abteilungsKarte).not.toBeNull();
+    expect(leer.textContent).toContain("Keine Checkliste");
+    const vor = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(vor(ausstattungsKarte, abteilungsKarte)).toBe(true);
+    expect(vor(abteilungsKarte, leer)).toBe(true);
+    // Der Leerzustand ersetzt nur Fortschritt und Liste.
+    expect(document.querySelector('[data-fortschritt="checkliste"]')).toBeNull();
+  });
+
+  it("ohne Checklistenpunkte und ohne Übersicht (keine HR-Rolle): Abteilungskarte und Leerzustand", () => {
+    onboarding([]);
+    expect(document.querySelector('[data-karte="ausstattung-checkliste"]')).toBeNull();
+    expect(document.querySelector('section[aria-labelledby="abteilungen-karte-titel"]')).not.toBeNull();
+    expect(document.querySelector('[data-leer="checkliste"]')).not.toBeNull();
+  });
+
+  it("zwei von fünf Punkten entfallen: Kopfzeile und Balken zählen x/3, Haken gesperrt, „Entfällt“ statt „erledigt von“", () => {
+    const toggle = jest.fn();
+    onboarding(
+      [
+        onbAufgabe({ id: "a", isCompleted: true, completedAt: "2027-07-21T08:00:00.000Z", erledigtVon: { art: "LINK", name: "IT-Abteilung" } }),
+        onbAufgabe({ id: "b" }),
+        onbAufgabe({ id: "c" }),
+        onbAufgabe({
+          id: "weg1",
+          isCompleted: true,
+          completedAt: "2027-07-20T08:00:00.000Z",
+          erledigtVon: { art: "PORTAL", name: "Erika Muster" },
+          entfaelltAm: "2027-07-20T08:00:00.000Z",
+          herkunft: "AUSSTATTUNG",
+        }),
+        onbAufgabe({ id: "weg2", isCompleted: true, entfaelltAm: "2027-07-20T08:00:00.000Z", herkunft: "AUSSTATTUNG" }),
+      ],
+      { toggleChecklistItem: toggle },
+    );
+    const fortschritt = document.querySelector('[data-fortschritt="checkliste"]') as HTMLElement;
+    expect(fortschritt.textContent).toContain("1 von 3 Aufgaben erledigt");
+    expect(fortschritt.textContent).toContain("33%");
+    expect((fortschritt.querySelector("[style]") as HTMLElement).style.width).toBe("33%");
+
+    const weg = onbKarte("weg1");
+    const haken = within(weg).getByRole("button", { name: ZUSATZ_TEXTE.haken }) as HTMLButtonElement;
+    expect(haken.disabled).toBe(true);
+    fireEvent.click(haken);
+    expect(toggle).not.toHaveBeenCalled();
+    expect(weg.querySelector('[data-kennzeichen="entfaellt"]')).not.toBeNull();
+    expect(weg.querySelector("[data-urheber]")).toBeNull();
+    expect(weg.textContent).not.toContain("erledigt im Portal von");
+    expect(weg.textContent).not.toContain("Fällig:");
+    // Die erledigte, nicht entfallene Aufgabe behält ihren Urheber und ihren Haken.
+    expect(onbKarte("a").querySelector("[data-urheber]")?.textContent).toBe("erledigt von IT-Abteilung (Link) am 21.07.2027, 10:00");
+    expect(within(onbKarte("a")).getByRole("button", { name: "Als offen markieren" })).not.toBeNull();
+  });
+
+  it("nur entfallene Punkte: Fortschritt 0 von 0 — nicht „fertig“", () => {
+    onboarding([onbAufgabe({ id: "weg", isCompleted: true, entfaelltAm: "2027-07-20T08:00:00.000Z" })]);
+    const fortschritt = document.querySelector('[data-fortschritt="checkliste"]') as HTMLElement;
+    expect(fortschritt.textContent).toContain("0 von 0 Aufgaben erledigt");
+    expect(fortschritt.textContent).toContain("0%");
+  });
+
+  it("„Eilt“ und die Bemerkung zur Position (nur HR, aus der Übersicht) unter der Aufgabe", () => {
+    onboarding([onbAufgabe({ id: "ipad", title: "Dienst-iPad (Lernmittel) bereitstellen", herkunft: "AUSSTATTUNG", eilt: true })], {
+      ausstattung: ausstattung(),
+      darfAusstattungBearbeiten: true,
+      onAusstattungAktion: jest.fn(),
+    });
+    const k = onbKarte("ipad");
+    expect(k.querySelector('[data-kennzeichen="eilt"]')).not.toBeNull();
+    expect(k.querySelector("[data-bemerkung]")?.textContent).toBe(`${bemerkungLabel("FUEHRUNGSKRAFT")}Mit Stift und Hülle`);
+  });
+
+  it("ohne Übersicht (keine HR-Rolle) keine Bemerkung an der Aufgabe", () => {
+    onboarding([onbAufgabe({ id: "ipad", herkunft: "AUSSTATTUNG" })]);
+    expect(onbKarte("ipad").querySelector("[data-bemerkung]")).toBeNull();
+  });
 });
 
 // =============================================
@@ -1156,5 +1608,271 @@ describe("Onboarding: Stepper", () => {
       ],
     });
     expect(seitentext()).toContain("Offene Aufgaben von Abteilungen verhindern den Abschluss nicht.");
+  });
+});
+
+// =============================================
+// 13. Offboarding, Ausstattung & Zugänge Stufe 2 (A4, S32): Einstellung
+//     zuordnen, Rücknahmeaufgaben im Reiter Checkliste, Stepper
+// =============================================
+
+describe("Einstellung zuordnen und Rücknahmeaufgaben (Offboarding, Stufe 2)", () => {
+  const LEER_VORSCHLAG = { rueckgaben: [], sperraufgaben: [], hinweisZentral: [], hinweisAndereEinrichtung: [], schonImAustritt: [] };
+
+  /** Feld `rueckgaben` wie der Server es fuer HR liefert (hier nur, was Uebersicht und Checkliste lesen). */
+  function rueckgabenStand(teil: Partial<RueckgabenUebersicht> = {}): RueckgabenUebersicht {
+    const text = LAGE_TEXTE.KEINE_EINSTELLUNG({ nr: "", gegenstaende: 0, zugaenge: 0, ohneVermerk: 0 });
+    return {
+      einstellung: null,
+      weitereBeschaeftigung: null,
+      arbeitsort: null,
+      einrichtungen: {},
+      lage: "KEINE_EINSTELLUNG",
+      text,
+      zusatz: null,
+      gedaechtnisstuetze: GEDAECHTNISSTUETZE,
+      zuordnungEmpfohlen: true,
+      aktionen: { zuordnen: true, loesen: false, aktualisieren: false, ohneVermerk: false },
+      zeilen: [],
+      sperraufgaben: [],
+      vorschlag: LEER_VORSCHLAG,
+      ohneVermerk: [],
+      loesen: null,
+      offen: [],
+      schritt: { erledigt: true, text },
+      fortschritt: { erledigt: 0, gesamt: 0 },
+      merkerWechsel: null,
+      protokoll: { art: "RUECKGABE", noetig: false, hochgeladenAm: null, text: null },
+      ...teil,
+    };
+  }
+
+  function austritt(teil: Partial<OffboardingData> = {}): OffboardingData {
+    return {
+      id: "vorgang-1",
+      displayId: "OFF-2027-GYM-014",
+      employeeEmail: "max.mustermann@fes-minden.de",
+      employeeFirstName: "Max",
+      employeeLastName: "Mustermann",
+      employeePersonalNr: null,
+      employeePrivateEmail: null,
+      exitType: "KUENDIGUNG_ARBEITNEHMER",
+      exitReason: null,
+      noticeDate: null,
+      lastWorkingDay: BEZUG,
+      contractEndDate: null,
+      noticePeriodEnd: null,
+      status: "NOTICE_PERIOD",
+      initiatedAt: "2027-06-01T00:00:00.000Z",
+      completedAt: null,
+      dataRetentionDate: null,
+      organization: { id: ORG, name: "FES Minden", mandantNumber: "10" },
+      exitData: null,
+      returnItems: [],
+      documents: [],
+      checklistItems: [],
+      notes: [],
+      departmentLinks: [],
+      supervisorEmail: null,
+      supervisorName: null,
+      fuehrungskraft: { email: null, name: null, quelle: null },
+      abteilungen: daten(),
+      ...teil,
+    };
+  }
+
+  function uebersichtZeigen(d: OffboardingData, onZuordnen?: () => void) {
+    render(
+      <TabOverview
+        data={d}
+        editingField={null}
+        editingValue=""
+        savingField={false}
+        setEditingField={jest.fn()}
+        setEditingValue={jest.fn()}
+        handleFieldSave={jest.fn()}
+        onNavigateTab={jest.fn()}
+        onZuordnen={onZuordnen}
+      />,
+    );
+  }
+
+  function aufgabeOff(teil: Partial<ChecklistItemData>): ChecklistItemData {
+    return {
+      id: "a1",
+      title: "IT-Zugänge und E-Mail-Konto sperren",
+      category: "Phase 5: Letzter Tag",
+      orderIndex: 1,
+      description: null,
+      assigneeDepartment: "IT",
+      isCompleted: false,
+      completedAt: null,
+      completedById: null,
+      dueDate: "2027-07-31T00:00:00.000Z",
+      notes: null,
+      ...teil,
+    };
+  }
+
+  function checkliste(extra: Partial<React.ComponentProps<typeof TabChecklist>> = {}) {
+    render(
+      <TabChecklist
+        checklistItems={[aufgabeOff({})]}
+        togglingItems={new Set()}
+        toggleChecklistItem={jest.fn()}
+        editingChecklistNoteId={null}
+        setEditingChecklistNoteId={jest.fn()}
+        checklistNoteText=""
+        setChecklistNoteText={jest.fn()}
+        savingChecklistNote={false}
+        saveChecklistNote={jest.fn()}
+        abteilungen={daten()}
+        onAbteilungsAktion={jest.fn()}
+        {...extra}
+      />,
+    );
+  }
+
+  const hinweis = () => document.querySelector('[data-hinweis="zuordnung-empfohlen"]') as HTMLElement | null;
+
+  it("Abteilungskarte: Hinweis „Einstellung zuordnen, bevor Sie die Abteilungen informieren“ mit Knopf – nur mit `empfohlen`", () => {
+    const onZuordnen = jest.fn();
+    karte(daten(), { zuordnung: { empfohlen: true, onZuordnen } });
+    expect(hinweis()!.textContent).toContain("Einstellung zuordnen, bevor Sie die Abteilungen informieren");
+    fireEvent.click(within(hinweis()!).getByRole("button", { name: "Einstellung zuordnen …" }));
+    expect(onZuordnen).toHaveBeenCalledTimes(1);
+  });
+
+  it("Abteilungskarte ohne die Eigenschaft: gleiche Ausgabe wie bisher (auch mit `empfohlen: false`)", () => {
+    const { container: ohne } = render(<AbteilungenKarte abteilungen={daten()} onAktion={jest.fn()} jetzt={JETZT} />);
+    const html = ohne.innerHTML;
+    const { container: mit } = render(
+      <AbteilungenKarte abteilungen={daten()} onAktion={jest.fn()} jetzt={JETZT} zuordnung={{ empfohlen: false, onZuordnen: jest.fn() }} />,
+    );
+    expect(mit.innerHTML).toBe(html);
+    expect(html).not.toContain("zuordnung-empfohlen");
+  });
+
+  it("Abteilungskarte nur lesend (abgeschlossen bzw. ohne Recht): kein Hinweis", () => {
+    karte(daten({ abgeschlossen: true }), { zuordnung: { empfohlen: true, onZuordnen: jest.fn() } });
+    expect(hinweis()).toBeNull();
+  });
+
+  it("Tab Checkliste reicht den Hinweis an die Abteilungskarte durch", () => {
+    const onZuordnen = jest.fn();
+    checkliste({ zuordnungEmpfohlen: true, onZuordnen });
+    fireEvent.click(within(hinweis()!).getByRole("button", { name: "Einstellung zuordnen …" }));
+    expect(onZuordnen).toHaveBeenCalledTimes(1);
+  });
+
+  it("Tab Checkliste: Rücknahme-, Sperr- und Folgeaufgaben ohne Bearbeitungsrecht ohne Haken; Vorlagenaufgaben unverändert", () => {
+    checkliste({
+      darfAbteilungsAktionen: false,
+      checklistItems: [
+        aufgabeOff({ id: "vorlage" }),
+        aufgabeOff({ id: "ruecknahme", title: "Dienst-iPad (Lernmittel) zurücknehmen", herkunft: "AUSGABE", ausgabeId: "ag-ipad" }),
+        aufgabeOff({ id: "folge", title: "Schließung prüfen: Schlüssel", herkunft: "AUSGABE_FEHLT", ausgabeId: "ag-gs", isCompleted: true, completedAt: "2027-07-29T08:00:00.000Z" }),
+      ],
+    });
+    const karteVon = (id: string) => document.querySelector(`[data-aufgabe="${id}"]`) as HTMLElement;
+    expect(within(karteVon("vorlage")).getByRole("button", { name: "Als erledigt markieren" })).not.toBeNull();
+    expect(within(karteVon("ruecknahme")).queryByRole("button", { name: /markieren$/ })).toBeNull();
+    expect(karteVon("ruecknahme").querySelector("[data-ohne-haken]")?.textContent).toBe("offen");
+    expect(within(karteVon("folge")).queryByRole("button", { name: /markieren$/ })).toBeNull();
+    expect(karteVon("folge").querySelector("[data-ohne-haken]")?.textContent).toBe("erledigt");
+  });
+
+  it("Tab Checkliste: an der Rücknahmeaufgabe der Zustand als Text und der Verweis auf den Reiter Rückgaben", () => {
+    const zumReiter = jest.fn();
+    checkliste({
+      checklistItems: [
+        aufgabeOff({ id: "ruecknahme", title: "Schlüssel: Haupteingang zurücknehmen", herkunft: "AUSGABE", ausgabeId: "ag-gs", isCompleted: true }),
+        aufgabeOff({ id: "sperre", title: "Zugänge sperren", herkunft: "AUSGABE", ausgabeId: "ag-zugang" }),
+      ],
+      returnItems: [
+        {
+          id: "r-gs",
+          category: "SCHLUESSEL",
+          itemName: "Schlüssel: Haupteingang",
+          serialNumber: "GS-114",
+          isReturned: false,
+          returnedAt: null,
+          condition: null,
+          notes: null,
+          zustand: "FEHLT",
+          ausgabeId: "ag-gs",
+        },
+      ],
+      onZumReiterRueckgaben: zumReiter,
+    });
+    const r = document.querySelector('[data-aufgabe="ruecknahme"]') as HTMLElement;
+    expect(r.querySelector("[data-ruecknahme-zustand]")?.textContent).toContain("Rückgabe: fehlt");
+    // Mit Recht bleibt der Haken (er heisst „zurück“, G15).
+    expect(within(r).getByRole("button", { name: "Als offen markieren" })).not.toBeNull();
+    fireEvent.click(within(r).getByRole("button", { name: "Zustand im Reiter „Rückgaben“ wählen" }));
+    expect(zumReiter).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[data-aufgabe="sperre"] [data-ruecknahme-zustand]')).toBeNull();
+  });
+
+  it("Stepper „Rückgaben einsammeln“: Hinweis und Knopf „Einstellung zuordnen …“ nur mit `zuordnungEmpfohlen`", () => {
+    const onZuordnen = jest.fn();
+    uebersichtZeigen(austritt({ rueckgaben: rueckgabenStand() }), onZuordnen);
+    expect(seitentext()).toContain("Einstellung zuordnen, bevor Sie die Abteilungen informieren");
+    fireEvent.click(screen.getByRole("button", { name: "Einstellung zuordnen …" }));
+    expect(onZuordnen).toHaveBeenCalledTimes(1);
+  });
+
+  it("Stepper mit `rueckgaben` ohne Empfehlung: Text und Stand vom Server; ohne `rueckgaben` wie bisher, Kategorie mit Namen", () => {
+    const offen = rueckgabenStand({
+      zuordnungEmpfohlen: false,
+      aktionen: { zuordnen: true, loesen: false, aktualisieren: false, ohneVermerk: false },
+      offen: [{ titel: "Dienst-iPad (Lernmittel)", stelle: "IT-Abteilung" }],
+      schritt: { erledigt: false, text: "Laut Portal ausgegeben (Einstellung 2027-GYM-007, von HR zugeordnet): 1 Gegenstand, 0 Zugänge." },
+    });
+    uebersichtZeigen(austritt({ rueckgaben: offen }), jest.fn());
+    expect(seitentext()).not.toContain("bevor Sie die Abteilungen informieren");
+    expect(seitentext()).toContain("Laut Portal ausgegeben (Einstellung 2027-GYM-007, von HR zugeordnet)");
+    expect(seitentext()).toContain("Dienst-iPad (Lernmittel)");
+    expect(screen.queryByRole("button", { name: "Einstellung zuordnen …" })).toBeNull();
+  });
+
+  it("Stepper mit `rueckgaben`: Fortschritt aus derselben Quelle wie Liste und Stand – nie „4/4“ neben einer offenen Sperraufgabe (Review A4c)", () => {
+    const zeile = (id: string) => ({
+      id,
+      category: "IT_HARDWARE",
+      itemName: `Gerät ${id}`,
+      serialNumber: null,
+      isReturned: true,
+      returnedAt: "2027-07-29T08:00:00.000Z",
+      condition: null,
+      notes: null,
+      zustand: "ZURUECK",
+      ausgabeId: `ag-${id}`,
+    });
+    const stand = rueckgabenStand({
+      zuordnungEmpfohlen: false,
+      offen: [{ titel: "Zugänge (Portal, E-Mail) sperren", stelle: "IT-Abteilung" }],
+      schritt: { erledigt: false, text: "Laut Portal ausgegeben." },
+      fortschritt: { erledigt: 4, gesamt: 5 },
+    });
+    uebersichtZeigen(austritt({ rueckgaben: stand, returnItems: ["r1", "r2", "r3", "r4"].map(zeile) }), jest.fn());
+    expect(seitentext()).toContain("4/5");
+    expect(seitentext()).not.toContain("4/4");
+    expect(seitentext()).toContain("Zugänge (Portal, E-Mail) sperren");
+  });
+
+  it("Stepper ohne `rueckgaben` (andere Rollen): Kategorie als Name statt Rohwert, „erledigt“ zählt jeden Zustand", () => {
+    uebersichtZeigen(
+      austritt({
+        returnItems: [
+          { id: "r1", category: "IT_HARDWARE", itemName: "Dienstlaptop", serialNumber: null, isReturned: false, returnedAt: null, condition: null, notes: null },
+          { id: "r2", category: "SCHLUESSEL", itemName: "Schlüssel", serialNumber: null, isReturned: false, returnedAt: null, condition: null, notes: null, zustand: "FEHLT" },
+        ],
+      }),
+    );
+    expect(seitentext()).toContain("IT-Hardware");
+    expect(seitentext()).not.toContain("IT_HARDWARE");
+    expect(seitentext()).toContain("1/2");
+    expect(seitentext()).not.toContain("bevor Sie die Abteilungen informieren");
   });
 });

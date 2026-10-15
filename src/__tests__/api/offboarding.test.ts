@@ -363,6 +363,39 @@ describe("API /api/offboarding", () => {
     });
   });
 
+  // A4, S30 (G16): Der Fortschritt der Rueckgaben zaehlt „erledigt“ (ein
+  // Zustand ist gesetzt), nicht nur „zurückgegeben“ – sonst bliebe er mit
+  // „fehlt“, „verbleibt“ oder „entfällt“ fuer immer unter 100 %.
+  describe("GET – Fortschritt der Rückgaben (A4, G16)", () => {
+    it("zählt jeden Zustand als erledigt, Altbestand mit `isReturned` ebenso; der Feldname bleibt", async () => {
+      mockPrisma.offboardingProcess.findMany.mockResolvedValue([
+        {
+          id: "off-1",
+          displayId: "OFF-2027-GYM-001",
+          checklistItems: [{ isCompleted: true }, { isCompleted: false }],
+          returnItems: [
+            { id: "r1", isReturned: false, zustand: null },
+            { id: "r2", isReturned: false, zustand: "FEHLT" },
+            { id: "r3", isReturned: true, zustand: null },
+            { id: "r4", isReturned: false, zustand: "VERBLEIBT" },
+            { id: "r5", isReturned: true, zustand: "BESCHAEDIGT" },
+          ],
+        },
+      ]);
+      mockPrisma.offboardingProcess.count.mockResolvedValue(1);
+      mockPrisma.offboardingProcess.groupBy.mockResolvedValue([]);
+
+      const res = await GET(createRequest("GET"));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.data[0].returnProgress).toEqual({ returned: 4, total: 5 });
+      expect(body.data[0].checklistProgress).toEqual({ completed: 1, total: 2 });
+      expect(body.data[0]).not.toHaveProperty("returnItems");
+      const include = mockPrisma.offboardingProcess.findMany.mock.calls[0][0].include;
+      expect(include.returnItems).toEqual({ select: { id: true, isReturned: true, zustand: true } });
+    });
+  });
+
   describe("GET – Authentifizierung", () => {
     it("sollte 401 zurueckgeben wenn nicht authentifiziert", async () => {
       mockGetSession.mockResolvedValue(null);

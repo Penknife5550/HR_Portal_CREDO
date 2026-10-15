@@ -111,6 +111,8 @@ interface Onboarding {
   supervisorData: {
     isComplete: boolean;
     currentStep: number;
+    /** Merker „Schritt Ausstattung & Zugänge" (Paket A2): 6 statt 5 Schritte. */
+    mitAusstattung?: boolean | null;
   } | null;
   _count?: { notes: number };
 }

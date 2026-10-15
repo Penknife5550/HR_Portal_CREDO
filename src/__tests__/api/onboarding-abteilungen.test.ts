@@ -5,7 +5,7 @@
  *   GET      /api/onboarding/[id]                 (Zusatzfelder, 404 statt 403)
  *   GET      /api/onboarding/[id]/checklist       (gehaertet, kein POST mehr)
  *   PATCH    /api/onboarding/[id]/checklist/[itemId]
- *   POST     /api/modalitaeten/[token]            (Faelligkeiten, KEIN Versand)
+ *   POST     /api/modalitaeten/[token]            (Faelligkeiten und Ausstattungsaufgaben, KEIN Versand)
  *
  * Die Fachlogik (Rolle, Mandant, Status, Voraussetzung, Sperre, Versand,
  * Uebergaenge, Mails) steckt in src/lib/abteilungsaufgaben-onboarding.ts und
@@ -61,7 +61,10 @@ jest.mock("@/lib/abteilungsaufgaben-onboarding", () => {
     ...echt,
     onboardingAbteilungsAktionAusfuehren: jest.fn(echt.onboardingAbteilungsAktionAusfuehren),
     onboardingAbteilungenLaden: jest.fn(echt.onboardingAbteilungenLaden),
-    faelligkeitenSetzen: jest.fn(echt.faelligkeitenSetzen),
+    // Paket A3 (S12): Die Abgabe der Modalitaeten ruft das Nachholen (statt
+    // nur `faelligkeitenSetzen`) — als Huelle, damit ein Test es scheitern
+    // lassen kann.
+    onboardingAusstattungNachholenIn: jest.fn(echt.onboardingAusstattungNachholenIn),
   };
 });
 jest.mock("@/lib/abteilungsaufgaben-uebergaenge", () => {
@@ -73,20 +76,34 @@ jest.mock("@/lib/abteilungsaufgaben-uebergaenge", () => {
 });
 
 import { NextRequest } from "next/server";
-import { db, dbLeeren, fakePrisma, naechsteId, neuerLink, type Zeile } from "../hilfen/abteilungs-fake-db";
+import {
+  db,
+  dbLeeren,
+  fakePrisma,
+  naechsteId,
+  neueAusstattungsZeile,
+  neuerLink,
+  neuerStellenHinweis,
+  type Zeile,
+} from "../hilfen/abteilungs-fake-db";
 import * as abteilungenRoute from "@/app/api/onboarding/[id]/abteilungen/route";
 import { GET as vorgangLaden } from "@/app/api/onboarding/[id]/route";
 import * as checklisteRoute from "@/app/api/onboarding/[id]/checklist/route";
 import { PATCH as punktAendern } from "@/app/api/onboarding/[id]/checklist/[itemId]/route";
 import { POST as modalitaetenAbsenden } from "@/app/api/modalitaeten/[token]/route";
 import {
-  faelligkeitenSetzen,
   onboardingAbteilungenLaden,
   onboardingAbteilungsAktionAusfuehren,
+  onboardingAusstattungNachholenIn,
 } from "@/lib/abteilungsaufgaben-onboarding";
 import { onboardingAufgabeImPortalAendern } from "@/lib/abteilungsaufgaben-uebergaenge";
 import { canAccessProcess, type SessionPayload } from "@/lib/permissions";
 import { MELDUNGEN } from "@/lib/abteilungsaufgaben";
+import {
+  AUSSTATTUNG_KATEGORIE,
+  HINWEIS_AUFGABE_TITEL,
+  ausstattungsFaelligkeit,
+} from "@/lib/ausstattung";
 
 const echtOnboarding = jest.requireActual<typeof import("@/lib/abteilungsaufgaben-onboarding")>(
   "@/lib/abteilungsaufgaben-onboarding",
@@ -98,7 +115,7 @@ const echtRechte = jest.requireActual<typeof import("@/lib/permissions")>("@/lib
 
 const mockAktion = onboardingAbteilungsAktionAusfuehren as jest.Mock;
 const mockLaden = onboardingAbteilungenLaden as jest.Mock;
-const mockFaelligkeiten = faelligkeitenSetzen as jest.Mock;
+const mockNachholen = onboardingAusstattungNachholenIn as jest.Mock;
 const mockPortal = onboardingAufgabeImPortalAendern as jest.Mock;
 const mockZugriff = canAccessProcess as jest.Mock;
 
@@ -242,6 +259,11 @@ function aufgabe(teil: Zeile = {}): Zeile {
     notes: null,
     abteilungKommentar: null,
     abteilungKommentarAm: null,
+    // Schemadefaults (Paket A3): Der Portal-PATCH filtert seit S15 auf
+    // `entfaelltAm: null`, und die Fake-DB wertet `undefined` nicht als null.
+    herkunft: null,
+    eilt: false,
+    entfaelltAm: null,
     ...teil,
   };
 }
@@ -312,8 +334,8 @@ beforeEach(() => {
   mockAktion.mockImplementation(echtOnboarding.onboardingAbteilungsAktionAusfuehren);
   mockLaden.mockReset();
   mockLaden.mockImplementation(echtOnboarding.onboardingAbteilungenLaden);
-  mockFaelligkeiten.mockReset();
-  mockFaelligkeiten.mockImplementation(echtOnboarding.faelligkeitenSetzen);
+  mockNachholen.mockReset();
+  mockNachholen.mockImplementation(echtOnboarding.onboardingAusstattungNachholenIn);
   mockPortal.mockReset();
   mockPortal.mockImplementation(echtUebergaenge.onboardingAufgabeImPortalAendern);
   mockZugriff.mockReset();
@@ -440,6 +462,84 @@ describe("POST /api/onboarding/[id]/abteilungen", () => {
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({ error: "Keine Berechtigung" });
     });
+
+    // Paket A3 (S12, Regel 6): Ist das Anlegen nach der Abgabe gescheitert,
+    // holt die naechste Aktion der Karte es nach — VOR dem Versand, damit die
+    // Mail die Aufgabe schon enthaelt.
+    it("holt fehlende Ausstattungsaufgaben vor dem Versand nach — die Mail nennt sie schon", async () => {
+      db.ausstattungZeilen = [
+        neueAusstattungsZeile({
+          id: "aus-ipad",
+          onboardingId: "onb-1",
+          positionId: "pos-ipad",
+          departmentKey: "IT",
+          art: "JA_NEIN",
+          bezeichnung: "Dienst-iPad (Lernmittel)",
+          aufgabeTitel: "Dienst-iPad (Lernmittel) bereitstellen",
+          relativeDueDays: 30,
+          quelle: "FUEHRUNGSKRAFT",
+        }),
+      ];
+
+      const vorher = new Date();
+      const res = await post();
+
+      expect(res.status).toBe(201);
+      const neu = db.onboardingAufgaben.filter((a) => a.herkunft === "AUSSTATTUNG");
+      expect(neu).toHaveLength(1);
+      // Vertragsbeginn + 30 Tage, nie vor heute (Regel 14; die Tests dieser
+      // Datei rechnen mit der echten Uhr).
+      const erwartet = ausstattungsFaelligkeit(BEGINN, 30, vorher)!;
+      expect(neu[0]).toMatchObject({
+        title: "Dienst-iPad (Lernmittel) bereitstellen",
+        category: AUSSTATTUNG_KATEGORIE,
+        assignee: "IT",
+        dueDate: erwartet.dueDate,
+        eilt: erwartet.eilt,
+      });
+      expect(db.ausstattungAufgaben).toEqual([
+        expect.objectContaining({ ausstattungId: "aus-ipad", option: "", checklistItemId: neu[0].id }),
+      ]);
+      const [mail] = mockTrigger.mock.calls.filter((c) => c[0] === "onboarding-department-assigned").map((c) => c[1]);
+      expect(String(mail.aufgabenliste)).toContain("Dienst-iPad (Lernmittel) bereitstellen");
+      expect(mail.anzahl_aufgaben).toBe(2);
+    });
+
+    // Paket A3 (S17, Regel 10): „nachtrag“ kennt nur das Onboarding-Schema.
+    it("„nachtrag“: im Onboarding eine gueltige Aktion — ohne Aenderungen 409 KEIN_NACHTRAG, nicht 400", async () => {
+      db.links = [link()];
+      const leer = await post({ body: { aktion: "nachtrag", departmentKey: "IT" } });
+      expect(leer.status).toBe(409);
+      expect((await leer.json()).data.uebersprungen).toEqual([
+        expect.objectContaining({ departmentKey: "IT", grund: "KEIN_NACHTRAG" }),
+      ]);
+
+      db.ausstattungAenderungen = [
+        { id: "aen-1", onboardingId: "onb-1", departmentKey: "IT", art: "NEU", titel: "Dienst-Laptop/PC bereitstellen", erfasstAm: new Date(), gesendetAm: null },
+      ];
+      const res = await post({ body: { aktion: "nachtrag", departmentKey: "IT" } });
+      expect(res.status).toBe(201);
+      expect((await res.json()).meldung).toBe("Nachtrag an IT-Abteilung gesendet. Der Link ist unverändert.");
+      expect(db.ausstattungAenderungen[0].gesendetAm).toBeInstanceOf(Date);
+    });
+
+    // Paket A3 (S19, E-A20): „absage“ kennt nur das Onboarding-Schema, und nur bei EXPIRED.
+    it("„absage“: laufender Vorgang 409 NICHT_ABGESAGT; abgelaufen eine Mail ohne Link je informierter Stelle", async () => {
+      db.links = [link()];
+      const laufend = await post({ body: { aktion: "absage" } });
+      expect(laufend.status).toBe(409);
+      expect(await laufend.json()).toEqual({ error: MELDUNGEN.ABSAGE_NUR_ABGELAUFEN, grund: "NICHT_ABGESAGT" });
+      expect(mockTrigger).not.toHaveBeenCalled();
+
+      db.onboardingVorgaenge = [vorgang({ status: "EXPIRED" })];
+      const res = await post({ body: { aktion: "absage" } });
+      expect(res.status).toBe(201);
+      expect((await res.json()).meldung).toBe("Absage an 1 Stelle gesendet: IT-Abteilung.");
+      const [p] = mockTrigger.mock.calls.filter((c) => c[0] === "onboarding-department-abgesagt").map((c) => c[1]);
+      expect(p).toMatchObject({ email: "it@example.org", departmentKey: "IT" });
+      expect(p).not.toHaveProperty("link");
+      expect(db.links[0].abgesagtAm).toBeInstanceOf(Date);
+    });
   });
 });
 
@@ -532,6 +632,43 @@ describe("GET /api/onboarding/[id]", () => {
     // Die bisherigen Felder bleiben.
     expect(body.requiredDocuments).toBeDefined();
     expect(body.fragebogenFortschritt).toBeDefined();
+  });
+
+  it("legt „Ausstattung & Zugänge“ über den Vorgang — nur für HR (Paket A2, über die Fake-DB)", async () => {
+    db.ausstattungZeilen = [
+      {
+        id: "aus-1",
+        onboardingId: "onb-1",
+        positionId: "pos-ipad",
+        departmentKey: "IT",
+        art: "JA_NEIN",
+        angabeSchluessel: null,
+        bezeichnung: "Dienst-iPad",
+        sichtbarFuer: [],
+        reihenfolge: 0,
+        auswahl: [],
+        angabe: null,
+        bemerkung: "Mit Stift",
+        bemerkungQuelle: "FUEHRUNGSKRAFT",
+        quelle: "FUEHRUNGSKRAFT",
+        erfasstVonId: null,
+        gestrichenAm: null,
+        createdAt: new Date(),
+      },
+    ];
+    const body = await (await get()).json();
+    expect(body.ausstattung).toMatchObject({ zustand: "BEARBEITBAR" });
+    expect(body.ausstattung.gruppen[0]).toMatchObject({ departmentKey: "IT", stelleName: "IT-Abteilung" });
+    expect(body.ausstattung.gruppen[0].zeilen[0].bemerkung.text).toBe("Mit Stift");
+
+    // Vorgesetzte mit Zuweisung zur Einrichtung: darf den Vorgang sehen, die Ausstattung nicht
+    db.zuweisungen = [{ userId: VORGESETZTE.userId, organizationId: "org-1" }];
+    mockGetSession.mockResolvedValue(VORGESETZTE);
+    const res = await get();
+    expect(res.status).toBe(200);
+    const fremd = await res.json();
+    expect(fremd.ausstattung).toBeNull();
+    expect(JSON.stringify(fremd)).not.toContain("Mit Stift");
   });
 
   it("meldet die fehlenden Modalitäten als Sperre und verschweigt das Bezugsdatum", async () => {
@@ -639,6 +776,148 @@ describe("PATCH /api/onboarding/[id]/checklist/[itemId]", () => {
     // Das eigene Haekchen im Portal meldet im Onboarding niemandem etwas.
     expect(mockTrigger).not.toHaveBeenCalled();
   });
+
+  // Paket A3 (S15; Regel 9, Regel 16, F2, Feinplan 1.11): Aufgaben mit
+  // `herkunft` (Ausstattung, Hinweis) aendert im Portal nur HR, Zustaendigkeit
+  // und Faelligkeit nur die Karte; eine entfallene Aufgabe laesst sich weder
+  // abhaken noch wieder oeffnen.
+  describe("Ausstattungs- und Hinweis-Aufgaben (S15)", () => {
+    const SERVICE: SessionPayload = {
+      userId: "u-svc",
+      email: "n8n@example.org",
+      role: "SERVICE",
+      firstName: "n8n",
+      lastName: "Schlüssel",
+    };
+    const ausstattung = (teil: Zeile = {}) =>
+      aufgabe({
+        title: "Dienst-iPad (Lernmittel) bereitstellen",
+        category: AUSSTATTUNG_KATEGORIE,
+        herkunft: "AUSSTATTUNG",
+        orderIndex: -99_000,
+        ...teil,
+      });
+    const hinweisAufgabe = (teil: Zeile = {}) =>
+      aufgabe({ title: HINWEIS_AUFGABE_TITEL, category: AUSSTATTUNG_KATEGORIE, herkunft: "HINWEIS", ...teil });
+
+    it.each([
+      ["SERVICE", SERVICE],
+      ["VORGESETZTER", VORGESETZTE],
+      ["EINRICHTUNGSLEITUNG", LEITUNG_FREMD],
+    ])("%s: Ausstattungsaufgabe → 403, eine Vorlagenaufgabe bleibt änderbar", async (_rolle, sitzung) => {
+      const a = ausstattung();
+      const vorlage = aufgabe({ title: "Benutzerkonto anlegen" });
+      db.onboardingAufgaben = [a, vorlage];
+      // Zugang zur Einrichtung — sonst endete es schon an der Mandantenpruefung (404).
+      db.zuweisungen = [{ userId: sitzung.userId, organizationId: "org-1" }];
+      mockGetSession.mockResolvedValue(sitzung);
+
+      const res = await patch(a.id as string, { body: { isCompleted: true } });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: "Ausstattungsaufgaben bearbeitet nur die Personalabteilung." });
+      expect(db.onboardingAufgaben[0]).toMatchObject({ isCompleted: false, completedById: null });
+
+      const notiz = await patch(a.id as string, { body: { notes: "intern" } });
+      expect(notiz.status).toBe(403);
+      expect(db.onboardingAufgaben[0].notes).toBeNull();
+
+      const ok = await patch(vorlage.id as string, { body: { isCompleted: true } });
+      expect(ok.status).toBe(200);
+      expect(db.onboardingAufgaben[1].isCompleted).toBe(true);
+    });
+
+    it.each([
+      ["assignee", { assignee: "FACILITY" }],
+      ["dueDate", { dueDate: "2026-09-30" }],
+      ["dueDate: null", { dueDate: null }],
+    ])("%s im Body → 409 (Ausstattungs- und Hinweis-Aufgabe), nichts geschrieben", async (_feld, body) => {
+      const a = ausstattung({ dueDate: new Date("2026-09-26T00:00:00.000Z"), relativeDueDays: -5 });
+      const h = hinweisAufgabe({ dueDate: new Date("2026-09-24T00:00:00.000Z"), relativeDueDays: -7 });
+      db.onboardingAufgaben = [a, h];
+
+      for (const item of [a, h]) {
+        const res = await patch(item.id as string, { body: { ...body, isCompleted: true } });
+        expect(res.status).toBe(409);
+        expect(await res.json()).toEqual({
+          error: "Zuständigkeit und Fälligkeit in der Karte ‚Ausstattung & Zugänge‘ ändern.",
+        });
+      }
+      expect(db.onboardingAufgaben.map((x) => [x.assignee, x.isCompleted, x.relativeDueDays])).toEqual([
+        ["IT", false, -5],
+        ["IT", false, -7],
+      ]);
+      expect(db.audits).toEqual([]);
+    });
+
+    it("HR hakt eine Ausstattungsaufgabe ab und schreibt eine Notiz — wie jede Aufgabe", async () => {
+      const a = ausstattung();
+      db.onboardingAufgaben = [a];
+      const res = await patch(a.id as string, { body: { isCompleted: true, notes: "liegt bereit" } });
+      expect(res.status).toBe(200);
+      expect(db.onboardingAufgaben[0]).toMatchObject({ isCompleted: true, completedById: "u-hr", notes: "liegt bereit" });
+    });
+
+    it.each([true, false])("entfallene Aufgabe: isCompleted %s → 409 AUFGABE_ENTFAELLT, nichts geschrieben", async (wert) => {
+      const entfallen = new Date("2026-09-20T10:00:00.000Z");
+      const a = ausstattung({ entfaelltAm: entfallen, isCompleted: true, completedAt: entfallen, completedById: "u-hr" });
+      db.onboardingAufgaben = [a];
+
+      const res = await patch(a.id as string, { body: { isCompleted: wert, notes: "egal" } });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: MELDUNGEN.AUFGABE_ENTFAELLT, grund: "AUFGABE_ENTFAELLT" });
+      expect(db.onboardingAufgaben[0]).toMatchObject({ entfaelltAm: entfallen, isCompleted: true, notes: null });
+      expect(db.audits).toEqual([]);
+    });
+
+    it("Wettlauf: HR streicht zwischen Lesen und Schreiben → 409, die Aufgabe bleibt entfallen", async () => {
+      const a = ausstattung();
+      db.onboardingAufgaben = [a];
+      const echt = fp.checklistItem.findUnique.getMockImplementation() as (args: unknown) => Promise<Zeile | null>;
+      // Der Lesestand vor der Transaktion ist noch offen; danach streicht die Karte.
+      fp.checklistItem.findUnique.mockImplementationOnce(async (args: unknown) => {
+        const stand = await echt(args);
+        Object.assign(db.onboardingAufgaben[0], { entfaelltAm: new Date(), isCompleted: true, completedById: "u-andere" });
+        return stand;
+      });
+
+      const res = await patch(a.id as string, { body: { isCompleted: true, notes: "zu spät" } });
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({ grund: "AUFGABE_ENTFAELLT" });
+      expect(db.onboardingAufgaben[0]).toMatchObject({ isCompleted: true, completedById: "u-andere", notes: null });
+      expect(db.onboardingAufgaben[0].entfaelltAm).toBeInstanceOf(Date);
+    });
+
+    it("progress zählt Entfallene weder im Zähler noch im Nenner (F2)", async () => {
+      const entfallen = new Date("2026-09-20T10:00:00.000Z");
+      const vorlage = aufgabe({ title: "Benutzerkonto anlegen" });
+      db.onboardingAufgaben = [
+        vorlage,
+        aufgabe({ title: "Zugänge einrichten" }),
+        ausstattung({ entfaelltAm: entfallen, isCompleted: true, completedAt: entfallen }),
+        hinweisAufgabe({ entfaelltAm: entfallen, isCompleted: true, completedAt: entfallen }),
+      ];
+
+      const res = await patch(vorlage.id as string, { body: { isCompleted: true } });
+
+      expect(res.status).toBe(200);
+      expect((await res.json()).progress).toEqual({ total: 2, completed: 1, allCompleted: false });
+    });
+
+    it("Vorlagenaufgaben unverändert: Zuständigkeit und Fälligkeit bleiben im Portal änderbar", async () => {
+      const vorlage = aufgabe({ title: "Benutzerkonto anlegen", relativeDueDays: -7 });
+      db.onboardingAufgaben = [vorlage];
+      db.konfigs = [konfig(), konfig({ departmentKey: "FACILITY", departmentName: "Facility", email: "fm@example.org" })];
+
+      const res = await patch(vorlage.id as string, { body: { assignee: "FACILITY", dueDate: "2026-09-28" } });
+
+      expect(res.status).toBe(200);
+      expect(db.onboardingAufgaben[0]).toMatchObject({
+        assignee: "FACILITY",
+        dueDate: new Date("2026-09-28T00:00:00.000Z"),
+      });
+    });
+  });
 });
 
 // =============================================
@@ -699,9 +978,53 @@ describe("POST /api/modalitaeten/[token]", () => {
     expect(mockTrigger.mock.calls.map((c) => c[0])).not.toContain("onboarding-department-assigned");
   });
 
-  it("lässt einen Fehler beim Setzen der Fälligkeiten die Abgabe nicht umwerfen", async () => {
+  // Paket A3 (S12): Aus der Wahl „Ausstattung & Zugänge" werden mit der Abgabe
+  // die Aufgaben der Stellen — je Option eine, Hinweise als eigene Aufgabe —,
+  // und zwar in derselben (zweiten) Transaktion wie die Faelligkeiten.
+  it("legt mit der Abgabe die Aufgaben aus der Wahl an — je Option eine, ohne Mail", async () => {
+    db.ausstattungZeilen = [
+      neueAusstattungsZeile({
+        id: "aus-schluessel",
+        onboardingId: "onb-1",
+        positionId: "pos-schluessel",
+        departmentKey: "FACILITY",
+        art: "AUSWAHL",
+        bezeichnung: "Schlüssel",
+        aufgabeTitel: "Schlüssel ausgeben",
+        relativeDueDays: -7,
+        auswahl: ["Haupteingang", "Lehrerzimmer"],
+        quelle: "FUEHRUNGSKRAFT",
+      }),
+    ];
+    db.stellenHinweise = [
+      neuerStellenHinweis({ onboardingId: "onb-1", departmentKey: "IT", text: "Bitte Mac statt PC", quelle: "FUEHRUNGSKRAFT" }),
+    ];
+
+    const vorher = new Date();
+    const res = await absenden();
+    expect(res.status).toBe(200);
+
+    const neu = db.onboardingAufgaben.filter((a) => a.herkunft != null);
+    expect(neu.map((a) => a.title)).toEqual([
+      "Schlüssel ausgeben: Haupteingang",
+      "Schlüssel ausgeben: Lehrerzimmer",
+      HINWEIS_AUFGABE_TITEL,
+    ]);
+    // Faelligkeit wie beim Anlegen (Regel 14): nie vor dem Tag der Abgabe.
+    const erwartet = ausstattungsFaelligkeit(BEGINN, -7, vorher)!;
+    for (const a of neu) {
+      expect(a.dueDate).toEqual(erwartet.dueDate);
+      expect(a.eilt).toBe(erwartet.eilt);
+    }
+    expect(db.stellenHinweise[0].checklistItemId).toBe(neu[2].id);
+    // Kein Versand: Abteilungen informiert nur HR per Knopf.
+    expect(db.links).toHaveLength(0);
+    expect(mockTrigger.mock.calls.map((c) => c[0])).not.toContain("onboarding-department-assigned");
+  });
+
+  it("lässt einen Fehler beim Nachholen (Ausstattung und Fälligkeiten) die Abgabe nicht umwerfen", async () => {
     const stumm = jest.spyOn(console, "error").mockImplementation(() => {});
-    mockFaelligkeiten.mockRejectedValue(new Error("Datenbank weg"));
+    mockNachholen.mockRejectedValue(new Error("Datenbank weg"));
 
     const res = await absenden();
 

@@ -41,6 +41,8 @@ import {
 import { triggerWebhooks } from "@/lib/webhooks";
 import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
+import { EVENTS_OHNE_WEBHOOK } from "@/lib/ereignis-liste";
+import { getEventDefinition } from "@/lib/events";
 
 const activeSmtpConfig = {
   id: "default",
@@ -379,6 +381,64 @@ describe("triggerWebhooks (Dispatcher)", () => {
     // E-Mail wurde versendet (primaerer Kanal) UND der Webhook gefeuert
     expect(mockSendMail).toHaveBeenCalled();
     expect(global.fetch).toHaveBeenCalled();
+  });
+
+  // E-A16 (Feinplan F1): Ereignisse aus EVENTS_OHNE_WEBHOOK gehen nur per
+  // Mail hinaus. Die Onboarding-Abteilungsmails tragen den Link der Stelle —
+  // die Payload darf an keine Webhook-URL, auch wenn dort einer eingetragen ist.
+  const webhookAuf = (event: string) => ({
+    id: "w1",
+    event,
+    url: "https://n8n.example.org/webhook/x",
+    authType: "none",
+    authHeader: null,
+    authValue: null,
+    isActive: true,
+  });
+
+  it("Ereignis aus EVENTS_OHNE_WEBHOOK: die Mail geht hinaus, Webhooks werden nicht einmal abgefragt", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue(null); // Code-Default-Vorlage
+    mockPrisma.webhookConfig.findMany.mockResolvedValue([webhookAuf("onboarding-department-assigned")]);
+    mockSendMail.mockResolvedValue({ messageId: "<msg-2>", accepted: ["it@example.org"] });
+    const beispiel = getEventDefinition("onboarding-department-assigned")!.samplePayload;
+
+    const result = await triggerWebhooks("onboarding-department-assigned", beispiel);
+
+    expect(result).toEqual(expect.objectContaining({ status: "SENT" }));
+    expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "it@example.org" }));
+    expect(mockPrisma.emailLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ event: "onboarding-department-assigned", status: "SENT" }),
+    });
+    expect(mockPrisma.webhookConfig.findMany).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("fragt fuer KEIN Ereignis der Liste Webhooks ab — auch wenn die Mail scheitert oder ausfaellt", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue(null);
+    for (const event of Object.keys(EVENTS_OHNE_WEBHOOK)) {
+      mockPrisma.webhookConfig.findMany.mockResolvedValue([webhookAuf(event)]);
+      await expect(triggerWebhooks(event, { email: "it@example.org" })).resolves.toEqual(
+        expect.objectContaining({ status: expect.any(String) }),
+      );
+    }
+    expect(mockPrisma.webhookConfig.findMany).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("die Gegenstuecke im Offboarding feuern ihre Webhooks weiter", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    mockPrisma.emailTemplate.findUnique.mockResolvedValue(null);
+    mockPrisma.webhookConfig.findMany.mockResolvedValue([webhookAuf("offboarding-department-assigned")]);
+    const beispiel = getEventDefinition("offboarding-department-assigned")!.samplePayload;
+
+    await triggerWebhooks("offboarding-department-assigned", beispiel);
+
+    expect(mockPrisma.webhookConfig.findMany).toHaveBeenCalledWith({
+      where: { event: "offboarding-department-assigned", isActive: true },
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("wirft niemals — auch wenn alles fehlschlaegt (liefert das E-Mail-Ergebnis)", async () => {

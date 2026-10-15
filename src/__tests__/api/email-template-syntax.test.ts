@@ -204,3 +204,80 @@ describe("PUT /api/settings/email-templates/[id] — verbotene Variablen im Betr
     expect(res.status).toBe(200);
   });
 });
+
+/**
+ * Paket A3 (Ausstattung & Zugaenge, Regel 17): Die Mails an eine Stelle im
+ * Onboarding tragen Bemerkungen (in der Aufgabenliste), Angaben und den Link
+ * ohne Anmeldung. Nichts davon darf in den Betreff — die Fehlermeldung ist
+ * allgemein gehalten, nicht mehr auf „Unterlagen“ gemuenzt.
+ */
+describe("PUT /api/settings/email-templates/[id] — Betreff der Onboarding-Abteilungsmails", () => {
+  it.each([
+    ["onboarding-department-assigned", "Ihre Aufgaben: {{aufgabenliste}}", "{{aufgabenliste}}"],
+    ["onboarding-department-assigned", "{{#angaben}}Mit Angaben{{/angaben}} für {{abteilung}}", "{{angaben}}"],
+    ["onboarding-department-assigned", "Angaben {{angaben_html}}", "{{angaben_html}}"],
+    ["onboarding-department-assigned", "Aufgaben unter {{magicLink}}", "{{magicLink}}"],
+    ["onboarding-department-reminder", "Erinnerung: {{link}}", "{{link}}"],
+    ["onboarding-department-reminder", "Offen: {{ aufgabenliste_html }}", "{{aufgabenliste_html}}"],
+    ["onboarding-department-reminder", "Nachtrag {{nachtrag_liste}}", "{{nachtrag_liste}}"],
+    // S18 (F19): Die HR-Meldung geht seit E-A17 auch allein wegen eines
+    // Kommentars hinaus — der Freitext der Stelle gehoert nicht in den Betreff.
+    ["onboarding-task-completed", "Aufgabe {{aufgabe}}: {{kommentar_text}}", "{{kommentar_text}}"],
+    ["onboarding-task-completed", "{{#kommentar}}Mit Kommentar: {{/kommentar}}{{aufgabe}}", "{{kommentar}}"],
+    ["onboarding-task-completed", "Liste {{aufgabenliste}}", "{{aufgabenliste}}"],
+    // A4, S25 (G9): Der Uebergabevermerk traegt Kennungen der Stelle.
+    ["onboarding-task-completed", "{{aufgabe}} übergeben: {{ausgabe_vermerk}}", "{{ausgabe_vermerk}}"],
+    ["onboarding-task-completed", "{{#ausgabe_vermerk}}Mit Übergabe {{/ausgabe_vermerk}}{{aufgabe}}", "{{ausgabe_vermerk}}"],
+    ["onboarding-task-completed", "Übergabe {{ausgabe_vermerk_html}}", "{{ausgabe_vermerk_html}}"],
+    // S18 (E-A18): Liste und Portal-Link der Sammelmail.
+    ["onboarding-ausstattung-offen", "Offen: {{offene_liste}}", "{{offene_liste}}"],
+    ["onboarding-ausstattung-offen", "Offen {{offene_liste_html}}", "{{offene_liste_html}}"],
+    ["onboarding-ausstattung-offen", "Ausstattung {{portalLink}}", "{{portalLink}}"],
+    // S19 (E-A20): die erledigten Aufgaben der Absage und jeder Weg zum Link.
+    ["onboarding-department-abgesagt", "Absage: {{erledigte_liste}}", "{{erledigte_liste}}"],
+    ["onboarding-department-abgesagt", "Absage {{erledigte_liste_html}}", "{{erledigte_liste_html}}"],
+    ["onboarding-department-abgesagt", "Absage {{link}}", "{{link}}"],
+    // A4, S27 (G10): die ausgegebenen Stuecke samt Kennung.
+    ["onboarding-department-abgesagt", "Absage – zurücknehmen: {{ausgaben_liste}}", "{{ausgaben_liste}}"],
+    ["onboarding-department-abgesagt", "{{#hat_ausgaben}}{{ausgaben_liste_html}}{{/hat_ausgaben}}", "{{ausgaben_liste_html}}"],
+  ])("%s: %s ergibt 400", async (event, subject, genannt) => {
+    const res = await PUT(req(vorlage({ event, subject })), params("t1"));
+
+    expect(res.status).toBe(400);
+    const { error } = await res.json();
+    expect(error).toContain(genannt);
+    expect(error).toContain("90 Tage im Versandprotokoll");
+    // Allgemeiner Text — gilt fuer jedes Ereignis mit Sperrliste.
+    expect(error).not.toContain("Unterlagen");
+    expect(mockPrisma.emailTemplate.upsert).not.toHaveBeenCalled();
+  });
+
+  it("zusammengesetzter Platzhalter im Betreff der Erinnerung ergibt 400", async () => {
+    const res = await PUT(
+      req(vorlage({ event: "onboarding-department-reminder", subject: "Erinnerung {{li{{#ist_info}}{{/ist_info}}nk}}" })),
+      params("t1"),
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("ineinander geschachtelte");
+  });
+
+  it.each([
+    ["onboarding-department-assigned", "Onboarding-Aufgaben für {{abteilung}}: Dienstbeginn {{vertragsbeginn}} ({{einrichtung}})"],
+    [
+      "onboarding-department-reminder",
+      "{{#ist_eskalation}}Dringend – {{/ist_eskalation}}Erinnerung: Onboarding-Aufgaben für {{abteilung}} – Dienstbeginn {{vertragsbeginn}}",
+    ],
+    ["onboarding-task-completed", "Onboarding-Aufgabe {{meldung_kurz}}: {{aufgabe}} ({{abteilung}})"],
+    [
+      "onboarding-ausstattung-offen",
+      "Noch offene Ausstattung für {{mitarbeiter_name}} – Dienstbeginn {{vertragsbeginn}} ({{vorgangsnummer}})",
+    ],
+    ["onboarding-department-abgesagt", "Absage: Onboarding für {{mitarbeiter_name}} entfällt ({{vorgangsnummer}})"],
+  ])("%s: der Standard-Betreff wird gespeichert", async (event, subject) => {
+    const res = await PUT(req(vorlage({ event, subject })), params("t1"));
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.emailTemplate.upsert).toHaveBeenCalled();
+  });
+});

@@ -12,6 +12,9 @@
  *   4. FREIGABELISTE — eine NEUE Adresse ausserhalb der freigegebenen Domains
  *      ergibt 409 vor jedem Schreiben und jeder Mail; die hinterlegte Adresse
  *      ist immer erlaubt (wie im Offboarding).
+ *   5. MERKER mitAusstattung (Ausstattung & Zugaenge, Regel 2) — der Katalog
+ *      wird in der Transaktion des Links gefragt (gemockt), ein gesetzter
+ *      Merker bleibt beim Erneuern, die Einladung folgt dem wirksamen Merker.
  */
 
 // Der Link wird aus APP_URL gebaut — fest, damit die Erwartungen unten nicht
@@ -25,7 +28,7 @@ const mockPrisma = {
     findUniqueOrThrow: jest.fn(),
     update: jest.fn(),
   },
-  supervisorData: { upsert: jest.fn() },
+  supervisorData: { upsert: jest.fn(), updateMany: jest.fn() },
   auditLog: { create: jest.fn() },
   userOrgAssignment: { findUnique: jest.fn() },
   // Freigabeliste der Empfaenger-Domains (Einstellungen → SMTP).
@@ -34,6 +37,10 @@ const mockPrisma = {
 };
 const mockSession = jest.fn();
 const mockWebhook = jest.fn();
+// Katalog „Ausstattung & Zugänge“: Hier zaehlt nur, DASS die Route fragt (in
+// der Transaktion, mit den Skalaren des Vorgangs) und was sie mit der Antwort
+// tut. Die Filterregeln selbst haelt ausstattung-katalog-lesen.test.ts.
+const mockAngeboten = jest.fn();
 
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 jest.mock("@/lib/auth", () => ({
@@ -43,6 +50,9 @@ jest.mock("@/lib/auth", () => ({
 }));
 jest.mock("@/lib/webhooks", () => ({
   triggerWebhooks: (...a: unknown[]) => mockWebhook(...a),
+}));
+jest.mock("@/lib/ausstattung-katalog", () => ({
+  ausstattungAngebotenIn: (...a: unknown[]) => mockAngeboten(...a),
 }));
 
 import { POST } from "@/app/api/onboarding/[id]/supervisor-link/route";
@@ -121,6 +131,9 @@ beforeEach(() => {
   mockWebhook.mockResolvedValue({ status: "SENT" });
   // Leere Liste = keine Einschraenkung (Auslieferungszustand).
   mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "" });
+  // Leerer Katalog (Auslieferungszustand).
+  mockAngeboten.mockResolvedValue(false);
+  mockPrisma.supervisorData.updateMany.mockResolvedValue({ count: 1 });
 });
 
 describe("Zugriff und Eingabe", () => {
@@ -191,6 +204,8 @@ describe("Neuer Link", () => {
       supervisorToken: null,
       supervisorSubmittedAt: null,
       status: { notIn: ["REVIEWED", "COMPLETED", "EXPIRED"] },
+      // Der Arbeitsort, aus dem der Merker stammt (hier: wie Einrichtung).
+      arbeitsortId: null,
     });
     expect(arg.data).toMatchObject({
       supervisorEmail: "schulleitung@fes.example",
@@ -475,5 +490,153 @@ describe("Freigabeliste der Fuehrungskraft", () => {
 
     expect(res.status).toBe(201);
     expect(mockWebhook).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Merker mitAusstattung (Ausstattung & Zugaenge, Regel 2)", () => {
+  /** Skalare, die `ausstattungAngebotenIn` braucht — das `include` liefert sie mit. */
+  const AM_ARBEITSORT = {
+    arbeitsortId: "org2",
+    questionnaireType: "STANDARD",
+    processType: "EINSTELLUNG",
+  };
+
+  it("fragt den Katalog in der Transaktion des Links — mit Einrichtung, Arbeitsort, Fragebogentyp und Vorgangsart", async () => {
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(vorgang(AM_ARBEITSORT));
+    let offen = false;
+    let imKatalogOffen: boolean | null = null;
+    mockPrisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => {
+      offen = true;
+      try {
+        return await fn(mockPrisma);
+      } finally {
+        offen = false;
+      }
+    });
+    mockAngeboten.mockImplementation(async () => {
+      imKatalogOffen = offen;
+      return true;
+    });
+
+    expect((await aufrufen()).status).toBe(201);
+
+    expect(mockAngeboten).toHaveBeenCalledWith(mockPrisma, {
+      organizationId: "org1",
+      ...AM_ARBEITSORT,
+    });
+    expect(imKatalogOffen).toBe(true);
+    // Erst der Katalog, dann der Link (dieselbe Transaktion, vor dem Schreiben).
+    // Die Sperre traegt den Arbeitsort, mit dem der Katalog gefragt wurde —
+    // steht der Vorgang dort nicht mehr, trifft sie nichts (Fall unten).
+    expect(mockAngeboten.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPrisma.onboardingProcess.updateMany.mock.invocationCallOrder[0],
+    );
+    expect(mockPrisma.onboardingProcess.updateMany.mock.calls[0][0].where.arbeitsortId).toBe(
+      mockAngeboten.mock.calls[0][1].arbeitsortId,
+    );
+    expect(mockPrisma.supervisorData.upsert.mock.calls[0][0].create).toEqual({
+      onboardingId: "ob1",
+      mitAusstattung: true,
+    });
+  });
+
+  it("Arbeitsort zwischen Lesen und Sperre geaendert: 409, kein Merker aus dem Katalog des alten Orts, keine Mail", async () => {
+    // HR-Tab 1 aendert den Arbeitsort von org2 auf org3 (PATCH, bedingt auf
+    // supervisorToken: null), Tab 2 erzeugt gleichzeitig den ersten Link und
+    // hat noch org2 gelesen. Die Sperre verlangt org2 und trifft nichts.
+    mockPrisma.onboardingProcess.findUnique
+      .mockResolvedValueOnce(vorgang(AM_ARBEITSORT))
+      .mockResolvedValueOnce(vorgang({ ...AM_ARBEITSORT, arbeitsortId: "org3" }));
+    mockAngeboten.mockResolvedValue(true);
+    // Die Zeile steht schon auf org3: Ein UPDATE ohne Arbeitsort im WHERE
+    // traefe sie (so entstand der Merker frueher aus dem Katalog von org2).
+    mockPrisma.onboardingProcess.updateMany.mockImplementation(
+      async ({ where }: { where: { arbeitsortId?: string | null } }) => ({
+        count: where.arbeitsortId === undefined || where.arbeitsortId === "org3" ? 1 : 0,
+      }),
+    );
+
+    const res = await aufrufen();
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe(
+      "Der Vorgang wurde gerade geändert. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
+    );
+    expect(mockPrisma.onboardingProcess.updateMany.mock.calls[0][0].where.arbeitsortId).toBe("org2");
+    expect(mockPrisma.supervisorData.upsert).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    expect(mockWebhook).not.toHaveBeenCalled();
+  });
+
+  it("Einladung mit ausstattung_angeboten \"ja\", wenn der Merker wirksam gesetzt ist", async () => {
+    mockAngeboten.mockResolvedValue(true);
+    mockPrisma.supervisorData.upsert.mockResolvedValue({ mitAusstattung: true, currentStep: 0 });
+
+    await aufrufen();
+
+    expect(mockWebhook.mock.calls[0][1].ausstattung_angeboten).toBe("ja");
+  });
+
+  it("leerer Katalog: Merker false, Einladung ohne den Satz", async () => {
+    mockPrisma.supervisorData.upsert.mockResolvedValue({ mitAusstattung: false, currentStep: 0 });
+
+    await aufrufen();
+
+    expect(mockPrisma.supervisorData.upsert.mock.calls[0][0].create.mitAusstattung).toBe(false);
+    expect(mockWebhook.mock.calls[0][1].ausstattung_angeboten).toBe("");
+  });
+
+  it("neuer Link fuer eine bestehende Zeile: ein gesetzter Merker bleibt, auch wenn der Katalog heute anbietet", async () => {
+    // Abgelaufener Link, die Fuehrungskraft hat schon zwei Schritte gespeichert.
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({
+        supervisorToken: "alter-token",
+        supervisorEmail: "schulleitung@fes.example",
+        supervisorTokenExpiresAt: new Date(Date.now() - 1000),
+      }),
+    );
+    mockAngeboten.mockResolvedValue(true);
+    mockPrisma.supervisorData.upsert.mockResolvedValue({ mitAusstattung: false, currentStep: 2 });
+
+    expect((await aufrufen()).status).toBe(201);
+
+    expect(mockPrisma.supervisorData.upsert.mock.calls[0][0].update).toEqual({});
+    expect(mockPrisma.supervisorData.updateMany).not.toHaveBeenCalled();
+    // Die Mail verspricht nur den Schritt, den das Formular auch zeigt.
+    expect(mockWebhook.mock.calls[0][1].ausstattung_angeboten).toBe("");
+  });
+
+  it("Altzeile ohne Merker, Formular nie gespeichert: der neue Link setzt ihn bedingt", async () => {
+    mockAngeboten.mockResolvedValue(true);
+    mockPrisma.supervisorData.upsert.mockResolvedValue({ mitAusstattung: null, currentStep: 0 });
+
+    await aufrufen();
+
+    expect(mockPrisma.supervisorData.updateMany).toHaveBeenCalledWith({
+      where: { onboardingId: "ob1", mitAusstattung: null, currentStep: 0 },
+      data: { mitAusstattung: true },
+    });
+    expect(mockWebhook.mock.calls[0][1].ausstattung_angeboten).toBe("ja");
+  });
+
+  it("ein wiederverwendeter Link fragt den Katalog nicht und aendert nichts", async () => {
+    mockPrisma.onboardingProcess.findUnique.mockResolvedValue(
+      vorgang({
+        supervisorToken: "alter-token",
+        supervisorEmail: "schulleitung@fes.example",
+        supervisorTokenExpiresAt: MORGEN(),
+      }),
+    );
+
+    expect((await aufrufen()).status).toBe(200);
+    expect(mockAngeboten).not.toHaveBeenCalled();
+    expect(mockPrisma.supervisorData.upsert).not.toHaveBeenCalled();
+  });
+
+  it("ein abgewiesener Aufruf (409 Freigabeliste) fragt den Katalog nicht", async () => {
+    mockPrisma.smtpConfig.findUnique.mockResolvedValue({ allowedRecipientDomains: "fes.example" });
+
+    expect((await aufrufen({ supervisorEmail: "leitung@freemail.example" })).status).toBe(409);
+    expect(mockAngeboten).not.toHaveBeenCalled();
   });
 });

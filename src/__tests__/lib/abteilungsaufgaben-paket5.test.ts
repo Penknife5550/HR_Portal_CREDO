@@ -209,10 +209,65 @@ describe("Zusatzfelder im Onboarding", () => {
       },
     ]);
     expect(h.hinweis).toBe("Keine Angaben aus dem Personalfragebogen.");
+    // Ohne Ausstattung: kein Satz dazu (Paket A3, S14).
+    expect(h.ausstattungSatz).toBeNull();
     expect(sichtbarkeitsHinweis("OFFBOARDING", [{ departmentKey: "IT", departmentName: "IT" }])).toEqual({
       alle: MODUL_TEXTE.OFFBOARDING.grunddaten,
       zusaetzlich: [],
       hinweis: null,
+    });
+  });
+
+  // ---- Paket A3 (S14): der Satz zu „Ausstattung & Zugänge“ (Mockup 6.4) ----
+
+  describe("ausstattungSatz", () => {
+    const IT = { departmentKey: "IT", departmentName: "IT-Abteilung", vorschau: { mitBemerkung: 2 } };
+    const FM = { departmentKey: "FACILITY", departmentName: "Facility Management", vorschau: { mitBemerkung: 0 } };
+    const BH = { departmentKey: "BUCHHALTUNG", departmentName: "Buchhaltung", vorschau: null };
+    const SICHT = {
+      stellen: {
+        IT: { angaben: ["Unterrichtsfächer"], hinweis: true },
+        FACILITY: { angaben: ["Unterrichtsfächer"], hinweis: false },
+      },
+    };
+
+    it("Mockup 6.4: Bemerkungen, Angaben mit ihren Stellen, Hinweis an die eigene Stelle", () => {
+      expect(sichtbarkeitsHinweis("ONBOARDING", [IT, FM], SICHT).ausstattungSatz).toBe(
+        "Zu ihren Aufgaben: die Bemerkungen der Führungskraft bzw. der Personalabteilung. " +
+          "Dazu die Angaben „Unterrichtsfächer“ (IT-Abteilung, Facility Management) und der Hinweis an die eigene Stelle (IT-Abteilung).",
+      );
+    });
+
+    it("nur die Empfänger DIESES Versands zählen — eine Stelle außerhalb erscheint nicht", () => {
+      // Facility wird diesmal nicht informiert: Weder ihre Angabe noch ihr Name stehen im Satz.
+      expect(sichtbarkeitsHinweis("ONBOARDING", [IT], SICHT).ausstattungSatz).toBe(
+        "Zu ihren Aufgaben: die Bemerkungen der Führungskraft bzw. der Personalabteilung. " +
+          "Dazu die Angaben „Unterrichtsfächer“ (IT-Abteilung) und der Hinweis an die eigene Stelle (IT-Abteilung).",
+      );
+      // Nur die Buchhaltung: nichts aus „Ausstattung & Zugänge“.
+      expect(sichtbarkeitsHinweis("ONBOARDING", [BH], SICHT).ausstattungSatz).toBeNull();
+    });
+
+    it("Teile fehlen, wenn es sie nicht gibt; mehrere Angaben werden aufgezählt", () => {
+      expect(sichtbarkeitsHinweis("ONBOARDING", [IT], null).ausstattungSatz).toBe(
+        "Zu ihren Aufgaben: die Bemerkungen der Führungskraft bzw. der Personalabteilung.",
+      );
+      expect(
+        sichtbarkeitsHinweis("ONBOARDING", [FM, { ...IT, vorschau: null }], {
+          stellen: {
+            IT: { angaben: ["Gewünschte Durchwahl", "Unterrichtsfächer"], hinweis: false },
+            FACILITY: { angaben: ["Unterrichtsfächer"], hinweis: false },
+          },
+        }).ausstattungSatz,
+      ).toBe("Dazu die Angaben „Unterrichtsfächer“ (Facility Management, IT-Abteilung) und „Gewünschte Durchwahl“ (IT-Abteilung).");
+      expect(
+        sichtbarkeitsHinweis("ONBOARDING", [{ ...IT, vorschau: null }], { stellen: { IT: { angaben: [], hinweis: true } } })
+          .ausstattungSatz,
+      ).toBe("Dazu der Hinweis an die eigene Stelle (IT-Abteilung).");
+    });
+
+    it("Offboarding: kein Schlüssel, auch nicht mit Angaben", () => {
+      expect(sichtbarkeitsHinweis("OFFBOARDING", [IT], SICHT)).not.toHaveProperty("ausstattungSatz");
     });
   });
 });
@@ -308,6 +363,35 @@ describe("abteilungsZeilenBauen (Paket 5)", () => {
     expect(unbekannteZustaendigkeiten).toEqual(["Hausmeister"]);
     expect(zeilen.some((z) => z.departmentKey === "Hausmeister")).toBe(false);
   });
+
+  // ---- Paket A3 (S14): Kennzeichen der Ausstattung (Mockup 6.4, F2) ----
+
+  it("Ausstattung: Vorschau zaehlt Herkunft und Bemerkung der OFFENEN Aufgaben; `gesamt` ohne Entfallene", () => {
+    const { zeilen } = abteilungsZeilenBauen({
+      ...basis,
+      aufgaben: [
+        ...aufgaben,
+        { id: "x1", title: "Dienst-iPad bereitstellen", assigneeDepartment: "IT", isCompleted: false, dueDate: null, herkunft: "AUSSTATTUNG", mitBemerkung: true },
+        { id: "x2", title: "Zugang einrichten: WebUntis", assigneeDepartment: "IT", isCompleted: false, dueDate: null, herkunft: "AUSSTATTUNG", mitBemerkung: false },
+        { id: "x3", title: "Hinweis der Führungskraft beachten", assigneeDepartment: "IT", isCompleted: false, dueDate: null, herkunft: "HINWEIS" },
+        // erledigt bzw. entfallen: in keinem Zaehler der Vorschau
+        { id: "x4", title: "Telefon bereitstellen", assigneeDepartment: "IT", isCompleted: true, dueDate: null, herkunft: "AUSSTATTUNG", mitBemerkung: true },
+        { id: "x5", title: "Parkplatz bereitstellen", assigneeDepartment: "IT", isCompleted: true, dueDate: null, herkunft: "AUSSTATTUNG", mitBemerkung: true, entfaellt: true },
+      ],
+    });
+    const zeile = zeilen.find((z) => z.departmentKey === "IT")!;
+    expect(zeile.vorschau).toMatchObject({ ausstattung: 3, mitBemerkung: 1 });
+    // Die Aufgaben der Vorschau behalten ihre Form — keine Kennzeichen, keine Texte.
+    for (const a of zeile.vorschau!.aufgaben) expect(Object.keys(a).sort()).toEqual(["description", "dueDate", "id", "title"]);
+    // 4 aus der Vorlage + 4 Ausstattung, die entfallene zaehlt nicht mit (F2).
+    expect(zeile.aufgaben).toMatchObject({ gesamt: 8, offen: 6 });
+  });
+
+  it("ohne Ausstattungsaufgabe fehlen die Zaehler ganz (Offboarding, Bestand)", () => {
+    const { zeilen } = abteilungsZeilenBauen(basis);
+    expect(zeilen[0].vorschau).not.toHaveProperty("ausstattung");
+    expect(zeilen[0].vorschau).not.toHaveProperty("mitBemerkung");
+  });
 });
 
 // =============================================
@@ -362,7 +446,25 @@ describe("onboardingAbteilungsMailFelder", () => {
       mandantNumber: "01",
       contractStartDate: "2026-10-01T00:00:00.000Z",
       vertragsbeginn: "01.10.2026",
+      // Einrichtung = Arbeitsort: leer, der Schluessel steht trotzdem da (F15).
+      arbeitsort: "",
     });
+  });
+
+  it("Arbeitsort (F15): nur gefuellt, wenn er von der Einrichtung abweicht", () => {
+    const grundschule = { arbeitsortId: "org-gs", arbeitsort: { name: "Grundschule Minden" } };
+    expect(onboardingAbteilungsMailFelder({ ...basis, organizationId: "org-fv", ...grundschule })).toMatchObject({
+      einrichtung: "FES Minden",
+      arbeitsort: "Grundschule Minden",
+    });
+    // Gleiche ID, gleicher Name oder kein Name: nie „Arbeitsort: FES Minden“.
+    expect(
+      onboardingAbteilungsMailFelder({ ...basis, organizationId: "org-gs", ...grundschule }).arbeitsort,
+    ).toBe("");
+    expect(
+      onboardingAbteilungsMailFelder({ ...basis, arbeitsortId: "org-x", arbeitsort: { name: " FES Minden " } }).arbeitsort,
+    ).toBe("");
+    expect(onboardingAbteilungsMailFelder({ ...basis, arbeitsortId: null, arbeitsort: null }).arbeitsort).toBe("");
   });
 
   it("ohne Namen die neutrale Bezeichnung — nie leer, nie eine Adresse; kein email-Feld", () => {

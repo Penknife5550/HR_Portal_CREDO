@@ -34,6 +34,35 @@ export function moduleLabel(value: string): string {
   return AVAILABLE_MODULES.find((m) => m.value === value)?.label || value;
 }
 
+/** Ein Feld je Eintrag einer Liste, z.B. {ausgabe_stelle}. */
+export interface ListenFeld {
+  /** Name OHNE Klammern; traegt ein Praefix (nie ein Name der Person). */
+  name: string;
+  /** Deutsche Beschreibung fuer die UI. */
+  label: string;
+}
+
+/**
+ * Eine Liste (Schleife in der Word-Vorlage):
+ *
+ *   {#ausgaben_je_stelle} … {ausgabe_stelle} …
+ *     {#gegenstaende}{ausgabe_gegenstand} …{/gegenstaende}
+ *   {/ausgaben_je_stelle}
+ *   {^ausgaben_je_stelle}Leersatz{/ausgaben_je_stelle}
+ *
+ * Der Resolver liefert ein Array, in dem JEDES innere Feld gesetzt ist ("" statt
+ * fehlend) – sonst griffe der Ausdrucks-Parser auf einen gleichnamigen Wert der
+ * Person zurueck oder setzte "___". Die inneren Namen sind keine Eingabefelder
+ * im Editor, und „Erzeugen“ ueberschreibt eine Liste nie mit einem Handwert
+ * (`istListenPlatzhalter`, `handwerteOhneListen`).
+ */
+export interface ListenDef {
+  /** Felder je Eintrag. */
+  felder: ListenFeld[];
+  /** Eine Liste in jedem Eintrag (z.B. die Gegenstaende je Stelle). */
+  unterliste?: ListenFeld & { felder: ListenFeld[] };
+}
+
 export interface PlaceholderDef {
   /** Variablenname OHNE geschweifte Klammern, z.B. "vorname". */
   key: string;
@@ -45,6 +74,8 @@ export interface PlaceholderDef {
   group?: string;
   /** Sensibles Feld (wird entschluesselt + auditiert). */
   sensitive?: boolean;
+  /** Gesetzt, wenn der Platzhalter eine Liste ist (Schleife, S33). */
+  liste?: ListenDef;
 }
 
 /** Allgemeine Platzhalter (commonPlaceholders) — fuer ALLE Module verfuegbar. */
@@ -121,6 +152,44 @@ export const ONBOARDING_PLACEHOLDERS: PlaceholderDef[] = [
   { key: "wochenstunden", label: "Wochenstunden", example: "39", group: "Vertrag" },
   { key: "probezeit_monate", label: "Probezeit (Monate)", example: "6", group: "Vertrag" },
   { key: "urlaubstage", label: "Urlaubstage pro Jahr", example: "30", group: "Vertrag" },
+  // Ausstattung & Zugaenge (E-A25): fuer ein Schreiben „Was Sie am ersten Tag
+  // erhalten“. Nur Katalogtitel und gewaehlte Optionen, eine Zeile je
+  // Position — nie Bemerkungen, Angaben oder Hinweise (Freitext fuer die
+  // Stellen) und nie Erstzugaenge. Resolver: `ausstattungListe` (ausstattung.ts).
+  {
+    key: "ausstattung_liste",
+    label: "Ausstattung & Zugänge (eine Zeile je Position, ohne Bemerkungen)",
+    example: "Zugänge: Dienst-E-Mail, WebUntis",
+    group: "Ausstattung",
+  },
+  // Ausgaben je Stueck (A4, G19, Feinplan 1.9): nur aktive Ausgaben der
+  // Einstellung (noch bei der Person), nie Kommentare der Stelle. Die
+  // System-Vorlage „Übergabeprotokoll Ausstattung“ nutzt die Liste je Stelle
+  // (eine Seite je ausgebender Stelle). Resolver: `ausgabenPlatzhalter`.
+  {
+    key: "ausgaben_je_stelle",
+    label: "Ausgaben je ausgebender Stelle (Liste, z. B. eine Seite je Stelle)",
+    group: "Ausgaben",
+    liste: {
+      felder: [{ name: "ausgabe_stelle", label: "Ausgebende Stelle" }],
+      unterliste: {
+        name: "gegenstaende",
+        label: "Gegenstände und Zugänge dieser Stelle",
+        felder: [
+          { name: "ausgabe_gegenstand", label: "Gegenstand bzw. Zugang" },
+          { name: "ausgabe_kennung", label: "Kennung (z. B. Inventar- oder Schlüsselnummer)" },
+          { name: "ausgabe_uebergeben_am", label: "Übergeben bzw. eingerichtet am" },
+        ],
+      },
+    },
+  },
+  {
+    key: "ausgaben_liste",
+    label: "Ausgegebene Gegenstände und Zugänge (eine Zeile je Stück)",
+    example: "Dienst-iPad (Lernmittel) · FES-IPAD-0412 · übergeben 28.01.2027",
+    group: "Ausgaben",
+  },
+  { key: "ausgaben_anzahl", label: "Anzahl ausgegebener Stücke", example: "3", group: "Ausgaben" },
 ];
 
 /**
@@ -270,10 +339,33 @@ export const OFFBOARDING_PLACEHOLDERS: PlaceholderDef[] = [
   { key: "zeugnis_gesamtformulierung", label: "Zufriedenheitsformel fuer das Zeugnis", example: "stets zu unserer vollen Zufriedenheit", group: "Zeugnis" },
   { key: "beurteiler_name", label: "Bewertende Fuehrungskraft", example: "Thomas Schmidt", group: "Zeugnis" },
 
-  // Rueckgaben
-  { key: "rueckgaben_liste", label: "Zurueckgegebene Gegenstaende (eine Zeile je Eintrag)", example: "Laptop Dell Latitude (SN: ABC123), zurueck am 30.06.2026", group: "Rueckgaben" },
-  { key: "rueckgaben_offen_liste", label: "Noch offene Rueckgaben (eine Zeile je Eintrag)", example: "Schluessel Haupteingang", group: "Rueckgaben" },
-  { key: "rueckgaben_offen_anzahl", label: "Anzahl offener Rueckgaben", example: "2", group: "Rueckgaben" },
+  // Rueckgaben. Seit A4 (G16) heisst „offen“: ohne Zustand; `rueckgaben_liste`
+  // nennt jede Zeile mit Zustand samt Zustandswort (1.9).
+  { key: "rueckgaben_liste", label: "Rückgaben mit Zustand (eine Zeile je Eintrag, z. B. „— fehlt“)", example: "Laptop Dell Latitude (ABC123) — zurueck am 30.06.2026", group: "Rückgaben" },
+  { key: "rueckgaben_offen_liste", label: "Noch offene Rückgaben (eine Zeile je Eintrag)", example: "Schlüssel: Haupteingang", group: "Rückgaben" },
+  { key: "rueckgaben_offen_anzahl", label: "Anzahl offener Rückgaben", example: "2", group: "Rückgaben" },
+  // Je zustaendiger Stelle (A4, G19, Feinplan 1.9) – die System-Vorlage
+  // „Rückgabeprotokoll Ausstattung“ nutzt sie (eine Seite je Stelle). Von HR
+  // erfasste Zeilen stehen unter „Personalabteilung“, offene haben einen
+  // leeren Zustand (zum Ausfuellen von Hand). Nie Zustandsnotiz oder Notiz.
+  {
+    key: "rueckgaben_je_stelle",
+    label: "Rückgaben je zuständiger Stelle (Liste, z. B. eine Seite je Stelle)",
+    group: "Rückgaben",
+    liste: {
+      felder: [{ name: "rueckgabe_stelle", label: "Zuständige Stelle" }],
+      unterliste: {
+        name: "gegenstaende",
+        label: "Gegenstände dieser Stelle",
+        felder: [
+          { name: "rueckgabe_gegenstand", label: "Gegenstand" },
+          { name: "rueckgabe_kennung", label: "Kennung (z. B. Inventar- oder Schlüsselnummer)" },
+          { name: "rueckgabe_zustand", label: "Zustand (leer = noch offen)" },
+          { name: "rueckgabe_am", label: "Zurück am" },
+        ],
+      },
+    },
+  },
 ];
 
 /**
@@ -376,6 +468,87 @@ export const PLACEHOLDER_CATALOG: Record<string, PlaceholderDef[]> = {
 /** Liefert die verfuegbaren Platzhalter fuer ein Modul (Fallback: ALLGEMEIN). */
 export function getPlaceholderCatalog(modul: string): PlaceholderDef[] {
   return PLACEHOLDER_CATALOG[(modul ?? "").toUpperCase()] ?? ALLGEMEIN_PLACEHOLDERS;
+}
+
+// =============================================
+// Listen (S33, Feinplan A4 1.9)
+// =============================================
+
+/** Alle Namen einer Liste: der Schluessel selbst, seine Felder, die Unterliste und deren Felder. */
+export function listenNamen(def: PlaceholderDef): string[] {
+  if (!def.liste) return [];
+  const { felder, unterliste } = def.liste;
+  return [
+    def.key,
+    ...felder.map((f) => f.name),
+    ...(unterliste ? [unterliste.name, ...unterliste.felder.map((f) => f.name)] : []),
+  ];
+}
+
+/**
+ * Jeder Name, der zu einer Liste des Katalogs gehoert (modul-uebergreifend,
+ * klein geschrieben) – Listenschluessel und innere Namen. Bewusst ueber ALLE
+ * Module: Eine Vorlage traegt ihr eigenes Modul, befuellt wird sie aber vom
+ * Resolver des Vorgangs (siehe `SENSIBLE_FELDER`).
+ */
+const LISTEN_PLATZHALTER: ReadonlySet<string> = new Set(
+  Object.values(PLACEHOLDER_CATALOG)
+    .flat()
+    .flatMap((d) => listenNamen(d))
+    .map((n) => n.toLowerCase()),
+);
+
+/**
+ * Gehoert dieser Platzhalter zu einer Liste (Schluessel oder innerer Name)?
+ * Dann ist er im Editor kein Eingabefeld, und „Erzeugen“ nimmt fuer ihn keinen
+ * Handwert an. Gross-/Kleinschreibung, Klammern und Punkt-Notation zaehlen
+ * nicht (wie `sensiblePlatzhalter`).
+ */
+export function istListenPlatzhalter(name: string): boolean {
+  return LISTEN_PLATZHALTER.has(normalisiere(name));
+}
+
+/**
+ * Die Platzhalter einer Vorlage, fuer die der Editor ein Eingabefeld zeigt:
+ * alles ausser Listen und ihren inneren Namen. Reihenfolge wie geliefert.
+ */
+export function eingabePlatzhalter(platzhalter: ReadonlyArray<string>): string[] {
+  return platzhalter.filter((p) => !istListenPlatzhalter(p));
+}
+
+/**
+ * Die Listen, die eine Vorlage nutzt (Schluessel aus dem Katalog des Moduls,
+ * sonst aus allen Modulen) – fuer den Hinweis „wird aus dem Vorgang gefüllt“
+ * im Editor. Nur Listenschluessel, keine inneren Namen.
+ */
+export function vorlagenListen(platzhalter: ReadonlyArray<string>, modul: string): PlaceholderDef[] {
+  const genutzt = new Set(platzhalter.map((p) => normalisiere(p)));
+  const katalog = [...getPlaceholderCatalog(modul), ...Object.values(PLACEHOLDER_CATALOG).flat()];
+  const gesehen = new Set<string>();
+  return katalog.filter((d) => {
+    if (!d.liste || !genutzt.has(d.key.toLowerCase()) || gesehen.has(d.key)) return false;
+    gesehen.add(d.key);
+    return true;
+  });
+}
+
+/**
+ * Die Handwerte des Erzeugen-Dialogs ohne Listen: Was der Resolver als Array
+ * liefert, ueberschreibt nie ein Handwert, und fuer Listenschluessel und
+ * innere Namen gilt kein Handwert (auch wenn der Resolver nichts lieferte –
+ * eine Zeichenkette an Stelle einer Liste druckte die Schleife einmal mit
+ * diesem Text). Alles andere bleibt unveraendert.
+ */
+export function handwerteOhneListen(
+  werte: Readonly<Record<string, string>> | null | undefined,
+  aufgeloest: Readonly<Record<string, unknown>>,
+): Record<string, string> {
+  const ergebnis: Record<string, string> = {};
+  for (const [key, wert] of Object.entries(werte ?? {})) {
+    if (Array.isArray(aufgeloest[key]) || istListenPlatzhalter(key)) continue;
+    ergebnis[key] = wert;
+  }
+  return ergebnis;
 }
 
 // =============================================

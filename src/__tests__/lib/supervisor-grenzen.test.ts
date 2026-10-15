@@ -28,6 +28,11 @@ import {
   supStep3Schema,
   supStep4Schema,
 } from "@/lib/validations/supervisor-data";
+import { GRENZEN } from "@/lib/ausstattung";
+import { modalitaetenAusstattungSchema } from "@/lib/validations/ausstattung";
+
+/** Eine gueltige Positions-ID fuer die Grenzfaelle der Ausstattung. */
+const UUID = "11111111-1111-4111-8111-111111111111";
 
 // =============================================
 // Gueltige Ausgangsdaten je Schritt
@@ -252,6 +257,71 @@ describe("Die Grenzen stimmen mit dem Server ueberein", () => {
     expect(server).not.toBeNull();
     expect(server!.min).toBe(min);
     expect(server!.max).toBe(max);
+  });
+});
+
+// =============================================
+// Schritt „Ausstattung & Zugänge“ (Paket A2, Feinplan S8)
+// =============================================
+/**
+ * Formular (Zeichenzaehler) und Server lesen dieselben Grenzen: `GRENZEN` in
+ * src/lib/ausstattung.ts. Die Route schreibt sie nicht selbst hin, sondern
+ * bindet `modalitaetenAusstattungSchema` ein — ohne das fielen `ausstattung`
+ * und `hinweise` wegen `.strip()` still aus dem Aufruf.
+ */
+describe("Ausstattung: die Route bindet modalitaetenAusstattungSchema ein, die Grenzen kommen aus GRENZEN", () => {
+  const quelle = (...teile: string[]) => fs.readFileSync(path.join(process.cwd(), ...teile), "utf-8");
+  const route = quelle("src", "app", "api", "modalitaeten", "[token]", "route.ts");
+  const validierung = quelle("src", "lib", "validations", "ausstattung.ts");
+  /** Der Teil der Validierung fuer das Formular der Fuehrungskraft (ab seiner Ueberschrift). */
+  const formularTeil = validierung.slice(validierung.indexOf("Formular der Fuehrungskraft"));
+
+  it("modalitaetenFieldsSchema mergt modalitaetenAusstattungSchema", () => {
+    expect(route).toMatch(/import\s*\{\s*modalitaetenAusstattungSchema\s*\}\s*from\s*"@\/lib\/validations\/ausstattung"/);
+    expect(route).toMatch(/const modalitaetenFieldsSchema = z\.object\(\{[\s\S]*?\}\)\.merge\(modalitaetenAusstattungSchema\)\.strip\(\);/);
+  });
+
+  it("die Felder stehen nicht in ALLOWED_FIELDS (eigene Tabellen, nicht SupervisorData)", () => {
+    const erlaubt = route.slice(route.indexOf("const ALLOWED_FIELDS"), route.indexOf("]);", route.indexOf("const ALLOWED_FIELDS")));
+    expect(erlaubt).not.toMatch(/"ausstattung"|"hinweise"/);
+  });
+
+  it("im Formularteil der Validierung steht keine Zahl als Grenze, nur GRENZEN", () => {
+    expect(formularTeil.length).toBeGreaterThan(0);
+    expect(formularTeil).not.toMatch(/\.max\(\d+/);
+    for (const g of ["wahlJeVorgang", "hinweiseJeVorgang", "optionen", "angabe", "bemerkung", "hinweis"]) {
+      expect(formularTeil).toContain(`GRENZEN.${g}`);
+    }
+  });
+
+  const GRENZFAELLE = [
+    { name: "bemerkung", max: GRENZEN.bemerkung, body: (n: number) => ({ ausstattung: [{ positionId: UUID, gewaehlt: true, bemerkung: "x".repeat(n) }] }) },
+    { name: "angabe", max: GRENZEN.angabe, body: (n: number) => ({ ausstattung: [{ positionId: UUID, angabe: "x".repeat(n) }] }) },
+    { name: "hinweis", max: GRENZEN.hinweis, body: (n: number) => ({ hinweise: [{ departmentKey: "IT", hinweis: "x".repeat(n) }] }) },
+    {
+      name: "Positionen je Vorgang",
+      max: GRENZEN.wahlJeVorgang,
+      body: (n: number) => ({ ausstattung: Array.from({ length: n }, () => ({ positionId: UUID, gewaehlt: true })) }),
+    },
+    {
+      name: "Hinweise je Vorgang",
+      max: GRENZEN.hinweiseJeVorgang,
+      body: (n: number) => ({ hinweise: Array.from({ length: n }, () => ({ departmentKey: "IT", hinweis: "x" })) }),
+    },
+    {
+      name: "Optionen je Auswahl",
+      max: GRENZEN.optionen,
+      body: (n: number) => ({ ausstattung: [{ positionId: UUID, auswahl: Array.from({ length: n }, (_, i) => `Option ${i}`) }] }),
+    },
+  ];
+
+  it.each(GRENZFAELLE)("$name: genau die Grenze geht, eins mehr wird deutsch abgewiesen", ({ max, body }) => {
+    expect(modalitaetenAusstattungSchema.safeParse(body(max)).success).toBe(true);
+    const zuViel = modalitaetenAusstattungSchema.safeParse(body(max + 1));
+    expect(zuViel.success).toBe(false);
+    if (!zuViel.success) {
+      for (const i of zuViel.error.issues) expect(istDeutsch(i.message)).toBe(true);
+    }
   });
 });
 

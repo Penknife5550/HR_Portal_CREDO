@@ -28,6 +28,7 @@ import {
   type PflichtQuelle,
 } from "@/lib/required-documents";
 import { masernschutzPflichtig } from "@/lib/masernschutz";
+import { $Enums } from "@prisma/client";
 
 describe("computeMissingRequiredDocuments", () => {
   it("meldet fehlende Pflichtdokumente", () => {
@@ -418,6 +419,57 @@ describe("Anzeige und Vorlagen-Editor kennen die neuen Typen", () => {
     for (const typ of ["AUFENTHALTSTITEL", "ARBEITSERLAUBNIS", "PKV_NACHWEIS"]) {
       expect(SELECTABLE_DOCUMENT_TYPES).toContain(typ);
     }
+  });
+});
+
+/**
+ * Ausstattung & Zugaenge (A4, E-A34): Das unterschriebene Uebergabeprotokoll
+ * laedt nur HR hoch. Es hat eine Beschriftung (Dokumentenliste, Download), ist
+ * aber nie waehlbar — weder als Pflichtdokument einer Fragebogen-Vorlage noch
+ * in der Liste, die die Person im Fragebogen sieht (G19).
+ */
+describe("UEBERGABEPROTOKOLL (A4)", () => {
+  it("hat eine Beschriftung", () => {
+    expect(DOCUMENT_TYPE_LABELS.UEBERGABEPROTOKOLL).toBe("Übergabeprotokoll Ausstattung");
+    expect(documentTypeLabel("UEBERGABEPROTOKOLL")).toBe("Übergabeprotokoll Ausstattung");
+  });
+
+  it("ist nicht wählbar", () => {
+    expect(SELECTABLE_DOCUMENT_TYPES).not.toContain("UEBERGABEPROTOKOLL");
+  });
+
+  it("ist der einzige Wert des Enums außerhalb der Positivliste; jeder Wert hat eine Beschriftung", () => {
+    // Die Positivliste der Fragebogen-Route (S34) aendert damit fuer den Bestand nichts.
+    const alle = Object.values($Enums.DocumentType);
+    expect(alle.filter((t) => !SELECTABLE_DOCUMENT_TYPES.includes(t))).toEqual(["UEBERGABEPROTOKOLL"]);
+    expect(Object.keys(DOCUMENT_TYPE_LABELS).sort()).toEqual([...alle].sort());
+  });
+
+  it("ist weder sensibel noch Schriftform noch nachreichbar", () => {
+    expect(SENSIBLE_DOKUMENTTYPEN).not.toContain("UEBERGABEPROTOKOLL");
+    expect(SCHRIFTFORM_DOKUMENTTYPEN).not.toContain("UEBERGABEPROTOKOLL");
+    expect(NACHREICHBARE_PFLICHTEN).not.toContain("UEBERGABEPROTOKOLL");
+  });
+
+  it("erledigt keinen offenen Nachweis und wird selbst nie als offen gemeldet (S34)", () => {
+    // Der Kasten „Offene Nachweise" und die Vorauswahl der Nachforderung lesen
+    // `offeneNachweise` mit den Typen ALLER Dokumente des Vorgangs — ein
+    // hochgeladenes Uebergabeprotokoll darf dort nichts verschieben.
+    const eingaben = pflichtEingabenAusVorgang({
+      required: ["GEBURTSURKUNDE_EIGEN"],
+      anzahlKinder: 0,
+      organisationstyp: "GYMNASIUM",
+      personalData: {
+        birthDate: "1990-05-03",
+        rvEntscheidung: null,
+        aufenthaltstitelErforderlich: true,
+        healthInsuranceType: "privat",
+      },
+    });
+    const ohne = offeneNachweise(eingaben, ["GEBURTSURKUNDE_EIGEN"]);
+    expect(offeneNachweise(eingaben, ["GEBURTSURKUNDE_EIGEN", "UEBERGABEPROTOKOLL"])).toEqual(ohne);
+    expect(ohne).not.toContain("UEBERGABEPROTOKOLL");
+    expect(ohne.length).toBeGreaterThan(0);
   });
 });
 

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { RUECKGABE_KATEGORIEN } from "@/lib/constants";
+import { MELDUNGEN_AUSGABEN, RUECKGABE_ZUSTAENDE } from "@/lib/ausgaben";
 import {
   fuehrungskraftAenderungFelder,
   fuehrungskraftAnlageFelder,
@@ -52,6 +54,18 @@ export const createOffboardingSchema = z.object({
   ...fuehrungskraftAnlageFelder,
 });
 
+/**
+ * Notiz im Reiter „Notizen" (/api/offboarding/:id/notes, Anlegen und
+ * Bearbeiten). Getrimmt — eine Notiz nur aus Leerzeichen ist leer.
+ */
+export const offboardingNotizSchema = z.object({
+  content: z
+    .string({ required_error: "Die Notiz darf nicht leer sein.", invalid_type_error: "Die Notiz darf nicht leer sein." })
+    .trim()
+    .min(1, "Die Notiz darf nicht leer sein.")
+    .max(5000, "Eine Notiz darf höchstens 5000 Zeichen lang sein."),
+});
+
 export const updateOffboardingSchema = z.object({
   status: z.string().optional(),
   employeeFirstName: z.string().min(1).max(100).optional(),
@@ -81,4 +95,84 @@ export const updateOffboardingSchema = z.object({
   // Fuehrungskraft (Paket 1b): undefined = unveraendert, "" oder null = loeschen.
   // Vor dem .refine, sonst zaehlte ein Aufruf nur mit diesen Feldern als leer.
   ...fuehrungskraftAenderungFelder,
-}).refine(data => Object.keys(data).length > 0, "Mindestens ein Feld erforderlich");
+  // Ausstattung & Zugaenge (A4, G18): Abschluss trotz offener Rueckgaben
+  // bestaetigt. Ohne ihn antwortet der COMPLETED-Zweig mit 409
+  // RUECKGABEN_OFFEN, solange etwas offen ist; sonst ohne Wirkung.
+  bestaetigt: z.boolean({ invalid_type_error: "bestaetigt muss wahr oder falsch sein." }).optional(),
+  // `bestaetigt` allein ist keine Aenderung (wie `stand` im Katalog-PATCH):
+  // Sonst liefe `{ bestaetigt: true }` mit leerem Update durch und
+  // hinterliesse ein inhaltsleeres „Offboarding aktualisiert“ (A1–A3: 400).
+}).refine(data => Object.keys(data).some((feld) => feld !== "bestaetigt"), "Mindestens ein Feld erforderlich");
+
+// =============================================
+// Rueckgaben (Reiter „Rückgaben“, /api/offboarding/:id/return-items)
+// =============================================
+
+/**
+ * Kategorien des Prisma-Enums `ReturnCategory`. Seit A4 in src/lib/constants.ts
+ * (auch die reinen Regeln der Ausgaben lesen sie); hier unveraendert
+ * weitergereicht, Name und Typ bleiben.
+ */
+export { RUECKGABE_KATEGORIEN };
+
+/**
+ * Freitext eines Gegenstands: getrimmt, leer = null (die Spalten sind
+ * nullable). `undefined` bleibt `undefined` — im PATCH heisst das "unveraendert".
+ */
+function optionalerText(max: number, feld: string) {
+  return z
+    .string({ invalid_type_error: `${feld} muss ein Text sein` })
+    .trim()
+    .max(max, `${feld} darf höchstens ${max} Zeichen lang sein`)
+    .nullable()
+    .optional()
+    .transform((v) => (v === "" ? null : v));
+}
+
+const GEGENSTAND_FEHLT = "Bitte den Gegenstand angeben";
+
+export const rueckgabeAnlegenSchema = z.object({
+  category: z.enum(RUECKGABE_KATEGORIEN, {
+    errorMap: () => ({ message: "Bitte eine gültige Kategorie wählen" }),
+  }),
+  itemName: z
+    .string({ required_error: GEGENSTAND_FEHLT, invalid_type_error: GEGENSTAND_FEHLT })
+    .trim()
+    .min(1, GEGENSTAND_FEHLT)
+    .max(200, "Der Gegenstand darf höchstens 200 Zeichen lang sein"),
+  serialNumber: optionalerText(100, "Die Seriennummer"),
+  notes: optionalerText(1000, "Die Notiz"),
+});
+
+const GEGENSTAND_ID_FEHLT = "Rückgabe-Gegenstand fehlt";
+
+/**
+ * PATCH: `itemId` im Body (so wie die Route es seit jeher erwartet).
+ *
+ * Seit A4 (G15, G16) zusaetzlich `zustand`: einer der fuenf Rueckgabezustaende
+ * oder `null` (= wieder offen). Die Altform `isReturned` bleibt gueltig
+ * (`true` = ZURUECK, `false` = offen), aber nie zusammen mit `zustand` – zwei
+ * Aussagen ueber dasselbe koennen sich widersprechen. Die 100 Zeichen fuer
+ * `serialNumber` gelten fuer von HR erfasste Zeilen; an Zeilen mit `ausgabeId`
+ * prueft der Dienst zusaetzlich `kennungSchema` (validations/ausgaben.ts, 400).
+ */
+export const rueckgabeAendernSchema = z
+  .object({
+    itemId: z
+      .string({ required_error: GEGENSTAND_ID_FEHLT, invalid_type_error: GEGENSTAND_ID_FEHLT })
+      .min(1, GEGENSTAND_ID_FEHLT)
+      .max(100, GEGENSTAND_ID_FEHLT),
+    isReturned: z.boolean({ invalid_type_error: "Rückgabe muss ja oder nein sein" }).optional(),
+    zustand: z
+      .enum(RUECKGABE_ZUSTAENDE, { errorMap: () => ({ message: MELDUNGEN_AUSGABEN.ZUSTAND_UNBEKANNT }) })
+      .nullable()
+      .optional(),
+    condition: optionalerText(200, "Der Zustand"),
+    notes: optionalerText(1000, "Die Notiz"),
+    serialNumber: optionalerText(100, "Die Seriennummer"),
+  })
+  .refine((d) => d.isReturned === undefined || d.zustand === undefined, {
+    message: MELDUNGEN_AUSGABEN.ZUSTAND_UND_RUECKGABE,
+  });
+
+export type RueckgabeAendernInput = z.infer<typeof rueckgabeAendernSchema>;

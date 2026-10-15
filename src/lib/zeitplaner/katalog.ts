@@ -67,7 +67,7 @@ export const LAEUFE: readonly LaufDefinition[] = [
     schluessel: "dokumente-aufbewahrung",
     name: "Aufbewahrung erzeugter Dokumente",
     beschreibung:
-      "Löscht erzeugte Dokumente (Briefe aus Vorlagen), die älter als 12 Monate sind — die führende Ablage ist das DMS —, sowie Text und Anhänge individueller E-Mails nach 12 Monaten (der Nachweis bleibt).",
+      "Löscht erzeugte Dokumente (Briefe aus Vorlagen), die älter als 12 Monate sind — die führende Ablage ist das DMS —, sowie Text und Anhänge individueller E-Mails nach 12 Monaten (der Nachweis bleibt). Leert außerdem Bemerkungen, Angaben und Hinweise aus „Ausstattung & Zugänge“ 6 Monate nach Abschluss oder Abbruch des Onboardings (die Auswahl bleibt als Nachweis) und löscht dort vermerkte Ausgaben nach Ablauf ihrer Frist (6 Monate nach der Rückgabe, 3 Jahre ab Jahresende bei fehlender Rückgabe) samt Kennungen in den Rückgaben, Kommentaren der Stellen und – mit der letzten Ausgabe eines Vorgangs – den Übergabe- und Rückgabeprotokollen.",
     standardUhrzeit: "03:15",
     kannProbelauf: true,
     loescht: true,
@@ -99,11 +99,11 @@ export const LAEUFE: readonly LaufDefinition[] = [
     schluessel: "reminders",
     name: "Onboarding-Erinnerungen",
     beschreibung:
-      "Erinnert an offene Personalfragebögen und Einstellungsmodalitäten (wöchentlich) und an offene Aufgaben der Abteilungen im Onboarding.",
+      "Erinnert an offene Personalfragebögen und Einstellungsmodalitäten (wöchentlich) und an offene Aufgaben der Abteilungen im Onboarding. Holt fehlende Aufgaben aus „Ausstattung & Zugänge“ nach und meldet HR am Werktag vor Dienstbeginn, was davon noch offen ist.",
     standardUhrzeit: "08:00",
     kannProbelauf: false,
     loescht: false,
-    vorlagen: ["employee-reminder", "supervisor-reminder", "onboarding-department-reminder"],
+    vorlagen: ["employee-reminder", "supervisor-reminder", "onboarding-department-reminder", "onboarding-ausstattung-offen"],
     route: "/api/cron/reminders",
   },
   {

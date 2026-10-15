@@ -20,6 +20,9 @@
  *     mit Namen und Fuehrungskraft ein Vorgang mit fremden Angaben.
  *  5. Der Doppelklick. Zwei Submits vor dem neuen Rendern ergaeben zwei
  *     Vorgaenge und bis zu vier Mails; die Sperre per Ref haelt das auf.
+ *  6. Der Arbeitsort (E-A10). Vorgabe „Wie Einrichtung“, nur aktive
+ *     Einrichtungen; `arbeitsortId` geht nur bei Abweichung hinaus — sonst
+ *     bleibt der Rumpf Schluessel fuer Schluessel wie bisher.
  *
  * Umgebung wie in dokumentenpaket-dialog.test.tsx: jsdom im Docblock, ohne
  * @testing-library/jest-dom.
@@ -80,6 +83,24 @@ function antwort(teil: Record<string, unknown> = {}) {
   };
 }
 
+/** Arbeitsort-Faelle: eine weitere aktive und eine stillgelegte Einrichtung. */
+const GRUNDSCHULE = {
+  id: "org-gs",
+  mandantNumber: "20",
+  name: "FES Grundschule Nord",
+  shortName: "GS",
+  type: "GRUNDSCHULE",
+  isActive: true,
+};
+const STILLGELEGT = {
+  id: "org-alt",
+  mandantNumber: "99",
+  name: "Alte Einrichtung",
+  shortName: "ALT",
+  type: "VEREIN",
+  isActive: false,
+};
+
 const MIT_FUEHRUNGSKRAFT = {
   supervisorEmail: "schulleitung@example.org",
   modalitaetenLink: "https://hr.example.org/modalitaeten/mod-token",
@@ -97,12 +118,15 @@ interface Anlegeaufruf {
 }
 
 let anlegeaufrufe: Anlegeaufruf[] = [];
+/** Was /api/organizations liefert — die Arbeitsort-Faelle setzen mehr. */
+let einrichtungsliste: Array<Record<string, unknown>> = [ORG];
 
 beforeEach(() => {
   anlegeaufrufe = [];
+  einrichtungsliste = [ORG];
   global.fetch = jest.fn((url: string, init: RequestInit) => {
     if (String(url) === "/api/organizations") {
-      return Promise.resolve({ ok: true, json: async () => ({ data: [ORG] }) } as Response);
+      return Promise.resolve({ ok: true, json: async () => ({ data: einrichtungsliste }) } as Response);
     }
     // Bewusst offen: Der Test bestimmt, wann das Anlegen antwortet — sonst
     // liesse sich weder die Sperre waehrend der Anfrage noch der Doppelklick
@@ -154,6 +178,7 @@ const EMAIL = /E-Mail des neuen Mitarbeiters/;
 const VORNAME = /^Vorname/;
 const NACHNAME = /^Nachname/;
 const EINRICHTUNG = /Einrichtung/;
+const ARBEITSORT = /^Arbeitsort/;
 const FUEHRUNGSKRAFT = /E-Mail der Führungskraft/;
 
 function tippe(label: RegExp, wert: string) {
@@ -432,6 +457,21 @@ describe("Schliessen", () => {
     expect((screen.getByLabelText(EINRICHTUNG) as HTMLSelectElement).value).toBe("");
   });
 
+  it("setzt nach Escape auch den Arbeitsort auf „Wie Einrichtung“ zurueck", async () => {
+    einrichtungsliste = [ORG, GRUNDSCHULE];
+    const { oeffne } = await zeigeModal();
+    pflichtfelder();
+    fireEvent.change(screen.getByLabelText(ARBEITSORT), { target: { value: GRUNDSCHULE.id } });
+
+    await act(async () => {
+      fireEvent.keyDown(document, { key: "Escape" });
+    });
+    await oeffne(false);
+    await oeffne(true);
+
+    expect((screen.getByLabelText(ARBEITSORT) as HTMLSelectElement).value).toBe("");
+  });
+
   it("zeigt nach Escape in der Erfolgsansicht beim naechsten Oeffnen wieder das Formular", async () => {
     const { oeffne } = await zeigeModal();
     pflichtfelder();
@@ -527,5 +567,52 @@ describe("Kopieren", () => {
     expect(seitentext()).toContain("Kopiert!");
     // Das Hilfsfeld raeumt sich wieder weg.
     expect(document.querySelectorAll("textarea")).toHaveLength(0);
+  });
+});
+
+// =============================================
+// 6. Der Arbeitsort (E-A10)
+// =============================================
+
+describe("Arbeitsort", () => {
+  beforeEach(() => {
+    einrichtungsliste = [ORG, GRUNDSCHULE, STILLGELEGT];
+  });
+
+  const optionen = () =>
+    Array.from((screen.getByLabelText(ARBEITSORT) as HTMLSelectElement).options).map((o) => o.textContent);
+
+  it("steht mit Vorgabe „Wie Einrichtung“ da und bietet nur aktive Einrichtungen an", async () => {
+    await zeigeModal({ darfVorgesetztenLink: false });
+
+    expect((screen.getByLabelText(ARBEITSORT) as HTMLSelectElement).value).toBe("");
+    expect(optionen()).toEqual(["Wie Einrichtung", "FES Gymnasium (10)", "FES Grundschule Nord (20)"]);
+    expect(seitentext()).toContain("Die Aufgaben für Abteilungen (Hausmeister, IT, Verwaltung) gehen dann an den Arbeitsort.");
+  });
+
+  it("laesst den Rumpf unveraendert, wenn der Arbeitsort die Einrichtung ist", async () => {
+    await zeigeModal();
+    pflichtfelder();
+    fireEvent.change(screen.getByLabelText(ARBEITSORT), { target: { value: ORG.id } });
+
+    await absenden();
+
+    expect(Object.keys(gesendet()).sort()).toEqual(["email", "organizationId", "processType", "questionnaireType"]);
+  });
+
+  it("schickt arbeitsortId nur bei Abweichung mit", async () => {
+    await zeigeModal();
+    pflichtfelder();
+    fireEvent.change(screen.getByLabelText(ARBEITSORT), { target: { value: GRUNDSCHULE.id } });
+
+    await absenden();
+
+    expect(gesendet()).toEqual({
+      email: "anna.privat@example.org",
+      organizationId: ORG.id,
+      processType: "EINSTELLUNG",
+      questionnaireType: "STANDARD",
+      arbeitsortId: GRUNDSCHULE.id,
+    });
   });
 });

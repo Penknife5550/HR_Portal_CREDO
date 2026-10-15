@@ -14,6 +14,10 @@
  * Zweiter Schwerpunkt: `{{mitarbeiter_name}}` faellt in `extractVariables`
  * zuletzt auf `payload.email` zurueck. Ohne ausdruecklich gesetztes Feld
  * stuende die PRIVATE Adresse der Person im Betreff der HR-Mail.
+ *
+ * Dritter Schwerpunkt (Paket A2, Feinplan S10): `ausstattung_kurz` in
+ * `supervisor-completed` — nur gezaehlt, nie Bemerkungstexte, und die Mail
+ * geht auch dann hinaus, wenn das Laden der Kurzform scheitert.
  */
 
 const mockPrisma = {
@@ -21,7 +25,8 @@ const mockPrisma = {
   document: { findMany: jest.fn() },
   child: { count: jest.fn() },
   personalData: { findUnique: jest.fn(), update: jest.fn() },
-  supervisorData: { upsert: jest.fn(), update: jest.fn() },
+  // updateMany (A4, S23): Merker `ausgabenAngeboten` bei der Abgabe, nur mit `mitAusstattung`.
+  supervisorData: { upsert: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
   supervisorKostenstelle: { deleteMany: jest.fn(), createMany: jest.fn() },
   onboardingProcess: {
     updateMany: jest.fn(),
@@ -30,6 +35,10 @@ const mockPrisma = {
     update: jest.fn(),
   },
   auditLog: { create: jest.fn() },
+  // Paket A2: Kurzform der Ausstattung fuer `supervisor-completed`
+  // (ausstattungKurzLaden, nur mit Merker `mitAusstattung`).
+  onboardingAusstattung: { findMany: jest.fn() },
+  onboardingStellenHinweis: { findMany: jest.fn() },
   $transaction: jest.fn(),
 };
 const mockMagicToken = jest.fn();
@@ -45,10 +54,18 @@ jest.mock("@/lib/rate-limit", () => ({
   tokenRateLimiter: { check: () => ({ allowed: true }) },
   getClientIp: () => "203.0.113.7",
   getClientIpOrNull: () => "203.0.113.7",
-  // Die Modalitaeten-Route zieht ueber `faelligkeitenSetzen` auch
-  // src/lib/abteilungsaufgaben-uebergaenge.ts herein, und die baut beim Laden
-  // ihre eigene Bremse je Link.
+  // Vorsorglich: Liefe der Adapter (unten gemockt) echt, zoege die
+  // Modalitaeten-Route src/lib/abteilungsaufgaben-uebergaenge.ts herein, und
+  // die baut beim Laden ihre eigene Bremse je Link.
   createRateLimiter: () => ({ check: () => ({ allowed: true }) }),
+}));
+// Paket A3 (S12): Nach der Abgabe holt die Route die Ausstattungsaufgaben nach
+// und setzt die Faelligkeiten (`onboardingAusstattungNachholenIn`, eigene
+// Transaktion). Hier geht es um die HR-Mail — das Nachholen ist ein Spy, seine
+// Regeln stehen in ausstattung-aufgaben.test.ts.
+const mockNachholenIn = jest.fn();
+jest.mock("@/lib/abteilungsaufgaben-onboarding", () => ({
+  onboardingAusstattungNachholenIn: (...a: unknown[]) => mockNachholenIn(...a),
 }));
 jest.mock("@/lib/n8n", () => ({
   triggerN8nWebhook: (...a: unknown[]) => mockN8n(...a),
@@ -62,6 +79,9 @@ jest.mock("@/lib/encryption", () => ({
 import { POST as FRAGEBOGEN_POST } from "@/app/api/fragebogen/[token]/route";
 import { POST as MODALITAETEN_POST } from "@/app/api/modalitaeten/[token]/route";
 import { AKTUELLE_ERKLAERUNG } from "@/lib/erklaerung-arbeitnehmer";
+import { renderEventEmail } from "@/lib/mailer";
+import { DEFAULT_EMAIL_TEMPLATES } from "@/lib/default-email-templates";
+import { EVENT_CATALOG } from "@/lib/events";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 import { NextRequest } from "next/server";
 
@@ -194,11 +214,15 @@ beforeEach(() => {
   });
   mockPrisma.personalData.update.mockResolvedValue({});
   mockPrisma.supervisorData.update.mockResolvedValue({});
+  mockPrisma.supervisorData.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.auditLog.create.mockResolvedValue({});
   mockPrisma.onboardingProcess.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.onboardingProcess.update.mockResolvedValue({});
   mockPrisma.onboardingProcess.findUnique.mockResolvedValue(null);
   mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachFragebogen());
+  mockPrisma.onboardingAusstattung.findMany.mockResolvedValue([]);
+  mockPrisma.onboardingStellenHinweis.findMany.mockResolvedValue([]);
+  mockNachholenIn.mockResolvedValue({ gesperrt: true, angelegt: 0, stellen: [], angehoben: 0 });
   // Die Transaktions-Rueckrufe laufen echt, gegen dieselben Mocks — und ihr
   // Rueckgabewert traegt den `StatusAbgleich` nach draussen.
   mockPrisma.$transaction.mockImplementation((arg: unknown) =>
@@ -538,5 +562,121 @@ describe("Modalitaeten abgesendet — Merker fuer die Gegenspur", () => {
     expect(res.status).toBe(500);
     expect(mockN8n).not.toHaveBeenCalled();
     fehler.mockRestore();
+  });
+});
+
+describe("Modalitaeten abgesendet — Ausstattung in Kurzform (Paket A2)", () => {
+  const MIT_AUSSTATTUNG = { isComplete: false, befristet: false, kostenstellen: [], mitAusstattung: true };
+
+  beforeEach(() => {
+    mockPrisma.onboardingProcess.findUniqueOrThrow.mockResolvedValue(standNachModalitaeten());
+  });
+
+  async function absenden() {
+    const res = await MODALITAETEN_POST(req(`/api/modalitaeten/${SUP_TOKEN}`, {}), {
+      params: params(SUP_TOKEN)(),
+    });
+    expect(res.status).toBe(200);
+  }
+
+  it("zaehlt Positionen und Stellen — ohne jeden Bemerkungs- oder Hinweistext", async () => {
+    mockSupervisorToken.mockResolvedValue(modalitaetenToken({ supervisorData: MIT_AUSSTATTUNG }));
+    mockPrisma.onboardingAusstattung.findMany.mockResolvedValue([
+      { art: "JA_NEIN", departmentKey: "IT", gestrichenAm: null },
+      { art: "AUSWAHL", departmentKey: "FACILITY", gestrichenAm: null },
+      { art: "ANGABE", departmentKey: "FACILITY", gestrichenAm: null },
+    ]);
+    mockPrisma.onboardingStellenHinweis.findMany.mockResolvedValue([
+      { departmentKey: "VERWALTUNG", text: "Fach bitte neben Frau Müller" },
+    ]);
+
+    await absenden();
+
+    const p = payload("supervisor-completed")!;
+    expect(p.ausstattung_kurz).toBe("2 Positionen für 3 Stellen");
+    expect(JSON.stringify(p)).not.toContain("Müller");
+    // gelesen wird nur, was gezaehlt wird — nie die Texte der Zeilen
+    const auswahl = mockPrisma.onboardingAusstattung.findMany.mock.calls[0][0];
+    expect(auswahl).toEqual({
+      where: { onboardingId: "ob1" },
+      select: { art: true, departmentKey: true, gestrichenAm: true },
+    });
+  });
+
+  it("ohne Merker `mitAusstattung` leer — und ohne Abfrage", async () => {
+    await absenden();
+
+    expect(payload("supervisor-completed")?.ausstattung_kurz).toBe("");
+    expect(mockPrisma.onboardingAusstattung.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.onboardingStellenHinweis.findMany).not.toHaveBeenCalled();
+  });
+
+  it("Laden scheitert → die Mail geht trotzdem, das Feld bleibt leer", async () => {
+    mockSupervisorToken.mockResolvedValue(modalitaetenToken({ supervisorData: MIT_AUSSTATTUNG }));
+    mockPrisma.onboardingAusstattung.findMany.mockRejectedValue(new Error("Verbindung verloren"));
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await absenden();
+
+    const p = payload("supervisor-completed")!;
+    expect(p.ausstattung_kurz).toBe("");
+    expect(p.fragebogen_offen).toBe("ja");
+    expect(fehler).toHaveBeenCalled();
+    fehler.mockRestore();
+  });
+
+  it("Nachholen der Aufgaben scheitert (Paket A3) → nur geloggt, die HR-Mail geht unveraendert", async () => {
+    mockSupervisorToken.mockResolvedValue(modalitaetenToken({ supervisorData: MIT_AUSSTATTUNG }));
+    mockPrisma.onboardingAusstattung.findMany.mockResolvedValue([
+      { art: "JA_NEIN", departmentKey: "IT", gestrichenAm: null },
+    ]);
+    mockNachholenIn.mockRejectedValue(Object.assign(new Error("Unique constraint"), { code: "P2002" }));
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await absenden();
+
+    expect(mockNachholenIn).toHaveBeenCalledWith(mockPrisma, "ob1", expect.objectContaining({ jetzt: expect.any(Date) }));
+    expect(fehler).toHaveBeenCalledWith(expect.stringContaining("[Modalitaeten]"), "P2002");
+    const p = payload("supervisor-completed")!;
+    expect(p.ausstattung_kurz).toBe("1 Position für 1 Stelle");
+    expect(p.fragebogen_offen).toBe("ja");
+    fehler.mockRestore();
+  });
+
+  it("die Payload hat genau die Felder des Katalogbeispiels", async () => {
+    await absenden();
+
+    const def = EVENT_CATALOG.find((d) => d.event === "supervisor-completed")!;
+    expect(Object.keys(payload("supervisor-completed")!).sort()).toEqual(Object.keys(def.samplePayload).sort());
+  });
+
+  it("Vorlage: Zeile „Ausstattung: …“ nur mit Kurzform, kein roher Marker", () => {
+    const vorlage = DEFAULT_EMAIL_TEMPLATES.find((t) => t.event === "supervisor-completed")!;
+    const rendern = (kurz: string) =>
+      renderEventEmail(
+        { ...vorlage, recipientTo: "", recipientCc: "", recipientBcc: "", recipientReplyTo: "" },
+        "supervisor-completed",
+        {
+          displayId: "2026-GYM-042",
+          mitarbeiter_name: "Anna Beispiel",
+          organization: "Berufskolleg",
+          fragebogen_eingereicht: "",
+          fragebogen_offen: "ja",
+          ausstattung_kurz: kurz,
+        },
+        { overrideTo: "hr@example.org" },
+      ).rendered!;
+
+    const mit = rendern("6 Positionen für 3 Stellen");
+    expect(mit.html).toContain("Ausstattung: 6 Positionen für 3 Stellen");
+    expect(mit.text).toContain("Ausstattung: 6 Positionen für 3 Stellen");
+    expect(mit.subject).not.toContain("Ausstattung");
+
+    const ohne = rendern("");
+    expect(ohne.html).not.toContain("Ausstattung:");
+    expect(ohne.text).not.toContain("Ausstattung:");
+    for (const mail of [mit, ohne]) {
+      for (const teil of [mail.subject, mail.html, mail.text ?? ""]) expect(teil).not.toMatch(/\{\{/);
+    }
   });
 });

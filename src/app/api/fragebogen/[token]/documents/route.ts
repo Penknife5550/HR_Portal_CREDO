@@ -5,9 +5,20 @@
  * GET    /api/fragebogen/:token/documents – Hochgeladene Dokumente auflisten
  * PATCH  /api/fragebogen/:token/documents – Ablaufdatum eines Nachweises nachtragen
  * DELETE via query param ?documentId=... – Einzelnes Dokument löschen
+ *
+ * Seit A4 (Ausstattung & Zugaenge, G19) sehen, aendern und loeschen GET, PATCH
+ * und DELETE nur Dokumente der waehlbaren Typen (`SELECTABLE_DOCUMENT_TYPES`).
+ * Der Vorgang traegt seitdem auch Dokumente, die nur HR ablegt (das
+ * unterschriebene Uebergabeprotokoll, `UEBERGABEPROTOKOLL`) – frueher listete
+ * die Route JEDES `Document` des Vorgangs und loeschte jedes samt Datei,
+ * solange der Fragebogen offen ist (der Dienstbeginn liegt oft davor). Ein
+ * Dokument eines anderen Typs ist hier unbekannt: PATCH und DELETE antworten
+ * mit derselben 404 wie fuer ein fremdes Dokument. POST legt solche Typen nie
+ * an (`DOCUMENT_TYPE_MAP` kennt nur waehlbare).
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { validateMagicToken } from "@/lib/auth";
 import { tokenRateLimiter, getClientIp } from "@/lib/rate-limit";
@@ -17,8 +28,16 @@ import {
   istAbgelaufen,
   pruefeGueltigBis,
 } from "@/lib/dokument-fristen";
+import { SELECTABLE_DOCUMENT_TYPES } from "@/lib/required-documents";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
+
+/**
+ * Was die Person ueber ihren Link sieht, aendert und loescht: nur Dokumente der
+ * waehlbaren Typen (G19, Kopfkommentar). In der Abfrage selbst, nicht danach
+ * gefiltert – ein anderer Typ ist dann schlicht „nicht gefunden".
+ */
+const NUR_WAEHLBARE_TYPEN: Prisma.DocumentWhereInput = { type: { in: SELECTABLE_DOCUMENT_TYPES } };
 
 // Erlaubte Dateitypen
 const ALLOWED_MIME_TYPES = [
@@ -264,7 +283,7 @@ export async function GET(
   const onboarding = result.onboarding!;
 
   const documents = await prisma.document.findMany({
-    where: { onboardingId: onboarding.id },
+    where: { onboardingId: onboarding.id, ...NUR_WAEHLBARE_TYPEN },
     select: {
       id: true,
       fileName: true,
@@ -364,9 +383,10 @@ export async function PATCH(
   }
 
   // Zugehoerigkeit zum eigenen Vorgang pruefen, bevor irgendetwas geschrieben
-  // wird — die documentId kommt aus der Anfrage, nicht aus dem Token.
+  // wird — die documentId kommt aus der Anfrage, nicht aus dem Token. Ein
+  // Dokument, das nur HR ablegt, ist hier unbekannt (dieselbe 404, G19).
   const document = await prisma.document.findFirst({
-    where: { id: documentId, onboardingId: onboarding.id },
+    where: { id: documentId, onboardingId: onboarding.id, ...NUR_WAEHLBARE_TYPEN },
     select: { id: true, type: true, fileName: true, gueltigBis: true },
   });
 
@@ -485,9 +505,12 @@ export async function DELETE(
     );
   }
 
-  // Pruefen ob Dokument zu diesem Vorgang gehoert
+  // Pruefen ob Dokument zu diesem Vorgang gehoert — und zu den Typen, die die
+  // Person selbst hochlaedt. Ein Dokument, das nur HR ablegt (das
+  // unterschriebene Uebergabeprotokoll), ist hier unbekannt: dieselbe 404,
+  // Datei und Zeile bleiben (G19).
   const document = await prisma.document.findFirst({
-    where: { id: documentId, onboardingId: onboarding.id },
+    where: { id: documentId, onboardingId: onboarding.id, ...NUR_WAEHLBARE_TYPEN },
   });
 
   if (!document) {

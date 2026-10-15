@@ -10,6 +10,7 @@ import type {
   ErledigtVon,
   Fuehrungskraft,
 } from "@/lib/abteilungsaufgaben";
+import type { RueckgabenUebersicht } from "@/lib/offboarding-ausgaben";
 
 export interface User {
   userId: string;
@@ -60,6 +61,14 @@ export interface ChecklistItemData {
   abteilungKommentarAm?: string | null;
   /** Wer hat abgehakt: im Portal (Name) oder ueber den Link (Abteilung). */
   erledigtVon?: ErledigtVon;
+  /**
+   * Ausstattung & Zugaenge Stufe 2 (A4): „AUSGABE“ = Ruecknahme- bzw.
+   * Sperraufgabe zu einem ausgegebenen Stueck, „AUSGABE_FEHLT“ = Folgeaufgabe
+   * „Schließung prüfen“; `null` = aus der Vorlage. Den Haken an solchen
+   * Aufgaben gibt es nur mit Bearbeitungsrecht (der Server antwortet sonst 403).
+   */
+  herkunft?: string | null;
+  ausgabeId?: string | null;
 }
 
 export interface ReturnItemData {
@@ -71,6 +80,14 @@ export interface ReturnItemData {
   returnedAt: string | null;
   condition: string | null;
   notes: string | null;
+  /**
+   * A4 (G16): Rueckgabezustand (ZURUECK, BESCHAEDIGT, FEHLT, VERBLEIBT,
+   * ENTFAELLT; `null` = offen) – `isReturned` folgt. Altbestand mit
+   * `isReturned` ohne Zustand gilt als „zurück“ (`rueckgabeZustand`).
+   */
+  zustand?: string | null;
+  /** A4 (G14): aus der zugeordneten Einstellung vorgeschlagen – nicht loeschbar. */
+  ausgabeId?: string | null;
 }
 
 export interface DocumentData {
@@ -228,6 +245,12 @@ export interface OffboardingData {
   fuehrungskraft?: Fuehrungskraft;
   /** Quelle der Karte „Aufgaben für Abteilungen" (auch nicht informierte Abteilungen). */
   abteilungen?: AbteilungenData;
+  /**
+   * Reiter „Rückgaben“ (Ausstattung & Zugaenge Stufe 2, A4, G23): zugeordnete
+   * Einstellung, Lage, Tabelle, Hinweise, Stepper, Protokoll – nur fuer
+   * HR_EDIT_ROLES, sonst `null` (dann die bisherige Liste nur lesend).
+   */
+  rueckgaben?: RueckgabenUebersicht | null;
 }
 
 // =============================================
@@ -247,3 +270,11 @@ export const TABS = [
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];
+
+/**
+ * Reiter nur mit HR_EDIT_ROLES — wie ihre Routen: das Mailprotokoll, das
+ * Exit-Interview (vertrauliche Befragung; die Antwort traegt den Magic Link
+ * der Person) und die Zeugnis-Bewertung (die Antwort traegt den
+ * Bewertungslink der Fuehrungskraft).
+ */
+export const NUR_HR_TABS: ReadonlySet<TabId> = new Set<TabId>(["exit-interview", "zeugnis", "mails"]);
