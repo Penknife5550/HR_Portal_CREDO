@@ -27,20 +27,23 @@ ist, steht hier.
   Protokoll Abschnitt 7). **Nach einem Merge von `main` immer `npm run db:generate`**, sonst
   meldet `tsc` die neuen Schema-Felder als Fehler.
 
-**Nächster Schritt: Pilot Tag 6–7 (Abnahme), Feinplan Abschnitt 7.** Die sieben Punkte dort,
-kurz: `npm run pruefen` + `npm run build`; alte Ansicht ohne Cookie bildgleich
-(`scripts/ux-abnahme.js vergleich`); Bilder je Lage in drei Breiten und Höhenmessung bei
-1366×768 (Ziel des Plans: Kopf + Leiste + Reiter höchstens ein Drittel —
-`scripts/ux-abnahme.js vertragsende`); ein Vorgang durch beide Stränge mit Vergleich des
-Audit-Protokolls; Rollen; Tastatur; Umschalten hin und zurück. Technisch deckt
-`scripts/ux-abnahme-pilot.js` Rollen, Tastatur und beide Stränge ab. Danach Befunde beheben,
-Ankündigungstext, **Deploy U0 + U1 + Pilot + Mailtext**.
+- **Abnahme des Pilots (Tag 6)** gelaufen, **ohne Befund am Pilot** (Protokoll Abschnitt 7):
+  256 Suiten / 8240 Tests, Build grün, 213 Browser-Prüfungen in Ordnung, 42 Bilder neu, die
+  alte Ansicht nachweislich nur um die drei U1-Dinge geändert. Der Ankündigungstext steht als
+  Entwurf in [pilot-ankuendigung.md](pilot-ankuendigung.md).
 
-**Dabei zu klären** (beim Bau aufgefallen, vom Prototyp-Tag nicht beantwortet): Bei drei
-Hinweisen gleichzeitig (z. B. Lage T04) stehen die Reiter bei 1366×768 unter dem sichtbaren
-Bereich, und das Entfristungsrisiko steht dreifach (Pille, „Jetzt dran“, Hinweis). Die Messung
-in Abnahmepunkt 3 zeigt, ob das Drittel-Ziel gerissen wird; wenn ja, dem Projektverantwortlichen
-vorlegen.
+**Nächster Schritt: Deploy von U0 + U1 + Pilot + Mailtext.** Kein Schema-Delta für den Pilot,
+**+1 Tabelle** für den Mailtext (`email_log_texte`); keine Umgebungsvariable, keine Vorlage
+zurückzusetzen. Vorher: Ankündigungstext durchsehen und Termin wählen (Zeitfenster und Regeln
+wie in [`deploy-main-2026-10.md`](../../historie/deploy-main-2026-10.md): Dienstag bis Freitag
+10–12 Uhr, nicht montags gegen 9 Uhr, nicht 07:00–08:45). Danach zwei Wochen Rückmeldung des
+Personalbüros, dann die Entscheidung „neue Ansicht wird Vorgabe, Onboarding folgt“.
+
+**Dem Projektverantwortlichen vorzulegen, wenn U2 ansteht** (nicht vor dem Deploy): Die
+Höhenmessung zeigt, dass das Drittel-Ziel des Plans ohne den Kompaktmodus (P-F6, bewusst erst
+mit Onboarding) **in keiner Lage** erreichbar ist — der Normalfall liegt bei 69 %, die
+Prozessleiste allein nimmt 233 px. Bei drei Hinweisen (T04) liegen die Reiter unter dem
+sichtbaren Bereich, und das Entfristungsrisiko steht dreifach. Zahlen im Protokoll, Abschnitt 7.
 
 **Offene Punkte außerhalb des Umbaus:** Die Bestandsaufnahme vom 09.10.2026 (36 Punkte über alle
 Stränge) steht im Gedächtnis der Sitzung, nicht im Repository. Die wichtigsten beim
@@ -313,7 +316,7 @@ Interaktionsfarbe. Die Fachlogik bleibt unangetastet.
 | V0 | Prototyp-Tag mit dem Personalbüro, Testdaten, Screenshot-Skript | **erledigt** 15.10.2026: „in allen Punkten wie im Plan“ – E9, E11, E13 entschieden, am Code des Pilots nichts nachzuziehen (Abschnitt 4) |
 | **U0** | Tokens und Basis-Bausteine | **gebaut und abgenommen** (02.10.2026): alle neun Bausteine, Musterseite, Build grün, Screenshots in drei Breiten, fünf bestehende Seiten bildgleich mit `main`. Gepusht am 02.10.2026. Offen: Tastaturprobe von Hand durch den Projektverantwortlichen, Deploy (Empfehlung: zusammen mit U1) |
 | U1 | Rahmen: ein Kopf für alle Seiten, neue Adressen | **gebaut und abgenommen** (02.10.2026): neue Adressen mit Weiterleitung, ein Kopf im Layout. Gepusht am 02.10.2026. Offen: Deploy zusammen mit U0, Ankündigung an das Personalbüro |
-| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); **Tag 3 Rest bis 5 gebaut, durchgesehen und gepusht** (07.10.2026: Seite, Dialoge, Schalter, Testdaten – vor V0 auf Wunsch des Projektverantwortlichen); **Prototyp-Tag vorbereitet** (07.10.2026); **Versandergebnis angeschlossen, Codereview behoben** (08.10.2026, Testumgebung bleibt ohne Mailserver); **V0 gelaufen, nichts nachzuziehen** (15.10.2026); offen: **Tag 6–7 (Abnahme)** – der nächste Schritt |
+| Pilot | U2 + U4 für Vertragsende, Vorschau-Schalter | **Feinplan freigegeben** (02.10.2026, [pilot-feinplan.md](pilot-feinplan.md)); **Tag 1 (Regeln) und Tag 2 (Prozessleiste, Reiter, Musterseite) gebaut, durchgesehen und gepusht** (05.10.2026); **Tag 3, erster Teil (Bausteine Hinweis und Textfeld) gebaut** (06.10.2026, vor V0 vorgezogen); **Tag 3 Rest bis 5 gebaut, durchgesehen und gepusht** (07.10.2026: Seite, Dialoge, Schalter, Testdaten – vor V0 auf Wunsch des Projektverantwortlichen); **Prototyp-Tag vorbereitet** (07.10.2026); **Versandergebnis angeschlossen, Codereview behoben** (08.10.2026, Testumgebung bleibt ohne Mailserver); **V0 gelaufen, nichts nachzuziehen** (15.10.2026); **Tag 6 (Abnahme) ohne Befund am Pilot, Ankündigungstext entworfen** (15.10.2026) → **deploybar**; offen: Deploy U0 + U1 + Pilot + Mailtext |
 | danach | Reihenfolge laut Plan, Abschnitt 5 | offen |
 
 ## 3. Arbeitsweise
@@ -1733,6 +1736,48 @@ abgeschlossen und die Entscheidungen E9, E11 und E13 gefallen (Abschnitt 4, „A
   `main`, darunter PR #3 (`1b4a9b1`, Offboarding-Routen) — der ist damit live und sein PR kann
   geschlossen werden.
 
+### 15.10.2026 – Pilot, Tag 6: Abnahme (Feinplan Abschnitt 7)
+
+Alle sieben Punkte gelaufen, **ohne Befund am Pilot**. Der Ankündigungstext (Tag 7) steht als
+Entwurf in [pilot-ankuendigung.md](pilot-ankuendigung.md).
+
+| Punkt | Ergebnis |
+|---|---|
+| 1 `pruefen` + `build` | tsc grün, `next lint` nur bekannte Warnungen, **256 Suiten / 8240 Tests**, `npm run build` grün |
+| 2 alte Ansicht unverändert | Statt des Bildvergleichs der **Quelltext-Vergleich gegen `origin/main`** – belastbarer, weil Vorher-Bilder fehlen und ein Bildvergleich inzwischen auch `main`-Änderungen zeigte. Die alte Ansicht unterscheidet sich um **genau drei U1-Dinge**: `PortalHeader` entfernt (hängt im Layout), Adressen über `vorgangPfad`/`vorgangslistePfad`, die alte `page.tsx` durch die Weiche ersetzt. Keine Fachlogik, kein Layout. Dazu Teil D des technischen Skripts (Schalter hin und zurück, zweiter Browser bleibt alt) |
+| 3 Bilder und Höhe | `scripts/ux-abnahme.js vertragsende`: 42 Bilder neu (zehn Lagen × drei Breiten plus T04 alt), genau eine `h1`, keine Konsolenfehler, kein waagerechtes Rollen. **Messung siehe unten** |
+| 4–7 Stränge, Rollen, Tastatur, Schalter | `scripts/ux-abnahme-pilot.js`: **213 Prüfungen, alles in Ordnung**; Teil E hat Rolle, Mandantenzuweisung und die zehn Lagen zurückgesetzt, die übrigen sieben Testvorgänge unberührt |
+
+**Die Höhenmessung bei 1366×768 ist der Eingangswert für P-F6, kein Befund am Pilot.** Der Plan
+sagt das Drittel (256 px) für den **Kompaktmodus** zu („Derselbe Modus greift am Laptop beim
+Scrollen, damit Kopf, Leiste und Reiter auf 768 px Höhe nicht mehr als ein Drittel belegen. In
+V0 wird das bei 1366×768 nachgemessen"), und genau dieser Modus ist mit P-F6 **aus dem Pilot
+heraus** entschieden („erst mit Onboarding; im Pilot nur messen“). Gemessen wurde also wie
+beauftragt — und die Zahlen sagen etwas Nützliches für U2:
+
+| Lage | Unterkante Reiterleiste | ohne Hinweise | Pille / Hinweise |
+|---|---|---|---|
+| T09 Storniert | 466 px (61 %) | 466 px | günstigster Fall |
+| T08 Abgeschlossen | 506 px (66 %) | 506 px | |
+| T01/T03 Anfrage | 528 px (69 %) | 528 px | der Normalfall |
+| T05, T07 | 542 px (71 %) | 542 px | |
+| T06 Abgelehnt | 568 px (74 %) | 568 px | |
+| T02 | 622 px (81 %) | 528 px | ein Hinweis |
+| T10 | 642 px (84 %) | 528 px | ein Hinweis |
+| **T04** Übernahme, Vertrag offen | **886 px (115 %)** | 568 px | **drei Hinweise** – die Reiter liegen unter dem sichtbaren Bereich |
+
+Aufschlüsselung im Normalfall (T01): Kopf 67 · Schalterzeile 116 · Seitenkopf 230 ·
+Prozessleiste 463 · Reiterleiste 528. **Die Prozessleiste allein nimmt 233 px** – sie ist der
+Hauptposten, nicht die Hinweise. Die Schalterzeile (49 px) entfällt mit der Vorschauphase.
+Daraus folgt für U2: Ohne Kompaktmodus ist das Drittel-Ziel **in keiner Lage** erreichbar, auch
+nicht im günstigsten. Bei T04 kommt dazu, dass das Entfristungsrisiko dreifach steht (Pille,
+„Jetzt dran“, Hinweis) – beides dem Projektverantwortlichen vorzulegen, wenn U2 ansteht.
+
+Zwei Befunde des technischen Skripts betreffen **nicht** den Pilot, sondern das Mandanten-Gate:
+Einrichtungsleitung und Führungskraft bekommen auch MIT Zuweisung des Mandanten 403 von
+`GET /api/contract-end/[id]` (die Allowlist der Middleware lässt nur `/api/auth` durch), beide
+Ansichten zeigen denselben Ladefehler. Bekannt und außerhalb des Umbaus (Weg C, siehe 0.0).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1790,7 +1835,8 @@ abgeschlossen und die Entscheidungen E9, E11 und E13 gefallen (Abschnitt 4, „A
 | `ux-umbau` | `466662b`, `da1c62e` | Mailtext im Versandprotokoll: Backend (eigener Commit), Routen und Dialog |
 | `ux-umbau` | `fb8ec05`, `4bd6f6b`, `e68d692` | Mailtext: Doku, Korrekturen der ersten Durchsicht, Korrekturen der zweiten Durchsicht |
 | `ux-umbau` | `7443ea8` | Logbuch: Push vom 15.10.2026 nachgetragen |
-| `ux-umbau` | (dieser Merge) | Merge von `main` (`5595cf7`, Ausstattung & Zugänge, Offboarding-Routen) samt vier Nacharbeiten; V0 und DSB im Logbuch |
+| `ux-umbau` | `24dbeb6` | Merge von `main` (`5595cf7`, Ausstattung & Zugänge, Offboarding-Routen) samt vier Nacharbeiten; V0 und DSB im Logbuch |
+| `ux-umbau` | (dieser Commit) | Pilot Tag 6: Abnahme (213 Browser-Prüfungen, 42 Bilder, Höhenmessung), Ankündigungstext, Logbuch |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
