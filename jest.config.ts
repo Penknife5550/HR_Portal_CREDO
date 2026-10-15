@@ -32,6 +32,20 @@ const config: Config = {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
   testMatch: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
+  // Arbeitskopien unter `.claude/worktrees/` bleiben aussen vor. Der Grund steht
+  // schon im Dateikopf: `npm run pruefen` ist die einzige Pruefung vor dem Push.
+  // Jede offene Claude-Sitzung legt dort eine vollstaendige Kopie des Repos ab,
+  // und `testMatch` greift ohne `roots` ueber das ganze Projekt — am 15.10.2026
+  // waren es 1331 fremde Suiten gegen 256 eigene. Schlimmer als die dreifache
+  // Laufzeit ist, dass `moduleNameMapper` oben auf das AKTUELLE `src/` zeigt:
+  // Die alten Tests laufen gegen den neuen Code und MUESSEN scheitern. Damit ist
+  // der Lauf immer rot, ein echter Rueckschritt in `src/` geht darin unter, und
+  // die Pruefung wird als „sowieso rot“ abgehakt. `.claude/` steht in
+  // `.gitignore`, die Kopien reisen also nicht mit — aber hier wird geprueft.
+  // `/node_modules/` muss mit, weil eine eigene Angabe die Vorgabe ersetzt und
+  // nicht ergaenzt. (`roots: ["<rootDir>/src"]` waere gleichwertig, schloesse
+  // aber auch kuenftige Tests ausserhalb von `src/` aus.)
+  testPathIgnorePatterns: ["/node_modules/", "/\\.claude/"],
   transform: {
     // GENAU EIN Eintrag fuer .ts und .tsx. Das ist die Lehre aus zwei
     // Fehlversuchen und gehoert deshalb aufgeschrieben:

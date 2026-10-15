@@ -34,12 +34,29 @@ export function NachtragHinweis({ nachtrag }: { nachtrag: AbteilungsZeile["nacht
 /**
  * Der rote Waechter in einer Sonderzeile (eine Zeile mit `flex-wrap`: der
  * Hinweis steht mit `basis-full` in einer eigenen Reihe darunter).
+ *
+ * Der Text steht in `text-foreground`, nicht in `text-credo-rot` — wie beim
+ * `NachtragHinweis` darueber und aus demselben Grund wie in
+ * `ausgaben/rueckgaben-karte.tsx` („Text immer in Vordergrundfarbe (Kontrast),
+ * der Zustand steht als Wort da“). Belegt durch die Durchsicht vom 15.10.2026,
+ * Zahlen nachgerechnet: Die beiden Sonderzeilen der Karte haben selbst schon
+ * `bg-credo-gelb/10`, die halbtransparenten Toene stapeln sich also
+ * (rgb(252,225,210)), und #E2001A kam darauf bei 12 px nur auf 3,96:1 (noetig
+ * 4,5:1) — auf weissem Grund allein waeren es 4,15:1, ebenfalls zu wenig.
+ * `foreground` erreicht 13,96:1. Genau davor warnt CLAUDE.md („Kein `opacity`,
+ * kein Filter, kein `/50` in Farbklassen — das aenderte den Kontrast am Test
+ * vorbei“), und diese Datei liegt ausserhalb der Reichweite des
+ * Kontrast-Waechters.
+ *
+ * Flaeche und Rand sind dabei Zierde, nicht die Aussage (der Rand hat gegen den
+ * Grund nur 1,96:1): Die Aussage steht im Text — „ein Zustand traegt immer
+ * Text, nie nur Farbe“.
  */
 export function WaechterHinweis({ anzeige }: { anzeige: Pick<Anzeige, "hinweis" | "hinweisTon"> }) {
   if (anzeige.hinweisTon !== "rot" || !anzeige.hinweis) return null;
   return (
     <p
-      className="basis-full rounded-md bg-credo-rot/10 px-2 py-1 text-xs text-credo-rot"
+      className="basis-full rounded-md border border-credo-rot/40 bg-credo-rot/10 px-2 py-1 text-xs text-foreground"
       data-hinweis="waechter"
     >
       {anzeige.hinweis}

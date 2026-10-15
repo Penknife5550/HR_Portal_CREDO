@@ -25,7 +25,7 @@ npm run dev          # Entwicklungsserver
 npm run build        # Produktion-Build
 npm run lint         # ESLint
 npm run test         # Jest-Tests
-npm run pruefen      # Typen + Lint + Tests — vor JEDEM Push (es gibt weder CI noch Git-Hooks)
+npm run pruefen      # Typen + Lint + Tests — vor JEDEM Push (es gibt weder CI noch Git-Hooks); Jest laesst `.claude/` aus (`testPathIgnorePatterns`), sonst laufen die Arbeitskopien offener Sitzungen mit und der Lauf ist immer rot
 npm run db:push      # Schema synchronisieren (kein Migrations-Ordner)
 npm run db:seed      # Seed (tsx prisma/seed.ts) — legt nur an, was fehlt, aendert nie Bestehendes
 npm run db:studio    # Prisma Studio

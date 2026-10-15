@@ -31,6 +31,13 @@ ist, steht hier.
   256 Suiten / 8240 Tests, Build grün, 213 Browser-Prüfungen in Ordnung, 42 Bilder neu, die
   alte Ansicht nachweislich nur um die drei U1-Dinge geändert. Der Ankündigungstext steht als
   Entwurf in [pilot-ankuendigung.md](pilot-ankuendigung.md).
+- **Durchsicht (Code-Review) der Merge-Naht** nachgeholt — sie fehlte in der Abnahme und wurde
+  auf Nachfrage des Projektverantwortlichen nachgezogen (Protokoll Abschnitt 7). Sieben
+  Blickwinkel, jeder Befund dreifach gegengeprüft: **18 Befunde, 2 bestätigt, 16 widerlegt;
+  beide bestätigten bestanden schon auf `main`, der Merge und der Pilot kamen ohne Befund
+  durch.** Beide behoben: `jest.config.ts` schließt `.claude/` aus (damit gilt **wieder
+  `npm run pruefen`**, siehe 0.3) und der rote Wächter-Hinweis der Abteilungskarte hat jetzt
+  lesbaren Kontrast. Dazu ein empfohlener Nachtrag im DSB-Papier.
 
 **Nächster Schritt: Deploy von U0 + U1 + Pilot + Mailtext.** Kein Schema-Delta für den Pilot,
 **+1 Tabelle** für den Mailtext (`email_log_texte`); keine Umgebungsvariable, keine Vorlage
@@ -63,17 +70,15 @@ eigener Strang, nie in UX- oder `main`-Commits aufnehmen.
 (`ausstattung-zugaenge`, `heuristic-chaplygin-b5558a`, `zealous-dirac-dffdc6`,
 `bold-heisenberg-a615cf`, `competent-turing-c6caae`, `nervous-leavitt-c5af8e`) — **alle sechs
 sind vollständig in `main`** (am 15.10.2026 mit `git merge-base --is-ancestor` geprüft) und
-können nach `git worktree remove` weg, sobald ihre Sitzungen geschlossen sind. Solange sie
-liegen, **nicht `npm run pruefen`**, sondern nach 0.3 prüfen: sonst scheitert z. B.
-`.claude/worktrees/ausstattung-zugaenge/…/pdf-export-zustaendigkeit.test.ts` und verdeckt den
-eigenen Stand. Lohnt sich: `.claude` dauerhaft in `tsconfig.json` und `jest.config.ts`
-ausschließen (gehört nach `main`, nicht in den Umbau).
+können nach `git worktree remove` weg, sobald ihre Sitzungen geschlossen sind. **Sie störten die
+Prüfung — das ist seit dem 15.10.2026 behoben** (`jest.config.ts` schließt `.claude/` aus, siehe
+0.3); `npm run pruefen` gilt wieder uneingeschränkt, auch solange die Kopien liegen.
 
 **Aufräumen, wenn es wieder geht:** `git worktree prune` (Reste `.git/worktrees/hr-fix` und
 `nervous-ritchie-2bbb51` ließen sich wegen „Permission denied“ nicht löschen – OneDrive);
 die drei Arbeitskopien `bold-heisenberg-a615cf`, `competent-turing-c6caae`,
 `nervous-leavitt-c5af8e` unter `.claude/worktrees/` sind vollständig in `main`. Prüfen
-weiter nach 0.3.
+weiter nach 0.3 (dort steht, dass der Umweg seit 15.10.2026 entfaellt).
 
 ### 0.1 Wo wir stehen (08.10.2026)
 
@@ -178,23 +183,28 @@ Frühere Schritte (Merge von `main` am 05.10., `tageZwischen` am 06.10., Nebenau
    Nebenaufgaben sind alle in `main` und hier gemergt. Dazu der Ordner
    `nervous-ritchie-2bbb51` (schon aus `git worktree list` entfernt, ließ sich nicht löschen).
    Wenn deren Sitzungen geschlossen sind: `git worktree remove <pfad>` bzw. Ordner löschen.
-   Solange sie liegen, prüfen nach 0.3.
+   Sie störten die Prüfung; seit 15.10.2026 behoben — siehe 0.3.
 
-### 0.3 Prüfen, solange fremde Arbeitskopien unter `.claude/` liegen
+### 0.3 Prüfen — ~~Umweg~~ erledigt, `npm run pruefen` gilt wieder
 
-`npm run pruefen` nimmt sie mit (`tsconfig.json` schließt nur `node_modules` aus, Jest kennt
-keine Ausnahme) – dreifache Laufzeit und fremde Fehler. Dann so prüfen:
+**Seit dem 15.10.2026 gibt es den Umweg nicht mehr.** Die Durchsicht (Abschnitt 7) hat die
+Sache als Befund bestätigt, und sie ist behoben: `jest.config.ts` trägt jetzt
 
-```bash
-printf '{ "extends": "./tsconfig.json", "exclude": ["node_modules", ".claude"] }\n' > tsconfig.pruefen.tmp.json && npx tsc --noEmit -p tsconfig.pruefen.tmp.json; rm -f tsconfig.pruefen.tmp.json
+```
+testPathIgnorePatterns: ["/node_modules/", "/\\.claude/"],
 ```
 
-```bash
-npx next lint && npx jest --testPathIgnorePatterns ".claude"
-```
+Damit ist **`npm run pruefen` wieder DIE Prüfung vor jedem Push**, so wie CLAUDE.md es verlangt.
+Kein temporäres `tsconfig.pruefen.tmp.json`, kein `--testPathIgnorePatterns` von Hand mehr.
 
-Dauerhaft lösen (auf `main`): `.claude` in `tsconfig.json` (`exclude`) und in
-`jest.config.ts` (`testPathIgnorePatterns`, `modulePathIgnorePatterns`) aufnehmen.
+Warum es nötig war: `testMatch` greift ohne `roots` über das ganze Projekt, und jede offene
+Sitzung legt unter `.claude/worktrees/` eine vollständige Kopie des Repos ab — am 15.10.2026
+1331 fremde Suiten gegen 256 eigene. Schlimmer als die dreifache Laufzeit war, dass
+`moduleNameMapper` auf das AKTUELLE `src/` zeigt: Die alten Tests laufen gegen den neuen Code
+und müssen scheitern. Der Lauf war damit immer rot, und ein echter Rückschritt in `src/` wäre
+darin untergegangen. `tsc` und `next lint` waren nie betroffen (beide überspringen Ordner, die
+mit einem Punkt beginnen — nachgeprüft: `tsc --listFilesOnly | grep -c .claude` = 0), deshalb
+genügt die eine Zeile in `jest.config.ts`.
 
 ### 0.4 Der Prototyp-Tag (V0) – erledigt am 15.10.2026
 
@@ -1777,6 +1787,51 @@ Zwei Befunde des technischen Skripts betreffen **nicht** den Pilot, sondern das 
 Einrichtungsleitung und Führungskraft bekommen auch MIT Zuweisung des Mandanten 403 von
 `GET /api/contract-end/[id]` (die Allowlist der Middleware lässt nur `/api/auth` durch), beide
 Ansichten zeigen denselben Ladefehler. Bekannt und außerhalb des Umbaus (Weg C, siehe 0.0).
+
+### 15.10.2026 – Pilot, Tag 6: Durchsicht (Code-Review) der Merge-Naht
+
+**Nachgeholt.** Die Abnahme oben war ohne die Durchsicht, die Feinplan Abschnitt 6 für Tag 6
+ausdrücklich verlangt („Abnahme: … Durchsicht (Code-Review)“) — auf Nachfrage des
+Projektverantwortlichen gemerkt und nachgeholt, bevor „deploybar“ stehen bleibt.
+
+Angelegt auf das Risiko, das an diesem Tag wirklich neu ist: die Naht zwischen `main` und
+`ux-umbau`. Sieben Blickwinkel (Merge-Naht · Mailtext-Archiv × neue Mails von `main` ·
+Adressen nach U1 · UI-Regeln im neuen `main`-Code · Pilot-Code · Deploy-Bereitschaft ·
+Zusammenspiel), jeder Befund danach von drei Skeptikern mit verschiedenen Linsen
+(Korrektheit · Ausfallpfad · Relevanz) zum Widerlegen vorgelegt; ein Befund überlebt nur,
+wenn höchstens einer ihn widerlegt. 61 Agenten, nur lesend; Git-Stand danach kontrolliert.
+
+**18 Befunde, 2 bestätigt, 16 widerlegt — und beide bestätigten bestanden schon auf `main`.
+Der Merge selbst und der Pilot kamen ohne Befund durch.**
+
+| Befund | Schwere | Stimmen | Behoben |
+|---|---|---|---|
+| `npm run pruefen` läuft über 1331 fremde Testdateien aus `.claude/worktrees/` und ist damit immer rot (`moduleNameMapper` zeigt auf das aktuelle `src/`, die alten Tests laufen gegen den neuen Code) | mittel | 3/3 | ja — `testPathIgnorePatterns: ["/node_modules/", "/\\.claude/"]` in `jest.config.ts`. Damit ist Abschnitt 0.3 erledigt: `npm run pruefen` ist wieder DIE Prüfung. Nachgezählt: 1587 Suiten insgesamt, 1331 fremd, alle 256 eigenen unter `src/__tests__` |
+| Der rote Wächter-Hinweis der Abteilungskarte steht mit 3,95:1 auf getöntem Grund (zwei halbtransparente Töne stapeln sich; auf Weiß allein 4,14:1, auch zu wenig) | niedrig (Finder: mittel) | 2/3 | ja — `text-credo-rot` → `text-foreground` plus Rand in `ausstattung/nachtrag-hinweis.tsx`, genau wie das Geschwister `NachtragHinweis` darüber. Die übrigen `credo-rot`-Stellen der Ausstattung bleiben: CLAUDE.md duldet die alten Zustandsfarben bis zum Umbau des Moduls |
+
+**Was die Gegenprobe aussortiert hat**, als Beleg dafür, dass die Linsen arbeiten: Der Befund
+„fünf Portal-Seiten haben seit U1 keine `h1`“ fiel, weil die Seiten sie sehr wohl haben — nur
+nicht in der Komponente, die der Finder gelesen hatte, sondern in `vorgaenge/[modul]/page.tsx`
+(`<h1 className="sr-only">Vorgänge: <Modul></h1>`); eine der fünf Dateien ist sogar toter Code.
+Der Befund „ein Deploy nach der Lauf-Uhrzeit führt alle offenen Läufe sofort aus“ fiel, weil das
+die getestete und zugesicherte Eigenschaft ist (`laufFaellig`, Regel 5) — und weil die Läufe
+zustandsbasiert rechnen: Ein Lauf um 07:06 löscht genau die Zeilen, die er um 07:00 gelöscht
+hätte. Die Zeitplaner-Dateien sind zwischen `origin/main` und HEAD ohnehin byte-identisch.
+
+**Eine Empfehlung umgesetzt, obwohl der Befund fiel:** Alle drei Skeptiker hielten die
+DSB-Mitteilung für sachlich richtig (Abschnitt 2 sagt generisch „Freitext aus dem jeweiligen
+Vorgang“, und die Aufzählung in Abschnitt 3 ist ausdrücklich auf „Freitexte von HR“ verengt) —
+empfahlen aber unabhängig voneinander denselben Nachtrag. Er steht jetzt drin: ein eigener Punkt
+für die Freitexte von Führungskräften und zuständigen Stellen samt den Feldern aus „Ausstattung
+& Zugänge“, mit dem Hinweis, dass die Aufzählung nicht abschließend ist. Die Zustimmung des DSB
+bleibt davon unberührt; das Papier sagt damit, was es tatsächlich deckt.
+
+**Nicht behoben, bewusst:** Die Durchsicht nennt drei Dinge, die außerhalb dieses Deploys
+liegen und in ihr Paket gehören — die n8n-Generatoren unter `scripts/` bauen weiter alte
+Adressen (der Wächter liest `scripts/` nicht rekursiv), die Offboarding-Detailseite liest `?tab=`
+aus der Adresse nicht (U4 des Moduls), und die Farbtabellen der rund 20 neuen
+Ausstattungs-Dateien erreicht kein Wächter (Kontrast-Test deckt nur `src/components/ui/` ab).
+Alle drei bestanden schon auf `main`.
 
 ## 8. Branches und Commits
 
