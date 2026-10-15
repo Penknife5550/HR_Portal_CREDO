@@ -1216,7 +1216,7 @@
 
     <div class="hinweis info">
       <span class="label">Wer darf das?</span>
-      <p>Den Reiter sehen Administrator, HR-Leitung und Sachbearbeiter. Einrichtungsleitungen und Vorgesetzte sehen ihn nicht, weil dort Adressen und Betreffzeilen stehen.</p>
+      <p>Den Reiter sehen Administrator, HR-Leitung und Sachbearbeiter. Einrichtungsleitungen und Vorgesetzte sehen ihn nicht, weil dort Adressen, Betreffzeilen und der Text der E-Mails stehen.</p>
     </div>
 
     <ol>
@@ -1246,9 +1246,57 @@
 
     <p>Beim Dokumentenpaket steht unter der Zeile <strong>Anhänge anzeigen</strong>. Ein Klick zeigt, welche Dateien mitgingen.</p>
 
+    <!-- Text einer E-Mail ansehen (Mailtext im Versandprotokoll, 10/2026): gilt erst, wenn die Funktion deployt ist. -->
+    <h4 id="vorgang-mails-text">Den Text einer E-Mail ansehen</h4>
+    <p>Bei jeder E-Mail mit gespeichertem Text steht der Knopf <strong>Text ansehen</strong>. So sehen Sie nicht nur, <em>dass</em> eine E-Mail hinausging, sondern auch, <em>was</em> die Person gelesen hat – zum Beispiel, wenn sie nachfragt, was ihr eigentlich geschickt wurde.</p>
+
+    <figure class="screenshot">
+      <img src="screenshots/vorgang-mails-reiter.png" alt="Der Reiter E-Mails eines Vorgangs mit vier Einträgen. Bei den beiden versendeten E-Mails von Mitarbeiterin und Führungskraft steht der Knopf Text ansehen. Der Eintrag nicht versendet nennt den Grund E-Mail-Vorlage ist deaktiviert und den Satz Kein Text: Die Mail wurde nicht erzeugt. Die älteste E-Mail trägt den Satz Kein Text gespeichert.">
+      <figcaption>Der Reiter E-Mails: „Text ansehen" steht nur dort, wo ein Text gespeichert ist. Bei den übrigen Zeilen steht, warum es keinen gibt. (Beispieldaten)</figcaption>
+    </figure>
+
+    <ol>
+      <li>Klicken Sie bei der E-Mail auf <strong>Text ansehen</strong>.</li>
+      <li>Es öffnet sich das Fenster „E-Mail ansehen". Oben stehen An, gegebenenfalls CC und BCC und der Betreff. Darunter sehen Sie die E-Mail so, wie die Person sie bekommen hat.</li>
+      <li>Mit <strong>Nur Text</strong> wechseln Sie auf eine schlichte Fassung ohne Gestaltung – praktisch zum Nachlesen oder zum Kopieren in eine Antwort. <strong>Ansicht</strong> bringt die gestaltete Fassung zurück.</li>
+      <li>Mit <strong>Schließen</strong> kehren Sie zur Liste zurück.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/vorgang-mails-text.png" alt="Das Fenster E-Mail ansehen zu einer Einladung an eine Mitarbeiterin. Oben stehen An und Betreff, darunter ein blauer Hinweis Persönliche Links sind ersetzt und der Umschalter Ansicht und Nur Text. Im Rahmen steht die gestaltete E-Mail; unter dem Knopf Personalfragebogen ausfüllen steht anstelle des Links der Platzhalter Persönlicher Link, aus Sicherheitsgründen nicht gespeichert.">
+      <figcaption>Das Fenster „E-Mail ansehen". An der Stelle des persönlichen Links steht ein Platzhalter. (Beispieldaten)</figcaption>
+    </figure>
+
+    <div class="hinweis info">
+      <span class="label">Persönliche Links stehen nicht im Text</span>
+      <p>An der Stelle des Links steht „[Persönlicher Link – aus Sicherheitsgründen nicht gespeichert]". Die Person hat den echten Link bekommen; in diesem gespeicherten Text steht er nicht. Das ist Absicht: Ein solcher Link öffnet ohne Anmeldung zum Beispiel den Personalfragebogen oder die Seite zum Hochladen von Unterlagen. Soll die Person ihn noch einmal bekommen, nutzen Sie im Vorgang die Aktion, die ihn verschickt hat (zum Beispiel „Link erneut senden"); der Platzhalter hilft dabei nicht weiter. In dieser Ansicht lassen sich Links nicht anklicken.</p>
+    </div>
+
+    <p>Nicht zu jeder E-Mail gibt es einen Text:</p>
+    <table>
+      <caption>Wann ein Text fehlt – und was dann dasteht</caption>
+      <thead>
+        <tr><th scope="col">Lage</th><th scope="col">Was Sie sehen</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Die E-Mail ging vor Einführung der Textspeicherung hinaus</td><td>„Kein Text gespeichert …" in der Zeile. Nachträglich lässt sich der Text nicht herstellen.</td></tr>
+        <tr><td>Gelb „nicht versendet"</td><td>„Kein Text: Die Mail wurde nicht erzeugt." – es gab nichts zu schicken, etwa weil die Vorlage abgeschaltet war.</td></tr>
+        <tr><td>Rot „fehlgeschlagen"</td><td>Der Text ist da. Das Fenster sagt „Nicht zugestellt" und zeigt, was hinausgehen sollte.</td></tr>
+        <tr><td>Test aus den Einstellungen („Test senden")</td><td>Kein Text; Testmails stehen auch nicht im Reiter des Vorgangs.</td></tr>
+        <tr><td>BEM</td><td>Es gibt keinen Reiter und keinen Text. BEM-Fälle sind vertraulich; dort gilt das eigene Kommunikationsprotokoll des Falls.</td></tr>
+      </tbody>
+    </table>
+
+    <p>Anhänge werden nicht mit aufgehoben. Ihre Namen stehen wie bisher unter <strong>Anhänge anzeigen</strong>. Links ins Portal (etwa „Vorgang öffnen“ in einer HR-E-Mail) sind nicht klickbar; die Adresse steht hinter dem Linktext.</p>
+
+    <div class="hinweis warnung">
+      <span class="label">Vertraulich behandeln</span>
+      <p>Der Text kann Namen, Fristen und andere Angaben zur Person enthalten. Behandeln Sie ihn wie den Vorgang selbst: nicht weiterleiten, nicht außerhalb des Portals ablegen. Den Text sehen nur Administrator, HR-Leitung und Sachbearbeiter – diese drei Rollen sehen alle Einrichtungen, auch hier.</p>
+    </div>
+
     <div class="hinweis info">
       <span class="label">Gut zu wissen</span>
-      <p>Der Reiter zeigt E-Mails ab dem 30.09.2026. Ältere E-Mails und solche, die mehrere Vorgänge auf einmal betreffen (etwa die Sammelwarnung zu Verbeamtungs-Fristen), stehen nur unter <strong>Einstellungen → Versandprotokoll</strong>. Nach 90 Tagen werden die Einträge gelöscht. Der BEM-Bereich hat bewusst keinen solchen Reiter; dort gilt das eigene Kommunikationsprotokoll des Falls.</p>
+      <p>Der Reiter zeigt E-Mails ab dem 30.09.2026. Ältere E-Mails und solche, die mehrere Vorgänge auf einmal betreffen (etwa die Sammelwarnung zu Verbeamtungs-Fristen), stehen nur unter <strong>Einstellungen → Versandprotokoll</strong>. Nach 90 Tagen werden die Einträge gelöscht – mit ihnen auch der gespeicherte Text der E-Mail. Nicht im Protokoll stehen E-Mails, die Sie selbst aus Brief-Vorlagen versenden, und Einladungen zur Kontoeinrichtung; sie gehen am Versandprotokoll vorbei. Der BEM-Bereich hat bewusst keinen solchen Reiter; dort gilt das eigene Kommunikationsprotokoll des Falls.</p>
     </div>
 
     <h3 id="ausstattung">3.9 Ausstattung &amp; Zugänge</h3>
@@ -2192,7 +2240,7 @@
       <tbody>
         <tr><td><strong>Versand-Status</strong></td><td>Eine Ampel pro E-Mail-Art: Grün heißt „alles bereit", Rot heißt „hier fehlt noch etwas".</td></tr>
         <tr><td><strong>E-Mail-Vorlagen</strong></td><td>Den Text der automatischen E-Mails anpassen – Betreff, Empfänger und Inhalt.</td></tr>
-        <tr><td><strong>Versandprotokoll</strong></td><td>Die Liste aller verschickten E-Mails mit Status (verschickt, fehlgeschlagen, übersprungen).</td></tr>
+        <tr><td><strong>Versandprotokoll</strong></td><td>Die Liste aller verschickten E-Mails mit Status (verschickt, fehlgeschlagen, übersprungen). Ein Klick auf einen Eintrag klappt die Einzelheiten auf; bei E-Mails mit gespeichertem Text öffnet <strong>Text ansehen</strong> die E-Mail (siehe <a href="#vorgang-mails-text">Kapitel 3.8</a>). Dieses Protokoll umfasst alle Einrichtungen; es sehen nur Administrator und HR-Leitung.</td></tr>
         <tr><td><strong>SMTP</strong></td><td>Die technischen Zugangsdaten für den E-Mail-Versand. „SMTP" ist das Standardverfahren, mit dem Programme E-Mails versenden – und der <strong>primäre Versandweg</strong> des Portals.</td></tr>
         <tr><td><strong>Webhooks</strong></td><td>Nur ein optionaler Zusatzkanal, um andere Programme anzubinden. Für den E-Mail-Versand nicht nötig – das übernimmt SMTP.</td></tr>
         <tr><td><strong>Abteilungen</strong></td><td>Die E-Mail-Adressen der Abteilungen, die ihre Checklisten-Aufgaben per Link erhalten – zentral oder je Einrichtung (siehe „Abteilungen pflegen" unten).</td></tr>
@@ -2280,7 +2328,7 @@
         <tr><th scope="col">Lauf</th><th scope="col">Was er tut</th><th scope="col">Uhrzeit</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Wartung</strong></td><td>Löscht Einträge des Versandprotokolls und Protokolle der Läufe, die älter als 90 Tage sind. <em>Löscht endgültig.</em></td><td>03:30</td></tr>
+        <tr><td><strong>Wartung</strong></td><td>Löscht Einträge des Versandprotokolls (mit dem gespeicherten E-Mail-Text) und Protokolle der Läufe, die älter als 90 Tage sind. <em>Löscht endgültig.</em></td><td>03:30</td></tr>
         <tr><td><strong>BEM-Aufbewahrung</strong></td><td>Löscht BEM-Fälle, deren Aufbewahrungsfrist abgelaufen ist. <em>Löscht endgültig.</em></td><td>03:00</td></tr>
         <tr><td><strong>Aufbewahrung erzeugter Dokumente</strong></td><td>Löscht erzeugte Briefe, die älter als 12 Monate sind – die führende Ablage ist das DMS –, sowie Text und Anhänge individueller E-Mails nach 12 Monaten (der Nachweis bleibt). <em>Löscht endgültig.</em></td><td>03:15</td></tr>
         <tr><td><strong>Unterlagen-Fristen</strong></td><td>Erinnert Personen an angeforderte Unterlagen, meldet verstrichene Fristen, holt gescheiterte E-Mails nach und löscht zurückgewiesene Dateien nach 30 Tagen (siehe <a href="#onboarding-unterlagen">Kapitel 3.7</a>). <em>Löscht endgültig.</em></td><td>07:00</td></tr>
@@ -2379,6 +2427,9 @@
 
     <h3>Eine E-Mail wurde nicht verschickt.</h3>
     <p>Öffnen Sie den Vorgang und dort den Reiter <strong>E-Mails</strong> (siehe <a href="#vorgang-mails">Kapitel 3.8</a>). Dort steht bei jeder E-Mail, ob sie verschickt wurde, und bei Problemen der Grund. Ältere E-Mails und Sammelmails finden Administrator und HR-Leitung unter <strong>Einstellungen → Versandprotokoll</strong>. Zeigt das Portal oben ein rotes Banner „SMTP ist nicht aktiv", muss zuerst der E-Mail-Versand eingerichtet werden (siehe Kapitel 12.3).</p>
+
+    <h3>Ich möchte wissen, was in einer E-Mail genau stand.</h3>
+    <p>Öffnen Sie den Vorgang, dort den Reiter <strong>E-Mails</strong>, und klicken Sie bei der E-Mail auf <strong>Text ansehen</strong> (siehe <a href="#vorgang-mails-text">Kapitel 3.8</a>). Steht dort stattdessen „Kein Text gespeichert", ging die E-Mail vor Einführung dieser Funktion hinaus. Persönliche Links zeigt dieser Text nie; dort steht ein Platzhalter.</p>
 
     <h3>Es kommen keine automatischen Erinnerungen.</h3>
     <p>Erinnerungen verschickt das Portal nur, wenn der passende automatische Lauf eingeschaltet ist, etwa „Onboarding-Erinnerungen". Administrator und HR-Leitung sehen das unter <strong>Einstellungen → Automatische Läufe</strong>: Steht die Karte auf „aus", ist der Lauf nicht eingeschaltet; ist sie rot „ausgeblieben", lief er zur geplanten Zeit nicht (siehe <a href="#verwaltung-laeufe">Kapitel 12.4</a>). Läuft alles, prüfen Sie im Reiter „E-Mails" des Vorgangs, ob die Erinnerung „nicht versendet" wurde – dann ist oft die Vorlage ausgeschaltet.</p>

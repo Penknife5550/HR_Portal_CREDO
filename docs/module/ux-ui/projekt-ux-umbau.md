@@ -4,7 +4,7 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 14.10.2026 (Mailtext im Protokoll, siehe Abschnitt 7; davor 12.10.: Übergabe vor einem Neustart – **0.0 zuerst lesen**; 09.10.: Bestandsaufnahme, vier Fehler auf `main`, Deploy-Anleitung, Prototyp-Tag vorbereitet)
+Letzte Änderung: 15.10.2026 (Mailtext im Protokoll: zwei Durchsichten, Handbuch, DSB-Papier, siehe Abschnitt 7; davor 12.10.: Übergabe vor einem Neustart – **0.0 zuerst lesen**; 09.10.: Bestandsaufnahme, vier Fehler auf `main`, Deploy-Anleitung, Prototyp-Tag vorbereitet)
 
 ## 0. Übergabe (Stand 12.10.2026)
 
@@ -1629,6 +1629,45 @@ deployt wird zusammen mit dem Umbau.
   eingeschlossen); Handbuch-Abschnitt zum Reiter „E-Mails“ (die Datei hat uncommittete Änderungen
   des Projektverantwortlichen, daher nicht angefasst).
 
+### 15.10.2026 – Mailtext im Versandprotokoll: zwei unabhängige Durchsichten, Handbuch, DSB-Papier
+
+Auftrag: „speichere alles und dokumentiere“. Vor dem Dokumentieren wurde die Umsetzung zweimal
+unabhängig durchgesehen (nur lesende Agenten, je Befund drei Skeptiker mit verschiedenem
+Blickwinkel; Skripte und Server der Prüfer wurden anschließend geprüft und sind entfernt).
+
+- **Erste Durchsicht (83 Agenten):** Umgehung der Link-Ersetzung, Zugriff, Versandweg, Anzeige,
+  Doku. 16 Befunde bestätigt, 10 widerlegt. Code (`4bd6f6b`): APP_URL wird nachsichtig gelesen;
+  Entitäten, Backslashes, Abfragewerte und Fragmente werden geprüft; Netz für UUID/Hex; die
+  Bereinigung der Ansicht ist eine Positivliste statt Regex-Entfernen (die Regex-Fassung ließ sich
+  durch Verschachteln umgehen); Prototyp-Schlüssel im Modulnamen (`__proto__`, `constructor` hoben
+  die `vorgangTyp`-Schranke auf); Link-Hinweis nur bei ersetztem Link; FAILED ohne Betreff.
+- **Zweite Durchsicht (59 Agenten) gegen die Korrekturen:** 14 Befunde bestätigt, 5 widerlegt.
+  Der wichtigste war mein eigener: der neue Anker-Regex in `textAusHtml` war kubisch (Minuten ab
+  10 KB, bei jedem Öffnen im Server) und mehrere Regexe quadratisch. Code (`e68d692`): eine
+  gemeinsame lineare Zerlegung (`lies`) für Ansicht und „Nur Text“; Attributwerte einmal
+  dekodiert und mit maskiertem `&` ausgegeben; `style` nur mit bekannten Funktionen; Logo nur von
+  der Portal-Adresse; `<!-->` und selbstschließende Container verschlucken den Rest nicht;
+  behaltene Portal-Adressen haben einen erwarteten Aufbau; Slugs mit Jahreszahl sind keine Tokens;
+  NUL und lose Surrogate werden vor dem Speichern bereinigt.
+- **Widerlegt und trotzdem notiert:** Brief-Mails aus Vorlagen und Kontoeinladungen laufen über
+  `sendEmail` am Versandprotokoll vorbei (hatten nie Zeile oder Text; im Handbuch ergänzt). Wird
+  `466662b` allein nach `main` übernommen, ersetzt es dort die `/dashboard`-Portal-Links der
+  HR-Mails durch den Platzhalter (fail-closed, folgenlos) — erst die neuen Adressen aus `ux-umbau`
+  bleiben stehen.
+- **Bekannte Grenze:** Liegt der Fokus im Rahmen der Ansicht, erreicht ein Escape das Portal nicht
+  (jedes iframe); „Schließen“ und Tab bleiben.
+- **Falsche Aussagen berichtigt:** Der Plan nannte den Reiter „nur eigener Mandant“ — alle drei
+  HR-Rollen (`GLOBAL_ROLES`) sehen alle Einrichtungen. „Zugangslinks stehen nirgends in der
+  Datenbank“ gilt nur für die Kopie; die Tokens liegen in den Vorgangszeilen.
+- **Dokumentiert:** Handbuch (Kapitel 3.8 mit zwei neuen Bildern, 12.3, 12.4, FAQ),
+  `docs/module/betrieb/mailtext-im-protokoll-dsb-mitteilung.md` (Entwurf, fünf Fragen an den DSB),
+  Plan, CLAUDE.md. Bilder entstanden mit Puppeteer gegen die Entwicklungsdatenbank (Beispieldaten
+  `beispiel.invalid`, danach gelöscht).
+- **Geprüft:** komplette Suite 210 Suites / 5782 Tests, `tsc`, `next lint` für die geänderten
+  Dateien. Nicht gepusht, nicht deployt.
+- **Offen:** DSB-Mitteilung abstimmen (Fragen a bis e); ob `466662b` und `e68d692` früh nach `main`
+  sollen, damit schon Texte entstehen (Schema +1 Tabelle).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1684,6 +1723,7 @@ deployt wird zusammen mit dem Umbau.
 | `ux-umbau` | `a4d6e7b` | Merge von `main` (Hinweis `next/font`) |
 | `ux-umbau` | `e8e4571` | Prototyp-Tag vorbereitet: Docker neu gebaut, Leitfaden gegen den Code geprüft, Bilder neu |
 | `ux-umbau` | `466662b`, `da1c62e` | Mailtext im Versandprotokoll: Backend (eigener Commit), Routen und Dialog |
+| `ux-umbau` | `fb8ec05`, `4bd6f6b`, `e68d692` | Mailtext: Doku, Korrekturen der ersten Durchsicht, Korrekturen der zweiten Durchsicht |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
