@@ -1891,7 +1891,8 @@ Alle drei bestanden schon auf `main`.
 | `ux-umbau` | `fb8ec05`, `4bd6f6b`, `e68d692` | Mailtext: Doku, Korrekturen der ersten Durchsicht, Korrekturen der zweiten Durchsicht |
 | `ux-umbau` | `7443ea8` | Logbuch: Push vom 15.10.2026 nachgetragen |
 | `ux-umbau` | `24dbeb6` | Merge von `main` (`5595cf7`, Ausstattung & Zugänge, Offboarding-Routen) samt vier Nacharbeiten; V0 und DSB im Logbuch |
-| `ux-umbau` | `5169eb1` | Pilot Tag 6: Abnahme (213 Browser-Prüfungen, 42 Bilder, Höhenmessung), Ankündigungstext, Logbuch |
+| `ux-umbau` | `5169eb1` | Pilot Tag 6: Abnahme (213 Browser-Prüfungen, 42 Bilder, Höhenmessung), Ankündigungstext, Logbuch |
+| `ux-umbau` | `87c5df3` | Durchsicht der Merge-Naht nachgeholt: `npm run pruefen` wieder grün (`.claude/` aus Jest), Kontrast des Wächter-Hinweises, Nachtrag im DSB-Papier |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
