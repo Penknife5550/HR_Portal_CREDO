@@ -124,7 +124,7 @@ export async function mailTextLaden(
       cc: zeile.cc || null,
       bcc: zeile.bcc || null,
     },
-    html: htmlFuerAnsicht(bodyHtml),
+    html: htmlFuerAnsicht(bodyHtml, portalAdresse()),
     text: textAusHtml(bodyHtml),
     gekuerzt: zeile.text.gekuerzt,
     hinweis: zeile.status === "FAILED" ? MAIL_TEXT_MELDUNGEN.nichtZugestellt : null,

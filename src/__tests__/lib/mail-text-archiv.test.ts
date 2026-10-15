@@ -589,9 +589,13 @@ describe("htmlFuerAnsicht: Positivliste (Befunde der Durchsicht)", () => {
 
   it("ein Bild bleibt nur als eingebettetes Bild oder als Logo", () => {
     expect(htmlFuerAnsicht('<img src="https://tracker.example/p.gif">')).not.toContain("<img");
-    expect(htmlFuerAnsicht('<img src="https://hr.fes-credo.de/credo_logo.png" alt="Logo">')).toContain(
+    expect(htmlFuerAnsicht('<img src="https://hr.fes-credo.de/credo_logo.png" alt="Logo">', APP)).toContain(
       '<img src="https://hr.fes-credo.de/credo_logo.png" alt="Logo">',
     );
+    // von einem fremden Host oder ohne bekannte Portal-Adresse nicht
+    expect(htmlFuerAnsicht('<img src="https://tracker.example/credo_logo.png">', APP)).not.toContain("<img");
+    expect(htmlFuerAnsicht('<img src="https://hr.fes-credo.de/credo_logo.png">')).not.toContain("<img");
+    expect(htmlFuerAnsicht('<img src="/credo_logo.png">')).toContain('<img src="/credo_logo.png">');
     expect(htmlFuerAnsicht('<img src="data:image/png;base64,iVBORw0KGgo=">')).toContain("<img src=");
     expect(htmlFuerAnsicht('<img src="data:text/html;base64,PHNjcmlwdD4=">')).not.toContain("<img");
   });
@@ -603,7 +607,7 @@ describe("htmlFuerAnsicht: Positivliste (Befunde der Durchsicht)", () => {
       organization: "FES Gymnasium Minden",
       link: `${APP}/fragebogen/${TOKEN}`,
     }, { overrideTo: "anna@beispiel.invalid" });
-    const ansicht = htmlFuerAnsicht(textFuerProtokoll(rendered!.html, APP).bodyHtml);
+    const ansicht = htmlFuerAnsicht(textFuerProtokoll(rendered!.html, APP).bodyHtml, APP);
     pruefe(ansicht);
     expect(ansicht).toContain("Herzlich willkommen");
     expect(ansicht).toContain("Personalfragebogen ausfüllen");
@@ -672,5 +676,174 @@ describe("textHinweis: FAILED ohne Betreff", () => {
     expect(textHinweis({ event: "onboarding-created", status: "FAILED", hatText: false })).toBe(
       MAIL_TEXT_MELDUNGEN.nichtGespeichert,
     );
+  });
+});
+
+// =============================================
+// Zweite Durchsicht vom 15.10.2026 (Korrekturen)
+// =============================================
+
+describe("Laufzeit: beide Anzeigen sind linear", () => {
+  const MS = 1500;
+  const PATHOLOGISCH: Array<[string, string]> = [
+    ["viele Anker ohne Ende", '<a href="x" '.repeat(5000)],
+    ["viele < ohne >", "<".repeat(100000)],
+    ["viele <a ohne >", "<a ".repeat(33000)],
+    ["viele Kommentaranfaenge", "<!--".repeat(25000)],
+    ["verschachtelte Anker mit Entitaeten", "<a href=http://a>".repeat(2500) + "&amp;".repeat(6000) + "</a>".repeat(2500)],
+    ["viele href ohne Ende", 'href="'.repeat(15000)],
+    ["lange Punktfolge hinter einer Adresse", "https://hr.fes-credo.de/x" + ".".repeat(90000) + "x"],
+    ["viele http://", "http://".repeat(14000)],
+    ["viele &#", "&#".repeat(50000)],
+    ["tiefe Verschachtelung", "<div>".repeat(20000) + "x" + "</div>".repeat(20000)],
+  ];
+
+  it.each(PATHOLOGISCH)("%s", (_name, eingabe) => {
+    const start = Date.now();
+    textAusHtml(eingabe);
+    htmlFuerAnsicht(eingabe, APP);
+    textFuerProtokoll(eingabe, APP);
+    expect(Date.now() - start).toBeLessThan(MS * 3);
+  });
+});
+
+describe("htmlFuerAnsicht: Attributwerte und Stil", () => {
+  const ohneStil = (eingabe: string) => htmlFuerAnsicht(eingabe, APP);
+
+  it.each([
+    ['<div style="background:u&amp;#114;l(http://h/t.gif)">x</div>'],
+    ['<div style="background:u&#38;#114;l(http://h/t.gif)">x</div>'],
+    ['<div style="background:url&lpar;http://h/t.gif)">x</div>'],
+    ['<div style="background:u&bsol;72 l(http://h/t.gif)">x</div>'],
+    ["<div style=\"background-image:image-set('http://h/t.gif' 1x)\">x</div>"],
+    ['<div style="background-image:-webkit-image-set(url(http://h/t.gif) 1x)">x</div>'],
+    ['<div style="--x:u&amp;#114;l(http://h/t.gif);background-image:var(--x)">x</div>'],
+    ['<div style="background:src(http://h/t.gif)">x</div>'],
+    ['<div style="width:expr/**/ession(alert(1))">x</div>'],
+    ['<body style="background:u&amp;#114;l(http://h/t.gif)"><p>x</p></body>'],
+  ])("verwirft den style-Wert in %s", (eingabe) => {
+    const ausgabe = ohneStil(eingabe);
+    expect(ausgabe).not.toMatch(/url|image-set|var\(|src\(|expression|#114|bsol|lpar/i);
+    expect(ausgabe).toContain("<body");
+  });
+
+  it("behaelt Gestaltung mit erlaubten Funktionen", () => {
+    const ausgabe = ohneStil('<td style="background-color:rgb(244,244,245);padding:calc(8px + 2px);color:#575756">x</td>');
+    expect(ausgabe).toContain("rgb(244,244,245)");
+    expect(ausgabe).toContain("calc(8px + 2px)");
+  });
+
+  it("maskiert jedes & im Attribut, damit der Browser nicht ein zweites Mal dekodiert", () => {
+    const ausgabe = ohneStil('<p title="a &amp;#60;b&#62; &lt;x&gt;">x</p>');
+    expect(ausgabe).toContain('title="a &amp;#60;b&gt; &lt;x&gt;"');
+  });
+});
+
+describe("htmlFuerAnsicht und textAusHtml: Randfaelle der Zerlegung", () => {
+  it("ein leerer Kommentar „<!-->“ verschluckt den Rest nicht", () => {
+    for (const leer of ["<!-->", "<!--->", "<!---->", "<!-- x --!>"]) {
+      expect(htmlFuerAnsicht(`<p>vorher</p>${leer}<p>nachher</p>`)).toContain("<p>nachher</p>");
+      expect(textAusHtml(`<p>vorher</p>${leer}<p>nachher</p>`)).toBe("vorher\n\nnachher");
+    }
+  });
+
+  it("selbstschliessende Container verschlucken den Rest nicht", () => {
+    for (const container of ['<svg width="10"/>', "<button/>", "<video src=x />", "<object data=x/>"]) {
+      const ansicht = htmlFuerAnsicht(`<p>a</p>${container}<p>danach</p>`);
+      expect(ansicht).toContain("<p>danach</p>");
+      expect(textAusHtml(`<p>a</p>${container}<p>danach</p>`)).toContain("danach");
+    }
+  });
+
+  it("ein eingebetteter Inhalt ohne Schluss-Tag verwirft nur das Tag, ein Skript ohne Ende den Rest", () => {
+    expect(htmlFuerAnsicht("<p>a</p><object data=x><p>danach</p>")).toContain("<p>danach</p>");
+    expect(htmlFuerAnsicht("<p>a</p><script>alert(1)<p>danach</p>")).not.toContain("danach");
+  });
+
+  it("ein einzelnes „<“ im Text ist Text — auch in „Nur Text“", () => {
+    expect(textAusHtml("<p>1 < 2 und 3 > 2</p>")).toBe("1 < 2 und 3 > 2");
+    expect(htmlFuerAnsicht("<p>1 < 2</p>")).toContain("1 &lt; 2");
+  });
+
+  it("button, form und select behalten ihren Text", () => {
+    expect(textAusHtml('<form action="x"><button>Jetzt oeffnen</button></form>')).toBe("Jetzt oeffnen");
+    expect(htmlFuerAnsicht('<button>Jetzt oeffnen</button>')).toContain("Jetzt oeffnen");
+  });
+});
+
+describe("linksErsetzen: Aufbau behaltener Portal-Adressen und Verpackungen", () => {
+  const U = TOKEN;
+
+  it.each([
+    [`${APP}/vorgaenge/onboarding/x,${APP}/fragebogen/${U}`],
+    [`${APP}/vorgaenge/onboarding/x|${APP}/fragebogen/${U}`],
+    [`${APP}/vorgaenge/onboarding/x/${APP}/fragebogen/${U}`],
+    [`${APP}/vorgaenge/onboarding/x/https%3A%2F%2Fhr.fes-credo.de%2Ffragebogen%2F${U}`],
+    [`${APP}/login/${APP}/fragebogen/${U}`],
+    [`${APP}/einstellungen/${APP}/unterlagen/${U}`],
+    [`${APP}/credo_logo.png/${APP}/fragebogen/${U}`],
+    [`${APP}/login?${U}`],
+    [`${APP}/login?${U}=1`],
+    [`https://${U}.example.org/x`],
+    [`${APP}/vorgaenge/${U}/x`],
+    [`${APP}/vorgaenge/onboarding/${U}/${U}`],
+    [`${APP}&sol;fragebogen&sol;${U}`],
+    [`https:&sol;&sol;hr.fes-credo.de/fragebogen/AbCdEfGhIjKlMnOpQr12`],
+    [`${APP}&bsol;fragebogen&bsol;${U}`],
+    [`${APP}&#47;fragebogen&#47;${U}`],
+    [`${APP}&#x2F;fragebogen&#x2F;${U}`],
+  ])("laesst von %s nichts Lesbares stehen", (vorlage) => {
+    const kopie = linksErsetzen(vorlage, APP);
+    expect(kopie).not.toContain(U);
+    expect(kopie).not.toContain("AbCdEfGhIjKlMnOpQr12");
+  });
+
+  it("behaelt die erwarteten Portal-Formen unveraendert", () => {
+    for (const adresse of [
+      `${APP}/vorgaenge/onboarding/${U}`,
+      `${APP}/vorgaenge/onboarding/${U}?tab=dokumente`,
+      `${APP}/vorgaenge/onboarding/${U}?tab=dokumente#abschnitt-unterlagen-2026`,
+      `${APP}/vorgaenge/vertragsende`,
+      `${APP}/vorgaenge/onboarding?filter=offene-unterlagen-2026-gymnasium`,
+      `${APP}/einstellungen?tab=laeufe&amp;lauf=unterlagen-fristen`,
+      `${APP}/login`,
+    ]) {
+      expect(linksErsetzen(adresse, APP)).toBe(adresse);
+    }
+  });
+
+  it("behaelt Fremdlinks mit Slugs, Jahreszahlen und Dateiendungen", () => {
+    for (const adresse of [
+      "https://www.fes-minden.de/wp-content/uploads/2024/05/Datenschutzerklaerung-Bewerber-2024.pdf",
+      "https://www.fes-minden.de/anmeldung?utm_campaign=sommerfest-2026-einladung-eltern",
+      "https://www.landesrecht.nrw/Masernschutzgesetz-Information-2020.pdf",
+    ]) {
+      expect(linksErsetzen(adresse, APP)).toBe(adresse);
+    }
+  });
+
+  it("ersetzt weiterhin zufaellige Zeichenfolgen als Token", () => {
+    for (const token of ["AbCdEfGhIjKlMnOpQr12", "k3j9x0q8z7w6v5u4t3s2r1", "3f9c7a1e52b04d1b9e6a0c2f8d4b71aa", "Zx9-Qw8_Er7-Ty6_Ui5-Op4_As3"]) {
+      expect(linksErsetzen(`https://dienst.example.org/u/${token}`, APP)).toBe(PLATZHALTER_LINK);
+    }
+  });
+});
+
+describe("textFuerProtokoll: speicherbar", () => {
+  const lose = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+  it("entfernt NUL", () => {
+    const kopie = textFuerProtokoll("<p>a\u0000b</p>", APP);
+    expect(kopie.bodyHtml).toBe("<p>ab</p>");
+  });
+
+  it("laesst nach dem Kuerzen kein loses Surrogat zurueck", () => {
+    const kopie = textFuerProtokoll("x".repeat(MAX_TEXT_ZEICHEN - 1) + "\u{1F600}bbb", APP);
+    expect(kopie.gekuerzt).toBe(true);
+    expect(lose.test(kopie.bodyHtml)).toBe(false);
+  });
+
+  it("ersetzt ein loses Surrogat in der Eingabe", () => {
+    expect(lose.test(textFuerProtokoll("<p>a\ud83db</p>", APP).bodyHtml)).toBe(false);
   });
 });
