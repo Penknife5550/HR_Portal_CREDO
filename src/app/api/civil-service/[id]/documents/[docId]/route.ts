@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
 import { readFile } from "fs/promises";
 import path from "path";
 
@@ -27,6 +28,15 @@ export async function GET(
       );
     }
 
+    // Rollenpruefung, bis zum 16.10.2026 FEHLEND. Hinter dieser Route liegen
+    // die Nachweise des Verfahrens, darunter die amtsaerztlichen Zeugnisse und
+    // die Gemeinde-Referenz — Art.-9-Daten. Geprueft wurde nur die Sitzung,
+    // und `canAccessProcess` fehlte ganz: Jede angemeldete Rolle haette die
+    // Unterlagen JEDES Traegers herunterladen und loeschen koennen.
+    if (!HR_EDIT_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
+
     const { id, docId } = await params;
 
     const document = await prisma.civilServiceDocument.findFirst({
@@ -35,9 +45,13 @@ export async function GET(
         processId: id,
         status: { not: "DELETED" },
       },
+      // Der Mandant haengt am Vorgang, nicht am Dokument — fuer die Pruefung
+      // unten mitgeladen.
+      include: { process: { select: { organizationId: true } } },
     });
 
-    if (!document) {
+    // Unbekannt und fremder Mandant geben dieselbe Antwort.
+    if (!document || !(await canAccessProcess(session, document.process.organizationId))) {
       return NextResponse.json(
         { error: "Dokument nicht gefunden" },
         { status: 404 }
@@ -98,6 +112,15 @@ export async function DELETE(
       );
     }
 
+    // Rollenpruefung, bis zum 16.10.2026 FEHLEND. Hinter dieser Route liegen
+    // die Nachweise des Verfahrens, darunter die amtsaerztlichen Zeugnisse und
+    // die Gemeinde-Referenz — Art.-9-Daten. Geprueft wurde nur die Sitzung,
+    // und `canAccessProcess` fehlte ganz: Jede angemeldete Rolle haette die
+    // Unterlagen JEDES Traegers herunterladen und loeschen koennen.
+    if (!HR_EDIT_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
+
     const { id, docId } = await params;
 
     const document = await prisma.civilServiceDocument.findFirst({
@@ -106,9 +129,13 @@ export async function DELETE(
         processId: id,
         status: { not: "DELETED" },
       },
+      // Der Mandant haengt am Vorgang, nicht am Dokument — fuer die Pruefung
+      // unten mitgeladen.
+      include: { process: { select: { organizationId: true } } },
     });
 
-    if (!document) {
+    // Unbekannt und fremder Mandant geben dieselbe Antwort.
+    if (!document || !(await canAccessProcess(session, document.process.organizationId))) {
       return NextResponse.json(
         { error: "Dokument nicht gefunden" },
         { status: 404 }
