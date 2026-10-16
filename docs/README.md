@@ -105,7 +105,8 @@ Branch: `feat/minijob-checkliste-2026`.
 | [historie/FEHLER_PDF_FIXES.md](historie/FEHLER_PDF_FIXES.md) | Behobene PDF-Fehler |
 | [historie/onboarding-fixes-2026-08.md](historie/onboarding-fixes-2026-08.md) | Onboarding-Fixes August 2026 (Zweckbefristung, Dokument-Typ-Mapping) |
 | [historie/deploy-onboarding-pakete-2026-09.md](historie/deploy-onboarding-pakete-2026-09.md) | **Deploy 24.09.2026** (Onboarding-Pakete 1, 1b, 2, 5 und Code-Review-Fixes): Ablaufplan, Protokoll, Mailvorlagen, Lehren |
-| [historie/codereview-und-vorlagen-2026-09.md](historie/codereview-und-vorlagen-2026-09.md) | **Gesamtdurchsicht + Vorlagen für Offboarding/Verbeamtung, Sept. 2026** — enthält die Deploy-Voraussetzung `./backups:/backups` und die offenen Punkte |
+| [historie/codereview-und-vorlagen-2026-09.md](historie/codereview-und-vorlagen-2026-09.md) | **Gesamtdurchsicht + Vorlagen für Offboarding/Verbeamtung, Sept. 2026** — enthält die Deploy-Voraussetzung `./backups:/backups` und die offenen Punkte |
+| [historie/zugriffs-korrekturen-2026-10-16.md](historie/zugriffs-korrekturen-2026-10-16.md) | **Zugriffs-Korrekturen an den Vorgangsmodulen, 16.10.2026** — Protokoll, Abfindung, Abteilungs-Token, Verbeamtung HR-only und vier Routen ohne Rollenprüfung. Einstieg für eine Durchsicht: was geändert wurde, was bewusst NICHT, die Testregeln und die offenen Punkte |
 
 ---
 
