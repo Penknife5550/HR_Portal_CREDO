@@ -2001,10 +2001,12 @@ das Gegenteil der späteren Entscheidung (umgeschrieben; der Dateikopf erzählt 
 | `ux-umbau` | `7443ea8` | Logbuch: Push vom 15.10.2026 nachgetragen |
 | `ux-umbau` | `24dbeb6` | Merge von `main` (`5595cf7`, Ausstattung & Zugänge, Offboarding-Routen) samt vier Nacharbeiten; V0 und DSB im Logbuch |
 | `ux-umbau` | `5169eb1` | Pilot Tag 6: Abnahme (213 Browser-Prüfungen, 42 Bilder, Höhenmessung), Ankündigungstext, Logbuch |
-| `ux-umbau` | `87c5df3` | Durchsicht der Merge-Naht nachgeholt: `npm run pruefen` wieder grün (`.claude/` aus Jest), Kontrast des Wächter-Hinweises, Nachtrag im DSB-Papier |
-| `ux-umbau` | `162cf30` | Entscheidungen E2, E8, E12, E14 samt ermittelten Tatsachen; Server-Prüfung für E8 |
+| `ux-umbau` | `87c5df3` | Durchsicht der Merge-Naht nachgeholt: `npm run pruefen` wieder grün (`.claude/` aus Jest), Kontrast des Wächter-Hinweises, Nachtrag im DSB-Papier |
+
+| `ux-umbau` | `162cf30` | Entscheidungen E2, E8, E12, E14 samt ermittelten Tatsachen; Server-Prüfung für E8 |
+
 | `main` | `c8b9c6e`, `1cffbba`, `b474d8a`, `98d0697` | Drei Zugriffs-Korrekturen plus die n8n-Berichtigung (nicht Umbau, siehe Abschnitt 7) |
-| `ux-umbau` | `68df3f9`, `4f2901b`, `1b58cf1`, (dieser Merge) | Die Merges von `main` dazu |
+| `ux-umbau` | `68df3f9`, `4f2901b`, `1b58cf1`, `6897b28` | Die Merges von `main` dazu |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
