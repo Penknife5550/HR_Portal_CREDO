@@ -29,7 +29,7 @@ import { decrypt } from "@/lib/encryption";
 import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
 import { LINK_STATUS, pruefungNichtMoeglichGrund } from "@/lib/onboarding-spuren";
 import { statusAenderungSchema } from "@/lib/validations/onboarding";
-import { MELDUNGEN, onboardingEmpfaengerEinrichtung } from "@/lib/abteilungsaufgaben";
+import { MELDUNGEN, onboardingEmpfaengerEinrichtung, ohneLinkSchluessel } from "@/lib/abteilungsaufgaben";
 import { onboardingAbteilungsUebersichtLaden } from "@/lib/abteilungsaufgaben-onboarding";
 import { konfigsLaden } from "@/lib/abteilungsaufgaben-dienst";
 import {
@@ -179,7 +179,16 @@ export async function GET(
       // Fortschritt gegen die Strecke *dieses* Vorgangs, nicht gegen alle
       // moeglichen Schritte — siehe fragebogen-fortschritt.ts.
       fragebogenFortschritt: fortschrittFuerVorgang(onboarding, vorlagen),
-      ...(await onboardingAbteilungsUebersichtLaden(onboarding)),
+      // Die Aufgaben-Links der Abteilungen sind Zugaenge OHNE Anmeldung (wer
+      // ihn hat, hakt fuer diese Stelle ab). Ohne HR_EDIT_ROLES nimmt
+      // `ohneLinkSchluessel` sie heraus — an allen drei Stellen, an denen der
+      // Schluessel steckt (Spalte `token`, `departmentLinks[].url`,
+      // `abteilungen.zeilen[].link.url`). Der STAND bleibt sichtbar:
+      // informiert, geoeffnet, Faelligkeiten, Zaehler. Dieselbe Schranke steht
+      // in /api/offboarding/[id]; Befund vom 16.10.2026.
+      ...(HR_EDIT_ROLES.includes(session.role)
+        ? await onboardingAbteilungsUebersichtLaden(onboarding)
+        : ohneLinkSchluessel(await onboardingAbteilungsUebersichtLaden(onboarding))),
       ...(await unterlagenUebersichtLaden(onboarding, session, { requiredDocuments })),
       // Ausstattung & Zugaenge (Paket A2): Bemerkungen, Angaben und Hinweise
       // der Fuehrungskraft sieht nur HR (Regel 16) — fuer alle anderen

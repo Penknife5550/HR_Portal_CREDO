@@ -34,8 +34,8 @@ import { decrypt, encrypt } from "@/lib/encryption";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { offboardingMailFelder } from "@/lib/offboarding-mail";
 import { updateOffboardingSchema } from "@/lib/validations/offboarding";
-import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
-import { MELDUNGEN, adresseGleich } from "@/lib/abteilungsaufgaben";
+import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES, FINANCIAL_ROLES } from "@/lib/permissions";
+import { MELDUNGEN, adresseGleich, ohneLinkSchluessel } from "@/lib/abteilungsaufgaben";
 import {
   abteilungsUebersichtLaden,
   faelligkeitenVerschieben,
@@ -80,6 +80,16 @@ export async function GET(
 
     const { id } = await params;
 
+    // Datenzuschnitt je Rolle. GET bleibt bei PORTAL_ROLES — die Ansicht ist
+    // ausdruecklich auch zum Lesen gebaut (`canEdit`, `NUR_HR_TABS`), eine
+    // Beschraenkung auf HR_EDIT_ROLES wuerde diesen Zugang zerstoeren. Was
+    // einzelne Rollen nicht sehen sollen, faellt deshalb FELDWEISE weg.
+    //
+    // Befund vom 16.10.2026 (adversarische Durchsicht des Verbeamtungs-Fixes):
+    // Die Antwort ging bis dahin ungeschnitten an alle PORTAL_ROLES.
+    const darfHrSehen = HR_EDIT_ROLES.includes(session.role);
+    const darfGeldSehen = FINANCIAL_ROLES.includes(session.role);
+
     const offboarding = await prisma.offboardingProcess.findUnique({
       where: { id },
       include: {
@@ -90,6 +100,13 @@ export async function GET(
         },
         returnItems: true,
         documents: true,
+        // Die internen Notizen bleiben fuer alle sichtbar, die den Vorgang
+        // oeffnen duerfen — samt Urheber. Entscheidung des
+        // Projektverantwortlichen vom 16.10.2026 („die Fuehrungskraft darf
+        // mitlesen"), nachdem die Durchsicht sie als moegliches Versehen
+        // gemeldet hatte: Der Reiter „Notizen" steht bewusst NICHT in
+        // `NUR_HR_TABS`. Geprueft und so gewollt — bitte nicht beim naechsten
+        // Review erneut als Befund melden.
         notes: {
           include: {
             createdBy: {
@@ -99,10 +116,18 @@ export async function GET(
           orderBy: { createdAt: "desc" },
         },
         departmentLinks: true,
-        auditLogs: {
-          orderBy: { createdAt: "desc" },
-          take: 20,
-        },
+        // Protokoll nur fuer HR_EDIT_ROLES, wie in /api/civil-service/[id] und
+        // /api/contract-end/[id]. Die Offboarding-Ansicht hat gar keinen
+        // Protokoll-Reiter — es war reine Fracht in der Antwort. Die Schranke
+        // sitzt in der ABFRAGE: Die Zeilen verlassen die Datenbank nicht.
+        ...(darfHrSehen
+          ? {
+              auditLogs: {
+                orderBy: { createdAt: "desc" as const },
+                take: 20,
+              },
+            }
+          : {}),
         // Rueckfall-Quellen der Fuehrungskraft (fuehrungskraftErmitteln):
         // nur die Adress-Felder, nicht die ganze Bewertung.
         zeugnisBewertung: { select: { supervisorEmail: true, supervisorName: true } },
@@ -119,11 +144,27 @@ export async function GET(
       );
     }
 
-    // Sensible Felder entschluesseln
+    // Sensible Felder entschluesseln — die Abfindung nur fuer FINANCIAL_ROLES.
+    //
+    // Sie ist mit AES-256-GCM verschluesselt wie IBAN, SV-Nummer und
+    // Steuer-ID, und das Portal entschluesselt solche Felder sonst nur mit
+    // ausdruecklichem Anlass. Bis zum 16.10.2026 wurde sie hier fuer JEDE
+    // Portal-Rolle entschluesselt — auch fuer VORGESETZTER, der in
+    // `FINANCIAL_ROLES` bewusst nicht steht. Entscheidung des
+    // Projektverantwortlichen vom 16.10.2026: die Liste anwenden. Das ist ihre
+    // ERSTE Verwendung im Code; sie war bis dahin nur eine Absicht.
+    //
+    // Ohne das Recht faellt das Feld GANZ weg (nicht als leerer Text): Ein
+    // leerer Wert liesse sich nicht von „keine Abfindung vereinbart"
+    // unterscheiden, und die Oberflaeche zeigt dann „—".
     if (offboarding.exitData?.severancePay) {
-      offboarding.exitData.severancePay = decrypt(
-        offboarding.exitData.severancePay
-      );
+      if (darfGeldSehen) {
+        offboarding.exitData.severancePay = decrypt(
+          offboarding.exitData.severancePay
+        );
+      } else {
+        offboarding.exitData.severancePay = null;
+      }
     }
 
     // Abteilungsuebersicht darueber legen: departmentLinks bekommen `url`
@@ -135,9 +176,16 @@ export async function GET(
     // `rueckgaben` (A4, G23): Einstellung, Lage und Vorschlaege nur fuer
     // HR_EDIT_ROLES — Einrichtungsleitung und Fuehrungskraft bekommen `null`,
     // und es wird dafuer nichts abgefragt.
+    //
+    // Die Aufgaben-Links der Abteilungen sind Zugaenge OHNE Anmeldung. Ohne
+    // HR_EDIT_ROLES nimmt `ohneLinkSchluessel` sie aus der Uebersicht — an
+    // allen drei Stellen, an denen der Schluessel steckt (Spalte `token`,
+    // `departmentLinks[].url`, `abteilungen.zeilen[].link.url`). Der STAND
+    // bleibt sichtbar: informiert, geoeffnet, Faelligkeiten, Zaehler.
+    const uebersicht = await abteilungsUebersichtLaden(offboarding);
     return NextResponse.json({
       ...offboarding,
-      ...(await abteilungsUebersichtLaden(offboarding)),
+      ...(darfHrSehen ? uebersicht : ohneLinkSchluessel(uebersicht)),
       rueckgaben: await rueckgabenUebersichtLaden(offboarding, session),
     });
   } catch (error) {
