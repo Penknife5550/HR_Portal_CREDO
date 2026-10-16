@@ -39,6 +39,12 @@ ist, steht hier.
   `npm run pruefen`**, siehe 0.3) und der rote Wächter-Hinweis der Abteilungskarte hat jetzt
   lesbaren Kontrast. Dazu ein empfohlener Nachtrag im DSB-Papier.
 
+- **Die letzten vier Entscheidungen des Plans (E2, E8, E12, E14) sind am 16.10.2026 gefallen**
+  (Abschnitt 4, „Am 16.10.2026"; Protokoll Abschnitt 7). Damit wartet **keine Bauarbeit mehr auf
+  eine Rückfrage**: U3, U6, U9, U10 und U2/U4 sind frei. Offen bleibt nur der zweite Teil von E8
+  — eine Abfrage auf dem Server ([e8-pruefung-personalakten.md](e8-pruefung-personalakten.md)) —
+  und der LOGA-Strang.
+
 **Nächster Schritt: Deploy von U0 + U1 + Pilot + Mailtext.** Kein Schema-Delta für den Pilot,
 **+1 Tabelle** für den Mailtext (`email_log_texte`); keine Umgebungsvariable, keine Vorlage
 zurückzusetzen. Vorher: Ankündigungstext durchsehen und Termin wählen (Zeitfenster und Regeln
@@ -422,13 +428,36 @@ des Pilots ist **nichts** nachzuziehen (anders als in 0.4 vorgesehen).
 | E13 | Textbausteine der individuellen E-Mail | Wie im Plan: drei bis fünf, gepflegt vom Personalbüro, ohne Baustein bleibt das Blatt frei; Anlässe wie im Plan genannt (Vertrag zurück, Rückfrage zu Unterlagen, Terminbestätigung) — gehört zum Umbau von Paket 3, nicht zum Pilot. |
 | – | Mailtext im Versandprotokoll | DSB hat zugestimmt (15.10.2026). Die fünf Fragen der Mitteilung sind damit beantwortet; geht mit dem Umbau live. |
 
+### Am 16.10.2026 (E2, E8, E12, E14 — die letzten offenen Entscheidungen des Plans)
+
+Vor der Entscheidung wurden die Tatsachen im Code ermittelt (24 Agenten: je Entscheidung ein
+Ermittler, danach jede entscheidungsrelevante Aussage einzeln gegengeprüft — 16 von 20 Aussagen
+wurden dabei richtiggestellt, meist verfeinert). Der Plan ist von 09/2026, und an mehreren
+Stellen stimmten seine Annahmen nicht mehr. **Alle vier Entscheidungen fielen auf die
+Empfehlung**, bei E2 mit einer Einschränkung und bei E12 gegen den Plan.
+
+| # | Thema | Entschieden | Was die Tatsachen beigetragen haben |
+|---|---|---|---|
+| **E2** | Startseite | **Eigene Seite „Start“ — aber ohne die Vorbelegung „Meine Mandanten“.** Reihenfolge nach Kosten: zuerst die Fristen, dann Paket 6, dann der Rest. Vorher zu beheben: der fehlende Mandantenfilter in `/api/dashboard/stats`. | Die wichtigste Korrektur: **Paket 6 wird in BEIDEN Varianten gebraucht** (am 24.09.2026 beauftragt) — E2 entscheidet nur über die Seite, nicht über die 8–8,5 Tage. Die drei Gruppen sind sehr unterschiedlich weit: „Fristen“ ist fast fertig (die Regeln für Vertragsende-Ampel, Elternzeit-Fristen und Mutterschutz-Beginn liegen vollständig vor, es fehlt nur die Abfrage darüber), „nächster Schritt bei HR“ ist halb da (Elternzeit und Mutterschutz haben `getNaechsterSchritt` mit `hrAktion` schon, Onboarding/Offboarding/Verbeamtung kennen kein „bei wem“), „Aufgaben“ fehlt ganz. **Zwei Kosten, die der Plan nicht nennt:** Mutterschutz- und Elternzeit-Aufgaben haben gar kein Fälligkeitsfeld (Schemaänderung), und `ProzessStand` ist Pilot-Zuschnitt — „parallel“, „blockiert“, „Schleife“ und Zeitachse fehlen, also genau das, was Onboarding, Verbeamtung und Elternzeit/Mutterschutz brauchen. **„Meine Mandanten“ ist heute wirkungslos:** `UserOrgAssignment` wird nirgends geschrieben, und alle drei vergebbaren HR-Rollen sind `GLOBAL_ROLES`. |
+| **E8** | Personenseite | **Erst auf dem Server zählen, dann entscheiden.** Anleitung und Lesebefehl: [e8-pruefung-personalakten.md](e8-pruefung-personalakten.md) (gibt nur Zahlen aus, gegen Dev getestet). | Die Auflage des Plans („vorher prüfen, ob `Employee` in Produktion gefüllt ist“) ist von hier nicht erfüllbar. In Dev: 0 Personalakten, 0 Anstellungen, kein Vorgang verknüpft. Eine Oberfläche gab es nie — nur `/api/employees`, das keine Seite aufruft; einen LOGA-Import gibt es im Code nicht. Die Zuordnungsregel trägt besser als befürchtet: Personalnummer in **6 von 7** Modulen, und wo sie fehlt (nur Onboarding) greift Stufe 2 über `PersonalData.birthDate` (Pflichtfeld im Fragebogen) — die Stufen ergänzen sich. Zwei Dinge gelten unabhängig vom Ergebnis: `Employee.personalNumber` ist je Person eindeutig, LOGA vergibt je **Anstellung** (gehört an `Employment`, Paket L2 — U8 und L2 zusammen), und `Employee` trägt fertige Beziehungen zu **BEM**, Mutterschutz und Elternzeit; BEM kennt keinen Rollen-Bypass, eine Personenseite darf darüber nichts verraten. |
+| **E12** | Reiter „E-Mails“ | **Gegen den Plan: bleibt eigenständig und wird nur neu gezeichnet.** Kein Reiter „Verlauf“. | Drei belegte Gründe. (1) **Die Quellen leben nicht gleich lang:** Das Mailprotokoll wird nach 90 Tagen gelöscht (`email-log-aufbewahrung.ts`), Audit-Zeilen löscht der Produktivcode **nie** (36 von 121 Dev-Zeilen sind älter als 90 Tage). Ein gemeinsamer Zeitstrahl wäre im älteren Teil halb blind — genau bei den langlaufenden Vorgängen, für die man ihn baut. Der neue Knopf „E-Mail ansehen“ wirkt ebenfalls nur 90 Tage (Cascade). (2) **Die Rechte gehen auseinander:** Mails nur `HR_EDIT_ROLES`, Audit-Zeilen an alle `PORTAL_ROLES`. (3) **Die Audit-Einträge sind nicht lesbar gemacht:** Im Vertragsende haben 9 von 10 vorkommenden Aktionsarten keinen deutschen Text. Kosten des Gegenvorschlags: im Kern eine Datei (`mail-protokoll.tsx`, 171 Zeilen). |
+| **E14** | Sprache der automatischen Läufe | **Umbenennen wie im Plan:** „Nur anzeigen“ statt „Probelauf“, „Wirklich ausführen“ statt „scharf“. | Betroffen sind **19 sichtbare Stellen in 4 Code-Dateien** (Reiter 11, `dienst.ts` 2, `ausfuehren.ts` 1, `default-email-templates.ts` 5) **plus 8 im Handbuch** inkl. Glossar (die erste Schätzung „29 in 5 Dateien“ war in sich widersprüchlich). Die Alternative ist nicht billiger: „scharf“ kommt im Handbuch **gar nicht** vor, der Erklärtext müsste also ohnehin erst entstehen. Beim Umsetzen zwingend beachten: die zwei Datenbankspalten `probelauf` (`schema.prisma:1270`, `:1295`) **nicht** mitumbenennen (`db push --accept-data-loss` rollte das als „alte löschen, neue anlegen“ aus), und die **Berichtsmail ist mitbetroffen (Betreff inbegriffen)** — auf dem Server braucht die Vorlage `automatischer-lauf-bericht` danach einmal „Text auf Standard zurücksetzen“, sonst bleibt der alte Wortlaut stehen. Kein Test prüft diese Texte, eine halb fertige Umbenennung fällt also durch kein Netz. |
+
+**Nebenbefund, nicht Teil des Umbaus:** Der Reiter „Protokoll“ im Verbeamtungsvorgang liefert und
+zeigt die Audit-Einträge **ungefiltert an alle Portal-Rollen** — auch Einrichtungsleitung und
+Führungskraft (`src/app/api/civil-service/[id]/route.ts:75`, `:103-106`; Anzeige
+`civil-service-detail-content.tsx:468`, `:548`). Gehört geprüft und gehört nach `main`, nicht in
+den Umbau.
+
 ### Noch offen
 
 | # | Thema | Gebraucht vor |
 |---|---|---|
-| E2, E8 | Startseite, Personenseite | U3 bzw. U8 |
-| E12, E14 | Reiter „Verlauf“, Sprache der automatischen Läufe | U10 bzw. U6 |
+| E8 (Teil 2) | Ja/Nein zur Personenseite — **wartet nur noch auf die Zahlen vom Server** ([e8-pruefung-personalakten.md](e8-pruefung-personalakten.md)) | U8 |
 | LOGA (E17, E19, E20, E22) | eigener Strang, siehe `docs/module/loga/` | L0 |
+
+Damit sind **alle Entscheidungen des UX-Plans getroffen**, bis auf den zweiten Teil von E8 (eine
+Abfrage auf dem Server) und den LOGA-Strang. U3, U6, U9, U10 und U2/U4 sind frei.
 
 ## 5. Abweichungen vom Plan
 
@@ -1833,6 +1862,32 @@ aus der Adresse nicht (U4 des Moduls), und die Farbtabellen der rund 20 neuen
 Ausstattungs-Dateien erreicht kein Wächter (Kontrast-Test deckt nur `src/components/ui/` ab).
 Alle drei bestanden schon auf `main`.
 
+### 16.10.2026 – Die letzten vier Entscheidungen des Plans (E2, E8, E12, E14)
+
+Nach dem Push von `ux-umbau` (`1bee0d7`) hat der Projektverantwortliche „erst die offenen
+Entscheidungen klären" gewählt — die wirtschaftlichste Reihenfolge, weil danach U3, U6, U9, U10
+und U2/U4 frei sind und keine Arbeit mehr auf eine Rückfrage wartet.
+
+Vorgehen: Zuerst die Vorschläge des Plans gelesen, dann **die Tatsachen im Code ermittelt** statt
+den Annahmen von 09/2026 zu folgen — vier Ermittler parallel, danach jede entscheidungsrelevante
+Aussage einzeln gegengeprüft (24 Agenten, nur lesend). **16 von 20 Aussagen stellte die
+Gegenprobe richtig**, und zwar überwiegend nicht als Fehler, sondern als Verfeinerung, die die
+Entscheidung besser macht: Bei E2 etwa fiel so auf, dass Paket 6 in beiden Varianten gebraucht
+wird (die Entscheidung ist also viel kleiner als gedacht) und dass eine der drei Datengruppen
+fast fertig ist; bei E8, dass die Zuordnung über die Personalnummer in sechs von sieben Modulen
+trägt und nur das Onboarding sie nicht hat.
+
+Die vier Entscheidungen samt Begründung stehen in Abschnitt 4 („Am 16.10.2026"). Kurz:
+E2 Seite „Start" ohne die wirkungslose Mandanten-Vorbelegung · E8 erst auf dem Server zählen
+(Anleitung [e8-pruefung-personalakten.md](e8-pruefung-personalakten.md)) · **E12 gegen den Plan**:
+kein Reiter „Verlauf", weil Mailprotokoll (90 Tage) und Handlungsprotokoll (unbegrenzt) nicht
+gleich lang leben und ein gemeinsamer Zeitstrahl bei alten Vorgängen irreführend wäre ·
+E14 umbenennen, mit zwei Auflagen (Datenbankspalten `probelauf` nicht anfassen, Berichtsmail auf
+dem Server zurücksetzen).
+
+Kein Code geändert. Nebenbefund für `main`: Der Verbeamtungs-Reiter „Protokoll" zeigt
+Audit-Einträge ungefiltert allen Portal-Rollen (Abschnitt 4, Fußnote).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1891,8 +1946,9 @@ Alle drei bestanden schon auf `main`.
 | `ux-umbau` | `fb8ec05`, `4bd6f6b`, `e68d692` | Mailtext: Doku, Korrekturen der ersten Durchsicht, Korrekturen der zweiten Durchsicht |
 | `ux-umbau` | `7443ea8` | Logbuch: Push vom 15.10.2026 nachgetragen |
 | `ux-umbau` | `24dbeb6` | Merge von `main` (`5595cf7`, Ausstattung & Zugänge, Offboarding-Routen) samt vier Nacharbeiten; V0 und DSB im Logbuch |
-| `ux-umbau` | `5169eb1` | Pilot Tag 6: Abnahme (213 Browser-Prüfungen, 42 Bilder, Höhenmessung), Ankündigungstext, Logbuch |
-| `ux-umbau` | `87c5df3` | Durchsicht der Merge-Naht nachgeholt: `npm run pruefen` wieder grün (`.claude/` aus Jest), Kontrast des Wächter-Hinweises, Nachtrag im DSB-Papier |
+| `ux-umbau` | `5169eb1` | Pilot Tag 6: Abnahme (213 Browser-Prüfungen, 42 Bilder, Höhenmessung), Ankündigungstext, Logbuch |
+| `ux-umbau` | `87c5df3` | Durchsicht der Merge-Naht nachgeholt: `npm run pruefen` wieder grün (`.claude/` aus Jest), Kontrast des Wächter-Hinweises, Nachtrag im DSB-Papier |
+| `ux-umbau` | (dieser Commit) | Entscheidungen E2, E8, E12, E14 samt ermittelten Tatsachen; Server-Prüfung für E8 |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
