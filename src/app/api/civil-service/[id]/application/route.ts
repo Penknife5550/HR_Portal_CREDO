@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
 import { randomUUID } from "crypto";
 
 // =============================================
@@ -22,6 +23,18 @@ export async function POST(
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    }
+
+    // Rollenpruefung, bis zum 16.10.2026 FEHLEND: Diese Route erzeugt einen
+    // lebenden Magic-Link-Token, ueberschreibt damit einen bestehenden und gibt
+    // Token samt Adresse in der Antwort zurueck — mit ihm reicht jemand den
+    // Verbeamtungsantrag im Namen der Lehrkraft ein. Geprueft wurde nur, ob
+    // ueberhaupt eine Sitzung besteht; jede angemeldete Rolle und das
+    // n8n-Dienstkonto kamen durch. Die uebrigen Unterrouten des Moduls pruefen
+    // alle selbst (assessments, board-decision, phases, export, checklist) —
+    // hier war es vergessen.
+    if (!HR_EDIT_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -45,6 +58,7 @@ export async function POST(
       where: { id },
       select: {
         id: true,
+        organizationId: true,
         displayId: true,
         status: true,
         applicationToken: true,
@@ -54,7 +68,9 @@ export async function POST(
       },
     });
 
-    if (!csProcess) {
+    // Unbekannt und fremder Mandant geben dieselbe Antwort — sonst verriete der
+    // Code, dass es den Vorgang gibt. `canAccessProcess` fehlte hier ebenfalls.
+    if (!csProcess || !(await canAccessProcess(session, csProcess.organizationId))) {
       return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
     }
 
