@@ -47,7 +47,9 @@ ist, steht hier.
 
 **Nächster Schritt: Deploy von U0 + U1 + Pilot + Mailtext.** Kein Schema-Delta für den Pilot,
 **+1 Tabelle** für den Mailtext (`email_log_texte`); keine Umgebungsvariable, keine Vorlage
-zurückzusetzen. Vorher: Ankündigungstext durchsehen und Termin wählen (Zeitfenster und Regeln
+zurückzusetzen. Mit hinaus gehen **drei Zugriffs-Korrekturen von `main`** (Abschnitt 7,
+„Drei Zugriffs-Korrekturen") — ohne Schema-Folgen und ohne sichtbare Änderung für das
+Personalbüro, die Ankündigung muss sie nicht nennen. Vorher: Ankündigungstext durchsehen und Termin wählen (Zeitfenster und Regeln
 wie in [`deploy-main-2026-10.md`](../../historie/deploy-main-2026-10.md): Dienstag bis Freitag
 10–12 Uhr, nicht montags gegen 9 Uhr, nicht 07:00–08:45). Danach zwei Wochen Rückmeldung des
 Personalbüros, dann die Entscheidung „neue Ansicht wird Vorgabe, Onboarding folgt“.
@@ -1888,6 +1890,58 @@ dem Server zurücksetzen).
 Kein Code geändert. Nebenbefund für `main`: Der Verbeamtungs-Reiter „Protokoll" zeigt
 Audit-Einträge ungefiltert allen Portal-Rollen (Abschnitt 4, Fußnote).
 
+### 16.10.2026 – Drei Zugriffs-Korrekturen (nicht Umbau, fahren aber mit)
+
+**Gehören fachlich nicht zum Umbau** — sie sind direkt auf `main` entstanden und von dort in
+`ux-umbau` gemergt. Hier nur, damit der Deploy sie nennen kann und die nächste Sitzung weiß,
+woher die Änderungen an den Routen kommen. Die vollständige Begründung steht jeweils im Commit
+und im Gedächtnis-Eintrag „Audit-Protokoll Datenzuschnitt".
+
+Angefangen hat es als Nebenbemerkung in der Durchsicht des Pilots: Der Reiter „Protokoll" im
+Verbeamtungsvorgang zeige die Audit-Einträge allen Portal-Rollen. Daraus wurde eine Kette.
+
+| Commit | Merge | Was |
+|---|---|---|
+| `c8b9c6e` | `e6db330` | **Protokoll bei Verbeamtung und Vertragsende** nur noch für `HR_EDIT_ROLES` (bedingtes Prisma-`include`). Dazu `NUR_HR_TABS` in der Verbeamtungs-Ansicht: Die Oberfläche gated den Reiter „E-Mails" schon, hatte „Protokoll" aber an beiden Stellen vergessen |
+| `1cffbba` | `457f3f6` | **Offboarding und Onboarding.** GET bleibt dort bei `PORTAL_ROLES` — die Offboarding-Ansicht ist ausdrücklich zum Lesen gebaut, eine Beschränkung hätte diesen Zugang zerstört. Also feldweise: Protokoll nur HR, Abfindung nur `FINANCIAL_ROLES` (**erste Verwendung dieser Liste im Code**, sie war toter Code), und die Aufgaben-Links der Abteilungen über die neue reine Funktion `ohneLinkSchluessel` — der Token steckte an **drei** Stellen |
+| `b474d8a` | `b12a1e9` | **Verbeamtung ist reine HR-Arbeit** (Entscheidung des Projektverantwortlichen): GET auf Detail- und Listenroute prüft `HR_EDIT_ROLES`. Und der eigentliche Fund: **vier Handler hatten gar keine Rollenprüfung** und keiner prüfte den Mandanten — `POST …/application` (erzeugt und überschreibt einen lebenden Magic-Link und gibt ihn zurück), `GET/POST …/documents`, `GET/DELETE …/documents/[docId]`. Damit waren die amtsärztlichen Zeugnisse **jedes Trägers** herunterladbar und löschbar (Art. 9 DSGVO). Dazu gab die Liste `applicationToken` für bis zu `limit` Vorgänge heraus, und ihr `groupBy` lief ohne `where` |
+| `98d0697` | `c82ffec` | **Korrektur an `b474d8a`: n8n war doppelt ausgeschlossen.** Die vier Handler hatten vorher gar keine Prüfung, das Dienstkonto `SERVICE` kam also durch — meine Sperre schnitt es mit 403 ab, und `canAccessProcess` hätte zusätzlich 404 gegeben (für `n8n-service` steht in `UserOrgAssignment` nichts). Dass der Weg gewollt ist, steht in denselben Dateien: Beide nehmen `n8n-service` im Protokolleintrag ausdrücklich auf. Jetzt `[...HR_EDIT_ROLES, "SERVICE"]`, Mandant nur für Benutzer-Sitzungen. `application` bleibt gesperrt — dort wäre n8n immer am Fremdschlüssel gescheitert (500), 403 ist ehrlicher |
+
+**Für den Deploy wichtig:** Kein Schema-Delta, keine Umgebungsvariable, keine Vorlage. Für
+**Benutzerkonten** verliert niemand etwas: Die beiden Rollen, die bei der Verbeamtung jetzt
+ausgeschlossen sind (`EINRICHTUNGSLEITUNG`, `VORGESETZTER`), lassen sich gar nicht vergeben. Für
+das Personalbüro ändert sich nichts Sichtbares — die Ankündigung braucht die Korrekturen nicht zu
+erwähnen.
+
+**Für das Dienstkonto stimmte dieser Satz zuerst NICHT**, und so fiel es auf: Beim Nachtragen
+dieses Eintrags wollte ich „niemand verliert etwas“ belegen und stieß auf `SERVICE` — den
+n8n-Schlüssel. Die vier Handler hatten vorher gar keine Rollenprüfung, n8n kam also durch; meine
+Sperre hätte es mit 403 abgeschnitten, und die neue Mandantenprüfung zusätzlich mit 404. Berichtigt
+mit `98d0697` (Zeile oben). **Lehre für die nächste Zugriffsänderung: `SERVICE` gehört
+ausdrücklich auf die Liste der zu prüfenden Aufrufer, auch wenn es kein Mensch ist** — und ein
+Blick in den Protokollcode derselben Datei verrät, ob das Dienstkonto dort vorgesehen war.
+
+**Was offen bleibt, und zwar hier im Umbau:** Die Modulliste
+(`(portal)/vorgaenge/[modul]/page.tsx`, gibt es nur auf diesem Branch) zeigt allen Portal-Rollen
+alle Module. Eine Führungskraft sähe also einen Reiter „Verbeamtung", der jetzt eine
+Fehlermeldung bringt. Keine Sicherheitsfrage, eine Anzeigefrage — beim nächsten Umbau-Schritt
+für Nicht-HR ausblenden.
+
+**Drei Lehren, die über diese Korrekturen hinausgehen** (ausführlich im Gedächtnis):
+1. **Bei einem Zugriffs-Befund alle Routen des Moduls durchzählen**, nicht nur die gemeldete
+   Stelle. Die gemeldete war hier jedes Mal die harmloseste.
+2. **Eine Prisma-Attrappe muss `include`-treu sein**, sonst sichert ein Test nur die Abfrage und
+   nicht die Antwort. `offboarding-einstellung.test.ts` ignoriert `include` völlig,
+   `abteilungs-fake-db.ts` ist include-**additiv** — in beiden lässt sich „nicht abgefragt" nicht
+   von „leer" unterscheiden. Diese Falle ist an einem Tag zweimal zugeschlagen.
+3. **Jeden Wächter gegen die Scheinkorrektur prüfen:** Fix zurücknehmen (muss rot werden) und die
+   Variante „Schranke nur in der Antwort statt in der Abfrage" einbauen (muss auch rot werden).
+
+**Zwei eigene Fehler, berichtigt und hier festgehalten**, weil sie sonst als stilles Aufweichen
+erscheinen: Ein Kommentar behauptete ungeprüft „die Verbeamtung hat keine Nicht-HR-Ansicht"
+(entfernt), und `civil-service-detail.test.ts` sicherte vormittags `200` für Nicht-HR zu, also
+das Gegenteil der späteren Entscheidung (umgeschrieben; der Dateikopf erzählt beide Schritte).
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -1948,7 +2002,9 @@ Audit-Einträge ungefiltert allen Portal-Rollen (Abschnitt 4, Fußnote).
 | `ux-umbau` | `24dbeb6` | Merge von `main` (`5595cf7`, Ausstattung & Zugänge, Offboarding-Routen) samt vier Nacharbeiten; V0 und DSB im Logbuch |
 | `ux-umbau` | `5169eb1` | Pilot Tag 6: Abnahme (213 Browser-Prüfungen, 42 Bilder, Höhenmessung), Ankündigungstext, Logbuch |
 | `ux-umbau` | `87c5df3` | Durchsicht der Merge-Naht nachgeholt: `npm run pruefen` wieder grün (`.claude/` aus Jest), Kontrast des Wächter-Hinweises, Nachtrag im DSB-Papier |
-| `ux-umbau` | `162cf30` | Entscheidungen E2, E8, E12, E14 samt ermittelten Tatsachen; Server-Prüfung für E8 |
+| `ux-umbau` | `162cf30` | Entscheidungen E2, E8, E12, E14 samt ermittelten Tatsachen; Server-Prüfung für E8 |
+| `main` | `c8b9c6e`, `1cffbba`, `b474d8a`, `98d0697` | Drei Zugriffs-Korrekturen plus die n8n-Berichtigung (nicht Umbau, siehe Abschnitt 7) |
+| `ux-umbau` | `68df3f9`, `4f2901b`, `1b58cf1`, (dieser Merge) | Die Merges von `main` dazu |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
