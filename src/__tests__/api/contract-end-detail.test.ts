@@ -15,14 +15,21 @@ const mockPrisma = {
 
 jest.mock("@/lib/auth", () => ({ getSession: mockGetSession }));
 jest.mock("@/lib/db", () => ({ prisma: mockPrisma }));
-jest.mock("@/lib/permissions", () => ({
-  PORTAL_ROLES: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER"],
-  HR_EDIT_ROLES: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"],
-  canAccessProcess: mockCanAccessProcess,
-}));
+// Die ECHTEN Rollenlisten, nur `canAccessProcess` als Attrappe (Hausmuster aus
+// offboarding-einstellung.test.ts). Eine Kopie der Listen im Test bliebe gruen,
+// wenn jemand `HR_EDIT_ROLES` in `permissions.ts` erweitert — also genau im
+// gefaehrlichen Fall.
+jest.mock("@/lib/permissions", () => {
+  const echt = jest.requireActual("@/lib/permissions");
+  return { ...echt, canAccessProcess: (...a: unknown[]) => mockCanAccessProcess(...a) };
+});
 
 import { GET, PATCH } from "@/app/api/contract-end/[id]/route";
 import { NextRequest } from "next/server";
+import { HR_EDIT_ROLES, PORTAL_ROLES } from "@/lib/permissions";
+
+/** Portal-Rollen ohne Bearbeitungsrecht — aus der Quelle abgeleitet. */
+const NICHT_HR = PORTAL_ROLES.filter((r: string) => !HR_EDIT_ROLES.includes(r));
 
 /** Steht fuer den Schluessel des Magic-Links — darf in keiner Antwort auftauchen. */
 const GEHEIM = "geheimer-magic-link-token";
@@ -124,6 +131,64 @@ describe("GET /api/contract-end/[id]", () => {
     });
     // Ohne Vertragsdaten gibt es nichts nachzuschlagen.
     expect(mockPrisma.organization.findUnique).not.toHaveBeenCalled();
+  });
+
+  // Das Protokoll des Vorgangs zeigt, WAS HR wann geaendert hat (`action`,
+  // `details`, `userId` — keine Namen, die Route laedt den Benutzer nicht mit).
+  // Bis zum 16.10.2026 ging es an jede Portal-Rolle, also auch an
+  // Einrichtungsleitung und Fuehrungskraft. Hier liest es ohnehin keine
+  // Ansicht; es lag nur in der Antwort.
+  describe("Protokoll (auditLogs) nur fuer HR_EDIT_ROLES", () => {
+    /**
+     * Attrappe, die sich wie Prisma verhaelt: Die Relation steht nur in der
+     * Zeile, wenn sie im `include` steht. Nur so laesst sich die ANTWORT
+     * zusichern und nicht bloss die Abfrage — eine include-blinde Attrappe
+     * liesse die Umstellung „zweite Abfrage, Ergebnis in die Antwort mischen"
+     * unbemerkt durchgehen.
+     */
+    function findUniqueWiePrisma() {
+      mockPrisma.contractEndProcess.findUnique.mockImplementation(
+        (args: { include?: Record<string, unknown> }) => {
+          const zeile = vorgang({
+            offboarding: null,
+            auditLogs: [{ id: "a1", action: "STATUS_CHANGED", userId: "u1" }],
+          }) as Record<string, unknown>;
+          if (!args?.include?.auditLogs) delete zeile.auditLogs;
+          return Promise.resolve(zeile);
+        },
+      );
+    }
+
+    const include = () => mockPrisma.contractEndProcess.findUnique.mock.calls[0][0].include;
+
+    it.each(HR_EDIT_ROLES)("%s: das Protokoll wird abgefragt und ausgeliefert", async (rolle) => {
+      mockGetSession.mockResolvedValue({ userId: "u1", role: rolle });
+      findUniqueWiePrisma();
+
+      const res = await GET(getRequest(), { params: params() });
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.auditLogs).toHaveLength(1);
+      expect(include().auditLogs).toEqual({ orderBy: { createdAt: "desc" }, take: 20 });
+    });
+
+    it.each(NICHT_HR)(
+      "%s: das Protokoll wird GAR NICHT abgefragt UND steht nicht in der Antwort",
+      async (rolle) => {
+        mockGetSession.mockResolvedValue({ userId: "u2", role: rolle });
+        findUniqueWiePrisma();
+
+        const res = await GET(getRequest(), { params: params() });
+        const json = await res.json();
+
+        // Der Vorgang selbst bleibt lesbar — nur das Protokoll faellt weg.
+        expect(res.status).toBe(200);
+        expect(json.id).toBe("ce1");
+        expect(include()).not.toHaveProperty("auditLogs");
+        expect(json.auditLogs).toBeUndefined();
+      },
+    );
   });
 
   describe("Betriebsstätte der Vertragsdaten", () => {

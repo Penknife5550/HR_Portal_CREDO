@@ -200,8 +200,15 @@ export interface CivilServiceData {
   checklistItems: ChecklistItem[];
   assessments: AssessmentData[];
   documents: DocumentData[];
-  auditLog: AuditLogEntry[];
-  auditLogs: AuditLogEntry[];
+  /**
+   * Protokoll des Vorgangs — **nur mit HR_EDIT_ROLES in der Antwort.**
+   * Seit 16.10.2026 laesst `/api/civil-service/[id]` die Zeilen fuer andere
+   * Rollen gar nicht erst aus der Datenbank kommen, deshalb optional. Die
+   * Anzeige faengt das mit `|| []` ab (`auditLog` ist eine aeltere Schreibweise
+   * derselben Sache; die Route liefert `auditLogs`).
+   */
+  auditLog?: AuditLogEntry[];
+  auditLogs?: AuditLogEntry[];
   boardDecisions: BoardDecision[];
   prerequisites: PrerequisiteData[];
   applicationToken: string | null;
@@ -224,6 +231,24 @@ export const TABS = [
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];
+
+/**
+ * Reiter, die nur HR_EDIT_ROLES sehen — EINE Liste fuer Reiterleiste UND Inhalt.
+ *
+ * Vorher stand die Einschraenkung zweimal einzeln im Markup, und zwar nur fuer
+ * „E-Mails“: Der Reiter „Protokoll“ war beide Male vergessen und zeigte das
+ * AuditLog des Vorgangs jeder Portal-Rolle (gefunden am 16.10.2026). Beide
+ * Stellen lesen jetzt diese Liste, damit der naechste HR-Reiter nicht wieder
+ * an einer von zwei Stellen durchfaellt.
+ *
+ * „Protokoll“ zeigt, was HR wann geaendert hat (`action`, `details`, `userId`);
+ * „E-Mails“ den Versand samt Betreff und — seit 10/2026 — dem Mailtext. Beides
+ * gehoert nicht zu dem, was eine Einrichtungsleitung oder eine Fuehrungskraft
+ * an einem Vorgang zu sehen braucht. Die Route schneidet es ebenfalls zu
+ * (`/api/civil-service/[id]` liefert `auditLogs` nur an HR_EDIT_ROLES), das hier
+ * ist die Anzeige dazu — nicht der Schutz.
+ */
+export const NUR_HR_TABS: readonly TabId[] = ["protocol", "mails"];
 
 export const PHASE_ORDER = ["I", "II_A", "II_B", "II_C", "II_D", "II_E", "II_F", "II_G", "II_H", "III", "IV"];
 
