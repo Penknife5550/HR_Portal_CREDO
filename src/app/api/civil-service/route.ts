@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { createCivilServiceSchema } from "@/lib/validations/civil-service";
-import { orgFilter, PORTAL_ROLES } from "@/lib/permissions";
+import { orgFilter, HR_EDIT_ROLES } from "@/lib/permissions";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { formatEmployeeName } from "@/lib/format";
 import { vorgangsjahrInBerlin } from "@/lib/vorgangsjahr";
@@ -31,8 +31,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Rollencheck: Portal-Rollen (inkl. VORGESETZTER)
-    if (!PORTAL_ROLES.includes(session.role)) {
+    // Rollencheck: NUR HR — dieselbe Entscheidung wie an der Detailroute
+    // (16.10.2026, die Verbeamtung ist reine HR-Arbeit). Vorher `PORTAL_ROLES`.
+    //
+    // Hier wiegt es besonders: Die Abfrage unten nimmt `include` ohne `select`
+    // am Vorgang, die Antwort trug also je Zeile den LEBENDEN Antrags-Token
+    // (`applicationToken`) und dazu `applicationData`, `prerequisites` (mit den
+    // Art.-9-Angaben zu Amtsarzt und Gemeinde) und `stakeholders` — und das
+    // fuer bis zu `limit` Vorgaenge auf einen Aufruf. Wer die Liste je fuer
+    // mandantenbeschraenkte Rollen oeffnet, schneidet sie vorher per `select`
+    // zu; die Rollenpruefung hier ist nicht der Ersatz dafuer, nur der
+    // derzeitige Schutz.
+    if (!HR_EDIT_ROLES.includes(session.role)) {
       return NextResponse.json(
         { error: "Keine Berechtigung" },
         { status: 403 }
@@ -122,8 +132,14 @@ export async function GET(request: NextRequest) {
         skip,
       }),
       prisma.civilServiceProcess.count({ where }),
+      // MIT `where`: Die Status-Zaehler zaehlten bis zum 16.10.2026 ueber ALLE
+      // Traeger, waehrend die Liste darunter gefiltert war — die Kacheln
+      // nannten also Zahlen aus Einrichtungen, die der Abfrage nicht
+      // zustanden. Derselbe Filter wie oben, sonst widersprechen sich Liste
+      // und Zaehler.
       prisma.civilServiceProcess.groupBy({
         by: ["status"],
+        where,
         _count: { status: true },
       }),
     ]);

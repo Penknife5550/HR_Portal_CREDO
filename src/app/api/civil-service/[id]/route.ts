@@ -9,8 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { updateCivilServiceSchema } from "@/lib/validations/civil-service";
-import { canAccessProcess, PORTAL_ROLES, HR_EDIT_ROLES } from "@/lib/permissions";
-// PORTAL_ROLES wird für GET verwendet, HR_EDIT_ROLES für PATCH
+import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
+// HR_EDIT_ROLES fuer GET und PATCH — die Verbeamtung ist reine HR-Arbeit (16.10.2026)
 
 // Gueltige Status-Uebergaenge
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -71,8 +71,30 @@ export async function GET(
       );
     }
 
-    // Rollencheck: Portal-Rollen (inkl. VORGESETZTER)
-    if (!PORTAL_ROLES.includes(session.role)) {
+    // Rollencheck: NUR HR. Entscheidung des Projektverantwortlichen vom
+    // 16.10.2026 — die Verbeamtung ist reine HR-Arbeit, Einrichtungsleitung und
+    // Fuehrungskraft lesen hier nicht mit. Vorher stand hier `PORTAL_ROLES`.
+    //
+    // Warum so und nicht feldweise (anders als im Offboarding, wo GET bei
+    // PORTAL_ROLES bleibt): Jede Funktion dieser Seite haengt an einer
+    // HR-only-Unterroute — Beurteilungen, Beiratsentscheidung, Phasen, Export
+    // und Checkliste pruefen alle selbst, eine Nicht-HR-Rolle saehe nur
+    // Knoepfe, die 403 geben. Die Fachdoku des Moduls verlangt ausdruecklich
+    // „403 fuer Nicht-HR-Rolle" (docs/module/verbeamtung/VERBEAMTUNG_NEXT_STEPS.md).
+    // Und es geht um Art.-9-Daten: amtsaerztliche Untersuchung, aber auch
+    // Gemeinde-Mitgliedschaft samt Freitext und „biblische Integration" liegen
+    // in `prerequisites`, dazu Amtsarzt-Dokumente und die Gemeinde-Referenz der
+    // Beurteilung. Verbeamtung betrifft die Person und die Behoerde, nicht die
+    // Einrichtung.
+    //
+    // Eine Leseansicht fuer Nicht-HR ist damit eine PRODUKTentscheidung, keine
+    // Reparatur: Wer sie will, schneidet vorher die vier Token-Arten
+    // (`applicationToken`, je Beurteilung `token`, `employeeAckToken`,
+    // `verifyToken`), die Beurteilung samt Gegenaeusserung,
+    // `acknowledgedByEmployeeIp` und die Art-9-Felder zu — Muster dafuer:
+    // `ohneVorgesetztenToken` (src/lib/contract-end-antwort.ts) und
+    // `ohneLinkSchluessel` (src/lib/abteilungsaufgaben.ts).
+    if (!HR_EDIT_ROLES.includes(session.role)) {
       return NextResponse.json(
         { error: "Keine Berechtigung" },
         { status: 403 }
@@ -81,34 +103,12 @@ export async function GET(
 
     const { id } = await params;
 
-    // Das Protokoll (AuditLog) sehen nur HR_EDIT_ROLES — wie das Mailprotokoll
-    // des Vorgangs (Reiter „E-Mails", von Anfang an so beschraenkt). GET selbst
-    // bleibt bei PORTAL_ROLES: Wer einen Vorgang lesen darf, soll ihn weiter
-    // lesen duerfen; das Protokoll ist aber etwas anderes als der Vorgang — es
-    // zeigt, WAS HR wann geaendert hat, mit `action`, `details` und `userId`.
-    //
-    // Die Schranke sitzt in der ABFRAGE, nicht erst in der Antwort: So verlassen
-    // die Zeilen die Datenbank gar nicht. Heute kommt ohnehin niemand hier an,
-    // dem das Protokoll nicht zusteht — die beiden mandantenbeschraenkten Rollen
-    // (EINRICHTUNGSLEITUNG, VORGESETZTER) lassen sich nicht vergeben, UND das
-    // Mandanten-Gate der Middleware verweigert ihnen ausser `/api/auth` jeden
-    // API-Pfad mit 403 (src/lib/mandanten-gate.ts). Beides soll sich aendern:
-    // Die Allowlist ist ausdruecklich als Arbeitsliste gedacht, und ohne diese
-    // Zeilen waere der Eintrag dieser Route der Moment, in dem das Protokoll an
-    // Einrichtungsleitung und Fuehrungskraft ginge.
-    //
-    // ACHTUNG, bevor jemand diese Route in MANDANTEN_API_ALLOWLIST eintraegt:
-    // Das Protokoll ist hier NICHT das Empfindlichste. Die Antwort traegt
-    // weiterhin an alle PORTAL_ROLES die lebenden Magic-Link-Schluessel
-    // (`applicationToken`, je Beurteilung `token`, `employeeAckToken`,
-    // `verifyToken`) sowie die vollstaendige dienstliche Beurteilung samt
-    // Begruendung, Gegenaeusserung und `acknowledgedByEmployeeIp`. Ein
-    // Gegenstueck zu `ohneVorgesetztenToken` (src/lib/contract-end-antwort.ts)
-    // fehlt. Wer die Route freigibt, schneidet das vorher zu — oder stellt GET
-    // ganz auf HR_EDIT_ROLES (die Verbeamtung hat keine Nicht-HR-Ansicht).
-    // Befund der Durchsicht vom 16.10.2026, bewusst nicht in derselben
-    // Korrektur behoben.
-    const darfProtokollSehen = HR_EDIT_ROLES.includes(session.role);
+    // Das Protokoll (AuditLog) braucht seit dem 16.10.2026 keine eigene
+    // Schranke mehr: Die ganze Route laesst nur HR_EDIT_ROLES herein (oben).
+    // Bis dahin stand hier ein bedingtes `include` — es war der erste, kleinere
+    // Schritt derselben Durchsicht (Commit c8b9c6e), und die Rollenpruefung
+    // oben loest es ab. Eine zweite Schranke fuer dieselbe Rolle waere toter
+    // Code, der ein breiteres Zugriffsmodell vortaeuscht, als es gibt.
 
     const process = await prisma.civilServiceProcess.findUnique({
       where: { id },
@@ -129,14 +129,10 @@ export async function GET(
         checklistItems: {
           orderBy: { orderIndex: "asc" },
         },
-        ...(darfProtokollSehen
-          ? {
-              auditLogs: {
-                orderBy: { createdAt: "desc" as const },
-                take: 10,
-              },
-            }
-          : {}),
+        auditLogs: {
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
       },
     });
 
