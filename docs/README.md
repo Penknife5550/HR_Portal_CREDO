@@ -90,6 +90,12 @@ Branch: `feat/minijob-checkliste-2026`.
 |---|---|
 | [module/ruhestandsplanung/ruhestandsplanung-modul-plan.html](module/ruhestandsplanung/ruhestandsplanung-modul-plan.html) | Modulplan |
 
+### Mitarbeiterportal (Self-Service) — *Fassung 4, Umsetzungsrichtung festgelegt*
+
+| Datei | Inhalt |
+|---|---|
+| [module/selfservice/selfservice-portal-plan.html](module/selfservice/selfservice-portal-plan.html) | **Konzeptplan, Fassung 4 (16.10.2026) — 12 von 21 Entscheidungen getroffen, noch abzustimmen mit DSB und MAV.** Vordefinierte Formulare als Kern, mit zwei Einstiegen (Lebensereignis-Kacheln und Themenliste); jedes Anliegen wird ein **Ticket** mit Lastübersicht (Maske 9.11) und einem Verlauf, den **beide Seiten** sehen — ein Protokoll, zwei Sichten, plus schreibgeschützte Chronik. **Benachrichtigung bei jedem Statuswechsel** (Abschnitt 8.6). Zweiter Eingang: automatische Übernahme der E-Mails an `CREDO-Personal-intern@fes-credo.de` über Microsoft Graph. Anmeldung zentral über **Keycloak**, föderiert gegen Microsoft 365 (alle Beschäftigten haben ein Dienstkonto). Personalstamm über einen zweiten Webhook nach dem Muster des Vertragsende-Empfängers (n8n liest `[DokuBit].[dbo].[dokubitmitarbeiter]`). Sonderurlaub als Regelwerk je Mandant, Zuordnung durch die Personalabteilung. Enthält die **vier Pflichtkanäle, die nicht in die HR-Warteschlange dürfen** (§ 13 AGG, HinSchG, kirchlicher Gewaltschutz, § 8a SGB VIII) aus einer Recherche über 521 Fälle. Prozesslandschaft, Prozesskette, elf Masken, Datenmodell, Pakete S0–S5, Entscheidungen E-S1–E-S21. **Reihenfolge:** Ticketsystem und Postfachübernahme (S3/S3b) vor dem Mitarbeiterportal. **Offen sind nur noch Abfragen und Zusagen**, keine Entscheidungen: vier SQL-Abfragen gegen DokuBit, zwei Zahlen aus LOGA, zwei App-Registrierungen in Entra ID |
+
 ## Historie
 
 | Datei | Inhalt |
