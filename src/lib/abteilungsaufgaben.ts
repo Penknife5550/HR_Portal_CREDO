@@ -2482,3 +2482,77 @@ export const ABTEILUNGS_AUDIT_LABELS: Record<string, string> = {
   DEPARTMENT_CONFIG_UPDATED: "Abteilung geändert",
   DEPARTMENT_CONFIG_DELETED: "Abteilung gelöscht",
 };
+
+// =============================================
+// Datenzuschnitt: Link-Schluessel aus der Uebersicht nehmen
+// =============================================
+
+/**
+ * Entfernt die Aufgaben-Links aus einer Abteilungsuebersicht — fuer Rollen ohne
+ * HR_EDIT_ROLES.
+ *
+ * **Warum das noetig ist.** Der Link einer Abteilung ist ein Zugang OHNE
+ * Anmeldung: Wer ihn hat, oeffnet die Aufgabenseite dieser Stelle und kann
+ * abhaken und kommentieren. Die Detailrouten von Onboarding und Offboarding
+ * pruefen die Rolle gegen `PORTAL_ROLES`, geben die Uebersicht also auch an
+ * EINRICHTUNGSLEITUNG und VORGESETZTER — und damit an Rollen, die den Link
+ * nicht brauchen. Dieselbe Begruendung schliesst im Offboarding seit laengerem
+ * Exit-Interview und Zeugnis aus („die Antwort traegt den Magic Link"), und
+ * `rueckgaben` wird in derselben Route schon rollenabhaengig geliefert.
+ *
+ * **Warum an EINER Stelle.** Der Schluessel steckt an DREI Orten in der
+ * Antwort: als Spalte `token` der Link-Zeile, in `departmentLinks[].url` und in
+ * `abteilungen.zeilen[].link.url`. Wer das je Route von Hand abraeumt, vergisst
+ * beim naechsten Feld eines davon. Diese Funktion kennt alle drei; beide Routen
+ * rufen nur sie.
+ *
+ * **Was bleibt.** Alles, was den Stand beschreibt: ob und wann informiert
+ * wurde, wie oft geoeffnet, Faelligkeiten, Zaehler, `anzeige`, die Zeilen der
+ * Karte. Eine lesende Rolle sieht also weiter, wie weit die Abteilungen sind —
+ * nur nicht den Schluessel. `id` bleibt ebenfalls: Sie ist eine
+ * Datenbankkennung, kein Zugang.
+ *
+ * Rein und ohne Uhr, damit sie ohne Datenbank pruefbar ist.
+ */
+// `object` statt `Record<string, unknown>`: Die Zeilen der Karte sind die
+// Schnittstelle `AbteilungsZeile`, und eine Schnittstelle ohne Index-Signatur
+// erfuellt `Record<string, unknown>` nicht — mit `Record` liesse sich die
+// Funktion in der Onboarding-Route gar nicht aufrufen (TS2345).
+export function ohneLinkSchluessel<
+  U extends {
+    departmentLinks: ReadonlyArray<object>;
+    abteilungen: { zeilen: ReadonlyArray<object> };
+  },
+>(uebersicht: U): U {
+  const ohne = (o: object, ...weg: string[]): Record<string, unknown> => {
+    const kopie = { ...(o as Record<string, unknown>) };
+    for (const schluessel of weg) delete kopie[schluessel];
+    return kopie;
+  };
+
+  // Nachsichtig gegenueber fehlenden Teilen: Was es nicht gibt, kann keinen
+  // Schluessel tragen — ein Absturz hier waere eine 500 fuer ALLE Rollen, also
+  // auch fuer HR, und zwar an einer Stelle, die nur etwas WEGNEHMEN soll. Ein
+  // Loch entsteht dadurch nicht: Nur eine vorhandene Liste wird geschnitten,
+  // und die Erzeuger (`abteilungsUebersichtLaden`,
+  // `onboardingAbteilungsUebersichtLaden`) liefern stets Arrays.
+  const ergebnis: Record<string, unknown> = { ...uebersicht };
+
+  if (Array.isArray(uebersicht.departmentLinks)) {
+    ergebnis.departmentLinks = uebersicht.departmentLinks.map((l) => ohne(l, "token", "url"));
+  }
+
+  const abteilungen = uebersicht.abteilungen as { zeilen?: unknown } | null | undefined;
+  if (abteilungen && Array.isArray(abteilungen.zeilen)) {
+    ergebnis.abteilungen = {
+      ...abteilungen,
+      zeilen: (abteilungen.zeilen as object[]).map((z) => {
+        const link = (z as { link?: object | null }).link;
+        if (!link) return z;
+        return { ...z, link: ohne(link, "url") };
+      }),
+    };
+  }
+
+  return ergebnis as U;
+}

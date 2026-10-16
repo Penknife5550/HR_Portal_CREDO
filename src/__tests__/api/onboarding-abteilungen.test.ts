@@ -634,6 +634,40 @@ describe("GET /api/onboarding/[id]", () => {
     expect(body.fragebogenFortschritt).toBeDefined();
   });
 
+  // Befund 16.10.2026: Der Aufgaben-Link einer Abteilung ist ein Zugang OHNE
+  // Anmeldung. Bis dahin ging er an alle PORTAL_ROLES — auch an
+  // Einrichtungsleitung und Fuehrungskraft, die ihn nicht brauchen. Dieselbe
+  // Schranke steht in /api/offboarding/[id]; `ohneLinkSchluessel` nimmt alle
+  // drei Stellen (eigene Tests in lib/abteilungs-link-schluessel.test.ts).
+  it.each(["EINRICHTUNGSLEITUNG", "VORGESETZTER"])("%s: kein Link-Schlüssel, der Stand bleibt", async (rolle) => {
+    mockGetSession.mockResolvedValue({ ...LEITUNG_FREMD, role: rolle });
+    // Der Mandantenzugriff ist hier nicht das Thema — die Rolle DARF den
+    // Vorgang sehen, nur den Schluessel nicht.
+    (canAccessProcess as jest.Mock).mockResolvedValueOnce(true);
+    const res = await get();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    const zeile = body.abteilungen.zeilen.find((z: Zeile) => z.departmentKey === "IT");
+    expect(body.departmentLinks[0].url).toBeUndefined();
+    expect(body.departmentLinks[0].token).toBeUndefined();
+    expect(zeile?.link?.url).toBeUndefined();
+    // Auch nicht in einem Feld, das wir nicht bedacht haben.
+    expect(JSON.stringify(body)).not.toContain("tok-it");
+
+    // Der Stand bleibt lesbar: Wer ist zuständig, wurde informiert, wie weit.
+    expect(body.departmentLinks[0].departmentKey).toBe("IT");
+    expect(body.departmentLinks[0].anzeige).toBeDefined();
+    expect(zeile?.link?.id).toBe(body.departmentLinks[0].id);
+    expect(body.abteilungen.modul).toBe("ONBOARDING");
+  });
+
+  it("HR behält den Link-Schlüssel", async () => {
+    const body = await (await get()).json();
+    expect(body.departmentLinks[0].url).toBe(`${BASIS}/onboarding-tasks/tok-it`);
+    expect(body.abteilungen.zeilen.find((z: Zeile) => z.departmentKey === "IT")?.link?.url).toContain("tok-it");
+  });
+
   it("legt „Ausstattung & Zugänge“ über den Vorgang — nur für HR (Paket A2, über die Fake-DB)", async () => {
     db.ausstattungZeilen = [
       {
