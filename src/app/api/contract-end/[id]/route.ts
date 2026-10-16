@@ -38,13 +38,25 @@ export async function GET(
 
     const { id } = await params;
 
+    // Protokoll (AuditLog) nur fuer HR_EDIT_ROLES — dieselbe Schranke und
+    // dieselbe Begruendung wie in /api/civil-service/[id]. Hier liest heute
+    // KEINE Ansicht das Protokoll (weder die alte noch die neue
+    // Vertragsende-Seite); es lag nur in der Antwort. Umso weniger Grund, es
+    // einer Rolle zu schicken, die es nicht sehen soll. (Ganz weglassen waere
+    // auch vertretbar — dann faellt es aber dem Tag zur Last, an dem eine
+    // Ansicht es braucht.) Den Schluessel des Magic-Links entfernt diese Route
+    // schon laenger: `ohneVorgesetztenToken`, src/lib/contract-end-antwort.ts.
+    const darfProtokollSehen = HR_EDIT_ROLES.includes(session.role);
+
     const contractEnd = await prisma.contractEndProcess.findUnique({
       where: { id },
       include: {
         organization: true,
         renewalData: true,
         offboarding: { select: { id: true, displayId: true, status: true } },
-        auditLogs: { orderBy: { createdAt: "desc" }, take: 20 },
+        ...(darfProtokollSehen
+          ? { auditLogs: { orderBy: { createdAt: "desc" as const }, take: 20 } }
+          : {}),
       },
     });
 

@@ -18,7 +18,7 @@ import {
 } from "@/lib/constants";
 
 import type { User, CivilServiceData, PhaseData, TabId } from "./types";
-import { TABS, MAIN_PHASES, SUB_PHASES_II, PHASE_ORDER } from "./types";
+import { TABS, NUR_HR_TABS, MAIN_PHASES, SUB_PHASES_II, PHASE_ORDER } from "./types";
 import { getPhaseStatus, getMainPhaseStatus } from "./helpers";
 import { ArrowLeftIcon } from "./icons";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
@@ -465,7 +465,9 @@ export function CivilServiceDetailContent({
         {/* ---- Tabs ---- */}
         <div className="mb-6 overflow-x-auto">
           <div className="flex gap-1 border-b border-gray-200">
-            {TABS.filter((tab) => tab.id !== "mails" || HR_EDIT_ROLES.includes(user.role)).map((tab) => (
+            {TABS.filter(
+              (tab) => !NUR_HR_TABS.includes(tab.id) || HR_EDIT_ROLES.includes(user.role),
+            ).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -545,7 +547,9 @@ export function CivilServiceDetailContent({
           />
         )}
 
-        {activeTab === "protocol" && <TabProtocol auditLog={data.auditLog || data.auditLogs || []} />}
+        {activeTab === "protocol" && HR_EDIT_ROLES.includes(user.role) && (
+          <TabProtocol auditLog={data.auditLog || data.auditLogs || []} />
+        )}
 
         {activeTab === "mails" && HR_EDIT_ROLES.includes(user.role) && (
           <MailProtokoll modul="civil-service" vorgangId={processId} />

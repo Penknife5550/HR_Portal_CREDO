@@ -81,6 +81,35 @@ export async function GET(
 
     const { id } = await params;
 
+    // Das Protokoll (AuditLog) sehen nur HR_EDIT_ROLES — wie das Mailprotokoll
+    // des Vorgangs (Reiter „E-Mails", von Anfang an so beschraenkt). GET selbst
+    // bleibt bei PORTAL_ROLES: Wer einen Vorgang lesen darf, soll ihn weiter
+    // lesen duerfen; das Protokoll ist aber etwas anderes als der Vorgang — es
+    // zeigt, WAS HR wann geaendert hat, mit `action`, `details` und `userId`.
+    //
+    // Die Schranke sitzt in der ABFRAGE, nicht erst in der Antwort: So verlassen
+    // die Zeilen die Datenbank gar nicht. Heute kommt ohnehin niemand hier an,
+    // dem das Protokoll nicht zusteht — die beiden mandantenbeschraenkten Rollen
+    // (EINRICHTUNGSLEITUNG, VORGESETZTER) lassen sich nicht vergeben, UND das
+    // Mandanten-Gate der Middleware verweigert ihnen ausser `/api/auth` jeden
+    // API-Pfad mit 403 (src/lib/mandanten-gate.ts). Beides soll sich aendern:
+    // Die Allowlist ist ausdruecklich als Arbeitsliste gedacht, und ohne diese
+    // Zeilen waere der Eintrag dieser Route der Moment, in dem das Protokoll an
+    // Einrichtungsleitung und Fuehrungskraft ginge.
+    //
+    // ACHTUNG, bevor jemand diese Route in MANDANTEN_API_ALLOWLIST eintraegt:
+    // Das Protokoll ist hier NICHT das Empfindlichste. Die Antwort traegt
+    // weiterhin an alle PORTAL_ROLES die lebenden Magic-Link-Schluessel
+    // (`applicationToken`, je Beurteilung `token`, `employeeAckToken`,
+    // `verifyToken`) sowie die vollstaendige dienstliche Beurteilung samt
+    // Begruendung, Gegenaeusserung und `acknowledgedByEmployeeIp`. Ein
+    // Gegenstueck zu `ohneVorgesetztenToken` (src/lib/contract-end-antwort.ts)
+    // fehlt. Wer die Route freigibt, schneidet das vorher zu — oder stellt GET
+    // ganz auf HR_EDIT_ROLES (die Verbeamtung hat keine Nicht-HR-Ansicht).
+    // Befund der Durchsicht vom 16.10.2026, bewusst nicht in derselben
+    // Korrektur behoben.
+    const darfProtokollSehen = HR_EDIT_ROLES.includes(session.role);
+
     const process = await prisma.civilServiceProcess.findUnique({
       where: { id },
       include: {
@@ -100,10 +129,14 @@ export async function GET(
         checklistItems: {
           orderBy: { orderIndex: "asc" },
         },
-        auditLogs: {
-          orderBy: { createdAt: "desc" },
-          take: 10,
-        },
+        ...(darfProtokollSehen
+          ? {
+              auditLogs: {
+                orderBy: { createdAt: "desc" as const },
+                take: 10,
+              },
+            }
+          : {}),
       },
     });
 
