@@ -55,8 +55,16 @@ const ID = "psi1";
 const DOC = "doc1";
 const BASIS = `https://hr.example.org/api/civil-service/${ID}`;
 
-/** Portal-Rollen ohne Bearbeitungsrecht, dazu das n8n-Dienstkonto. */
-const OHNE_RECHT = [...PORTAL_ROLES.filter((r: string) => !HR_EDIT_ROLES.includes(r)), "SERVICE"];
+/**
+ * Portal-Rollen ohne Bearbeitungsrecht. **Ohne `SERVICE`** — der n8n-Schluessel
+ * darf an die Dokumente, und das ist belegt, nicht geraten: Beide
+ * Dokument-Dateien nehmen `n8n-service` im Protokolleintrag ausdruecklich auf
+ * (`userId: session.userId !== "n8n-service" ? … : undefined`), die
+ * Nachbarroute `checklist/[itemId]` laesst `SERVICE` zu, und `/api/employees`
+ * auch. Ein erster Entwurf dieser Korrektur sperrte ihn aus — das haette einen
+ * laufenden Ablauf still mit 403 abgeschnitten.
+ */
+const OHNE_RECHT = PORTAL_ROLES.filter((r: string) => !HR_EDIT_ROLES.includes(r));
 
 const idParams = () => ({ params: Promise.resolve({ id: ID }) });
 const docParams = () => ({ params: Promise.resolve({ id: ID, docId: DOC }) });
@@ -148,6 +156,45 @@ describe("Unterrouten der Verbeamtung: Rolle und Mandant", () => {
       expect(mockPrisma.civilServiceProcess.update).not.toHaveBeenCalled();
       expect(mockPrisma.civilServiceDocument.create).not.toHaveBeenCalled();
       expect(mockPrisma.civilServiceDocument.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // =============================================
+  // Der n8n-Schluessel (SERVICE)
+  //
+  // Er darf an die Dokumente — dort ist er im Code ausdruecklich vorgesehen —,
+  // aber NICHT an `application`: Dort schreibt der Protokolleintrag `userId`
+  // unbedingt, eine n8n-Anfrage waere also immer am Fremdschluessel gescheitert
+  // (500). 403 ist dort die ehrlichere Antwort.
+  //
+  // Und der Mandant wird fuer `SERVICE` nicht geprueft: `canAccessProcess`
+  // sucht fuer `n8n-service` in `UserOrgAssignment` und findet nichts, die
+  // Pruefung wuerde jede Anfrage mit 404 beantworten.
+  // =============================================
+
+  describe("SERVICE (n8n)", () => {
+    beforeEach(() => {
+      mockGetSession.mockResolvedValue({ userId: "n8n-service", role: "SERVICE" });
+    });
+
+    it.each([1, 2, 3, 4])("Dokument-Handler %i: kommt durch (kein 403)", async (i) => {
+      const res = await HANDLER[i].ruf();
+      expect(res.status).not.toBe(403);
+    });
+
+    it("auch ohne Mandanten-Zuordnung: kein 404 durch die Mandantenpruefung", async () => {
+      // So verhaelt sich `canAccessProcess` fuer n8n wirklich — es gibt keine
+      // Zuordnung, die Pruefung wuerde also verneinen.
+      mockCanAccessProcess.mockResolvedValue(false);
+      const res = await HANDLER[1].ruf();
+      expect(res.status).not.toBe(404);
+      expect(mockCanAccessProcess).not.toHaveBeenCalled();
+    });
+
+    it("application bleibt gesperrt (dort war n8n nie vorgesehen)", async () => {
+      const res = await HANDLER[0].ruf();
+      expect(res.status).toBe(403);
+      expect(mockPrisma.civilServiceProcess.update).not.toHaveBeenCalled();
     });
   });
 

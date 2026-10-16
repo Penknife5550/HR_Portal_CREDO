@@ -9,6 +9,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
+
+/** HR plus der n8n-Schluessel — Begruendung an den Pruefstellen unten. */
+const DOKUMENT_ROLLEN = [...HR_EDIT_ROLES, "SERVICE"];
 import { CIVIL_SERVICE_UPLOAD_TYPES } from "@/lib/constants";
 import { sanitizeFilename } from "@/lib/file-upload";
 import { writeFile, mkdir } from "fs/promises";
@@ -64,14 +67,25 @@ export async function GET(
     }
 
 
-    // Rollenpruefung, bis zum 16.10.2026 FEHLEND — hier besonders schwer:
-    // Ueber diese Route liegen die Nachweise des Verbeamtungsverfahrens,
-    // darunter die amtsaerztlichen Zeugnisse (Dokumentarten AMTSARZT_PROBE und
-    // AMTSARZT_LEBENSZEIT) und die Gemeinde-Referenz — Gesundheits- und
-    // Religionsdaten nach Art. 9 DSGVO. Geprueft wurde nur, ob ueberhaupt eine
-    // Sitzung besteht, und `canAccessProcess` fehlte ganz: Jede angemeldete
-    // Rolle haette die Unterlagen JEDES Traegers lesen koennen.
-    if (!HR_EDIT_ROLES.includes(session.role)) {
+    // Rollenpruefung, bis zum 16.10.2026 FEHLEND. Hinter dieser Route liegen
+    // die Nachweise des Verfahrens, darunter die amtsaerztlichen Zeugnisse
+    // (AMTSARZT_PROBE, AMTSARZT_LEBENSZEIT) und die Gemeinde-Referenz —
+    // Art.-9-Daten. Geprueft wurde nur, ob ueberhaupt eine Sitzung besteht.
+    //
+    // `SERVICE` (der n8n-Schluessel) BLEIBT zugelassen, und das ist kein
+    // Versehen: Dieselbe Datei nimmt ihn im Protokolleintrag ausdruecklich auf
+    // (`userId: session.userId !== "n8n-service" ? … : undefined`) — jemand hat
+    // diesen Weg bewusst gebaut. Die Nachbarroute `checklist/[itemId]` laesst
+    // ihn ebenso zu, und `/api/employees` auch. Ihn hier auszuschliessen haette
+    // einen laufenden Ablauf still mit 403 abgeschnitten.
+    //
+    // Deshalb auch der Mandant NUR fuer Benutzer-Sitzungen: `canAccessProcess`
+    // fragt fuer eine Rolle ausserhalb von `GLOBAL_ROLES` die Tabelle
+    // `UserOrgAssignment` ab, und fuer `n8n-service` steht dort nichts — die
+    // Pruefung wuerde jede n8n-Anfrage mit 404 beantworten. n8n ist im Portal
+    // traegeruebergreifend angelegt (so auch `checklist/[itemId]`, das den
+    // Mandanten gar nicht prueft).
+    if (!DOKUMENT_ROLLEN.includes(session.role)) {
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
@@ -83,7 +97,7 @@ export async function GET(
     });
 
     // Unbekannt und fremder Mandant: dieselbe Antwort.
-    if (!process || !(await canAccessProcess(session, process.organizationId))) {
+    if (!process || (session.role !== "SERVICE" && !(await canAccessProcess(session, process.organizationId)))) {
       return NextResponse.json(
         { error: "Verbeamtungsvorgang nicht gefunden" },
         { status: 404 }
@@ -125,14 +139,25 @@ export async function POST(
     }
 
 
-    // Rollenpruefung, bis zum 16.10.2026 FEHLEND — hier besonders schwer:
-    // Ueber diese Route liegen die Nachweise des Verbeamtungsverfahrens,
-    // darunter die amtsaerztlichen Zeugnisse (Dokumentarten AMTSARZT_PROBE und
-    // AMTSARZT_LEBENSZEIT) und die Gemeinde-Referenz — Gesundheits- und
-    // Religionsdaten nach Art. 9 DSGVO. Geprueft wurde nur, ob ueberhaupt eine
-    // Sitzung besteht, und `canAccessProcess` fehlte ganz: Jede angemeldete
-    // Rolle haette in den Vorgang JEDES Traegers Dateien legen koennen.
-    if (!HR_EDIT_ROLES.includes(session.role)) {
+    // Rollenpruefung, bis zum 16.10.2026 FEHLEND. Hinter dieser Route liegen
+    // die Nachweise des Verfahrens, darunter die amtsaerztlichen Zeugnisse
+    // (AMTSARZT_PROBE, AMTSARZT_LEBENSZEIT) und die Gemeinde-Referenz —
+    // Art.-9-Daten. Geprueft wurde nur, ob ueberhaupt eine Sitzung besteht.
+    //
+    // `SERVICE` (der n8n-Schluessel) BLEIBT zugelassen, und das ist kein
+    // Versehen: Dieselbe Datei nimmt ihn im Protokolleintrag ausdruecklich auf
+    // (`userId: session.userId !== "n8n-service" ? … : undefined`) — jemand hat
+    // diesen Weg bewusst gebaut. Die Nachbarroute `checklist/[itemId]` laesst
+    // ihn ebenso zu, und `/api/employees` auch. Ihn hier auszuschliessen haette
+    // einen laufenden Ablauf still mit 403 abgeschnitten.
+    //
+    // Deshalb auch der Mandant NUR fuer Benutzer-Sitzungen: `canAccessProcess`
+    // fragt fuer eine Rolle ausserhalb von `GLOBAL_ROLES` die Tabelle
+    // `UserOrgAssignment` ab, und fuer `n8n-service` steht dort nichts — die
+    // Pruefung wuerde jede n8n-Anfrage mit 404 beantworten. n8n ist im Portal
+    // traegeruebergreifend angelegt (so auch `checklist/[itemId]`, das den
+    // Mandanten gar nicht prueft).
+    if (!DOKUMENT_ROLLEN.includes(session.role)) {
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
@@ -144,7 +169,10 @@ export async function POST(
       select: { id: true, status: true, organizationId: true },
     });
 
-    if (!civilServiceProcess || !(await canAccessProcess(session, civilServiceProcess.organizationId))) {
+    if (
+      !civilServiceProcess ||
+      (session.role !== "SERVICE" && !(await canAccessProcess(session, civilServiceProcess.organizationId)))
+    ) {
       return NextResponse.json(
         { error: "Verbeamtungsvorgang nicht gefunden" },
         { status: 404 }
