@@ -1948,7 +1948,7 @@ Audit-Einträge ungefiltert allen Portal-Rollen (Abschnitt 4, Fußnote).
 | `ux-umbau` | `24dbeb6` | Merge von `main` (`5595cf7`, Ausstattung & Zugänge, Offboarding-Routen) samt vier Nacharbeiten; V0 und DSB im Logbuch |
 | `ux-umbau` | `5169eb1` | Pilot Tag 6: Abnahme (213 Browser-Prüfungen, 42 Bilder, Höhenmessung), Ankündigungstext, Logbuch |
 | `ux-umbau` | `87c5df3` | Durchsicht der Merge-Naht nachgeholt: `npm run pruefen` wieder grün (`.claude/` aus Jest), Kontrast des Wächter-Hinweises, Nachtrag im DSB-Papier |
-| `ux-umbau` | (dieser Commit) | Entscheidungen E2, E8, E12, E14 samt ermittelten Tatsachen; Server-Prüfung für E8 |
+| `ux-umbau` | `162cf30` | Entscheidungen E2, E8, E12, E14 samt ermittelten Tatsachen; Server-Prüfung für E8 |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.
