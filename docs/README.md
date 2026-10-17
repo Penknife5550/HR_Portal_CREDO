@@ -90,6 +90,13 @@ Branch: `feat/minijob-checkliste-2026`.
 |---|---|
 | [module/ruhestandsplanung/ruhestandsplanung-modul-plan.html](module/ruhestandsplanung/ruhestandsplanung-modul-plan.html) | Modulplan |
 
+### Mitarbeiterportal (Self-Service) — *Fassung 6, Umsetzungsrichtung festgelegt*
+
+| Datei | Inhalt |
+|---|---|
+| [module/selfservice/selfservice-portal-plan.html](module/selfservice/selfservice-portal-plan.html) | **Konzeptplan, Fassung 6 (17.10.2026) — nach Code-Review (7 Fachbereiche, 75 Agenten) mit allen kritischen und wesentlichen Befunden eingearbeitet; 16 von 29 Entscheidungen getroffen, keine Trägerentscheidung mehr offen; Zustimmung von HR, DSB und MAV am 17.10.2026 erteilt; vor S0 bleiben E-S25 (Gremium der GmbHs) und E-S27 (DSG-EKD oder BDSG) offen.** Vordefinierte Formulare als Kern; jedes Anliegen wird ein **Ticket** mit vollständigem Statusmodell, Lastübersicht und einem Verlauf, den **beide Seiten** sehen. **Benachrichtigung bei jedem Statuswechsel** (13 Vorlagen). Zweiter Eingang: Übernahme der E-Mails an `CREDO-Personal-intern@fes-credo.de` über Microsoft Graph, berechtigt ausschließlich in Exchange Online. Anmeldung zentral über **Keycloak**, föderiert gegen Microsoft 365, mit abgeschotteter Sitzungsrolle für Beschäftigte. Personalstamm aus DokuBit über n8n. Sonderurlaub als Regelwerk je Mandant. Pakete S0–S5 mit Tests und Rücknahme, **46–63 Arbeitstage** ohne die vier Vorbedingungen. Entscheidungen E-S1–E-S29. |
+| [module/selfservice/selfservice-designkonzept.html](module/selfservice/selfservice-designkonzept.html) | **Designkonzept Mitarbeiterportal (17.10.2026)** — Leitbild „Klarer Weg", Tokens und Bausteine aus `ux-umbau`, Statuskatalog je Sicht, Mockups aller Masken für Beschäftigte (Desktop und Handy), Schulleitung und HR, Benachrichtigungen, Barrierefreiheit (WCAG 2.1 AA) und Umsetzungshinweise je Maske |
+
 ## Historie
 
 | Datei | Inhalt |
@@ -98,6 +105,7 @@ Branch: `feat/minijob-checkliste-2026`.
 | [historie/onboarding-fixes-2026-08.md](historie/onboarding-fixes-2026-08.md) | Onboarding-Fixes August 2026 (Zweckbefristung, Dokument-Typ-Mapping) |
 | [historie/deploy-onboarding-pakete-2026-09.md](historie/deploy-onboarding-pakete-2026-09.md) | **Deploy 24.09.2026** (Onboarding-Pakete 1, 1b, 2, 5 und Code-Review-Fixes): Ablaufplan, Protokoll, Mailvorlagen, Lehren |
 | [historie/codereview-und-vorlagen-2026-09.md](historie/codereview-und-vorlagen-2026-09.md) | **Gesamtdurchsicht + Vorlagen für Offboarding/Verbeamtung, Sept. 2026** — enthält die Deploy-Voraussetzung `./backups:/backups` und die offenen Punkte |
+| [historie/codereview-selfservice-plan-2026-10.md](historie/codereview-selfservice-plan-2026-10.md) | **Code-Review des Self-Service-Konzeptplans, 17.10.2026** — 7 Fachbereiche mit Gegenprüfung, 7 kritische und 32 wesentliche Befunde (F1–F83), ihre Umsetzung in Fassung 6 und die Konsistenzprüfung danach |
 
 ---
 
