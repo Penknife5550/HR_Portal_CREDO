@@ -1055,7 +1055,7 @@ ul.zwei-spalten li { break-inside: avoid; }
       <li><b>Heirat bei gleicher Adresse:</b> Der Name wird geändert, wenn alle laufenden Verträge der
         Person ihn im selben Stapel nennen. Nennt ihn nur ein Teil, wird gemeldet
         (<code>EMAIL_ANDERER_NAME</code>), der Name bleibt. Ebenso bei einem ganz anderen Namen (Vor-
-        und Nachname neu): Das ist ein anderer Mensch, kein neuer Name. <b>Restrisiko, offen:</b>
+        und Nachname neu): Das ist ein anderer Mensch, kein neuer Name. <b>Restrisiko (bekannt):</b>
         Vergibt DokuBit einen Vertragsschlüssel samt Postfach neu, solange der Vertrag der
         bisherigen Person im Portal noch läuft, und teilt der neue Name Vor- oder Nachnamen mit
         ihr, ist das von einer Heirat nicht zu unterscheiden; ist es ihr einziger laufender
@@ -5567,7 +5567,7 @@ model SonderurlaubAnlass {
         17.10.2026, hat der Auftraggeber nach den Gegenprüfungen ergänzt:
         <ul>
           <li><b>R1:</b> Umbenannt wird nur, wenn Vor- oder Nachname bleibt. Ein ganz anderer Name
-            ist ein anderer Mensch. Restrisiko, offen: Vergibt DokuBit einen Vertragsschlüssel samt
+            ist ein anderer Mensch. Restrisiko (bekannt): Vergibt DokuBit einen Vertragsschlüssel samt
             Postfach neu, solange der Vertrag der bisherigen Person noch läuft, und teilt der neue
             Name Vor- oder Nachnamen mit ihr, wird ihr Datensatz umbenannt, es sei denn, die Zeile
             nennt einen anderen als den gespeicherten Vertragsbeginn; dann gilt der Schlüssel als
@@ -5590,9 +5590,10 @@ model SonderurlaubAnlass {
             Ende, eine laufende die Stunden und ein früheres Ende, nie ein späteres oder leeres und
             nie einen neuen Beginn; nennt sie einen anderen Beginn als gespeichert, auch keine
             Stunden und keine andere Organisation, denn dann beschreibt sie vermutlich den Vertrag
-            eines anderen Menschen. Offen: Eine zweifelhafte laufende Zeile mit Adresse und Namen
-            der Person schützt sie weiter vor der Stilllegung, auch wenn ihr Vertrag im Portal
-            schon beendet ist (Anleitung zum n8n-Ablauf, Abschnitt 4).</li>
+            eines anderen Menschen. Entschieden am 17.10.2026 nach diesen Grundsätzen: Eine
+            zweifelhafte laufende Zeile mit Adresse und Namen der Person schützt sie weiter vor der
+            Stilllegung, auch wenn ihr Vertrag im Portal schon beendet ist. Grund: Sie hält nur einen bestehenden Zugang aufrecht und schafft keinen neuen; der Zweifel steht in „Zu prüfen“ und wird in DokuBit aufgelöst. (Anleitung
+            zum n8n-Ablauf, Abschnitt 4).</li>
         </ul></li>
       <li>Nach einer Heirat mit neuer Adresse gibt es <b>zwei Datensätze</b>; der alte wird inaktiv
         und behält Namen und Adresse.</li>

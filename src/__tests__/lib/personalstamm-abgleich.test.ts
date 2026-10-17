@@ -2060,7 +2060,7 @@ describe("Nachtrag v3 — Pflichtfaelle V7", () => {
           await wiederholungAendertNichts(stapel);
 
           // Am Tag nach dem gespeicherten Ende: wie ohne die Zeile. Annas eigene Zeile unter ihrer
-          // Adresse haelt sie aktiv, solange sie kommt und laeuft (V4; offen beim Auftraggeber).
+          // Adresse haelt sie aktiv, solange sie kommt und laeuft (V4; entschieden am 17.10.2026).
           const tagDanach = await abgleichen(stapel, new Date("2026-10-21T08:00:00.000Z"));
 
           expect(tagDanach.summary).toMatchObject({ aktualisiert: 0, stillgelegt: eigeneZeile ? 0 : 1, reaktiviert: 0 });

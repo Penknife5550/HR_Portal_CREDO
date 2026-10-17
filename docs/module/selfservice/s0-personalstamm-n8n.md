@@ -332,10 +332,11 @@ Person, frischt der nächste Lauf den Vertrag auf, auch ein verlängertes Ende, 
 bei Bedarf. Ist es ein anderer Mensch, braucht er in DokuBit eine eigene Adresse; dann wandert
 der Vertrag zu ihm. Eine echte Verlängerung kommt in DokuBit ohnehin als neue Zeile.
 
-**Ausnahme, offen beim Auftraggeber:** Trägt die zweifelhafte laufende Zeile Adresse und Namen
+**Ausnahme, entschieden am 17.10.2026:** Trägt die zweifelhafte laufende Zeile Adresse und Namen
 der Person, schützt sie die Person vor der Stilllegung (Abschnitt 1), auch wenn der Vertrag im
 Portal schon beendet ist und die Zeile deshalb nichts ändert. Die Person bleibt dann aktiv, solange
 diese Zeile kommt und läuft; der Vertrag bleibt mit seinem verstrichenen Ende stehen.
+Grund: Sie hält nur einen bestehenden Zugang aufrecht und schafft keinen neuen; der Zweifel steht in „Zu prüfen“ und wird in DokuBit aufgelöst.
 
 **Anschluss nach dem Ende des alten Vertrags, nur mit Nachweis** (Entscheidungen R2 und F des
 Auftraggebers vom 17.10.2026). Hat eine Person keinen laufenden Vertrag mehr, etwa weil ihr alter
@@ -379,7 +380,7 @@ ausgeschiedenen Person deshalb nicht, auch wenn deren alte Zeile ohne Adresse ko
 DokuBit ihr den alten Vertragsschlüssel gibt. Hat sie schon einen eigenen Datensatz, bleibt ihr
 Vertrag dort.
 
-**Restrisiko, offen beim Auftraggeber.** Nicht von einer Heirat unterscheiden lassen sich zwei Fälle:
+**Restrisiko (bekannt, dem Auftraggeber am 17.10.2026 genannt).** Nicht von einer Heirat unterscheiden lassen sich zwei Fälle:
 
 - Ein Fehler in DokuBit ändert die Zeile des alten Vertrags auf den Namen der Nachfolgerin, ohne
   ihren Vertragsbeginn zu ändern. Dann greift der Anschluss nach dem Ende.
