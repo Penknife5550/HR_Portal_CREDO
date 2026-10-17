@@ -274,7 +274,7 @@ ul.zwei-spalten li { break-inside: avoid; }
     <span><b>Stand:</b> 17.10.2026</span>
     <span><b>Fassung:</b> 6 — nach Code-Review, 16 von 29 Entscheidungen getroffen, keine Trägerentscheidung mehr offen</span>
     <span><b>Grundlage:</b> main <code>5595cf7</code></span>
-    <span><b>Status:</b> Umsetzungsrichtung festgelegt · noch abzustimmen mit DSB und MAV</span>
+    <span><b>Status:</b> Umsetzungsrichtung festgelegt · Zustimmung von HR, Datenschutzbeauftragtem und MAV am 17.10.2026</span>
   </div>
 </header>
 
@@ -303,6 +303,9 @@ ul.zwei-spalten li { break-inside: avoid; }
     <li><b>Entscheidungen vom 17.10.2026:</b> Abmelden beendet Portal und Keycloak, nicht
       Microsoft 365 — mit Kontoauswahl bei der nächsten Anmeldung (4.3); keine Optimistic Updates im
       Self-Service, wie im UX-Umbau (9).</li>
+    <li><b>Zustimmung erteilt:</b> Personalabteilung, Datenschutzbeauftragter und MAV haben dem
+      Plan am 17.10.2026 zugestimmt. Vor S0 bleiben E-S25 (zuständiges Gremium der drei GmbHs) und
+      E-S27 (DSG-EKD oder BDSG, je juristische Person) zu klären (12.2, 13, 14).</li>
     <li><b>Ehrlicher Umfang:</b> 46 bis 63 Arbeitstage statt 36 bis 53 (13). Neu: das
       <a href="selfservice-designkonzept.html">Designkonzept</a> mit allen Mockups.</li>
   </ul>
@@ -2324,8 +2327,8 @@ ul.zwei-spalten li { break-inside: avoid; }
   <p><b>Festlegung vom 16.10.2026:</b> Ändert ein Vorgang seinen Status, wird die Beschäftigte
     darüber informiert — nicht nur am Anfang und am Ende. Das ist die Gegenleistung dafür, dass auf
     Papier und Unterschriften verzichtet wird (E-S7): Wer nichts unterschreibt, muss wenigstens
-    jederzeit wissen, was mit seinem Anliegen geschieht. Diese Zusage wird so in die Abstimmung mit
-    der MAV gehen; sie gilt deshalb <b>ab Welle 1 vollständig</b>, nicht gestaffelt.</p>
+    jederzeit wissen, was mit seinem Anliegen geschieht. Diese Zusage ist Teil des Plans, dem die MAV
+    am 17.10.2026 zugestimmt hat; sie gilt deshalb <b>ab Welle 1 vollständig</b>, nicht gestaffelt.</p>
 
   <p>Die Matrix legt fest, welcher Wechsel eine Nachricht auslöst, an wen, und welche Vorlage
     dahinter steht:</p>
@@ -4438,6 +4441,10 @@ model SonderurlaubAnlass {
     die Verarbeitung, und die beginnt mit dem Abgleich des Stamms aller rund 600 Beschäftigten.
     Einzig S1 kann davor laufen: Es stellt nur die Anmeldung des HR-Teams um und verarbeitet keine
     neuen Beschäftigtendaten.</p>
+    <p><b>Stand 17.10.2026: Die Zustimmungen sind erteilt.</b> Personalabteilung,
+    Datenschutzbeauftragter und MAV haben diesem Plan zugestimmt (13). Für die drei GmbHs ist offen,
+    ob statt der MAV ein Betriebsrat zuständig ist (E-S25, nächster Absatz); bis zur Klärung werden
+    beide beteiligt, wo eines besteht. Ebenfalls vor S0 offen bleibt E-S27 (12.3).</p>
     <p><b>Für die GmbHs kann ein anderes Gremium zuständig sein.</b> Wo das Betriebsverfassungsgesetz
     gilt und ein Betriebsrat gewählt ist, braucht es statt der Dienstvereinbarung eine
     Betriebsvereinbarung nach § 87 Abs. 1 Nr. 6 BetrVG mit denselben drei Zusagen (E-S25). Und
@@ -4456,6 +4463,9 @@ model SonderurlaubAnlass {
     deren beschäftigtenbezogene Einträge betreffen Überwachungsverarbeitungen; das Ergebnis der
     Vorabprüfung ist trotzdem festzuhalten. Die Beteiligung der MAV aus 12.2 wird dabei als
     Einholung des Standpunkts der Betroffenen nach Art. 35 Abs. 9 dokumentiert.</p>
+    <p><b>Stand 17.10.2026:</b> Der Datenschutzbeauftragte hat dem Plan zugestimmt. Mit ihm offen
+    bleiben E-S27 (vor S0) und E-S28 mit der Löschtabelle (vor S3); die gezeichnete Vorabprüfung
+    wird hier vermerkt, sobald sie vorliegt.</p>
   </div>
 
   <h4>1 · Welches Recht gilt, und wer ist verantwortlich?</h4>
@@ -4689,10 +4699,12 @@ model SonderurlaubAnlass {
     <tr><th style="width:52px">Vor</th><th style="width:195px">Vorbedingung</th><th>Warum</th></tr>
     <tr>
       <td><b>S0</b></td>
-      <td><b>Zustimmung von Datenschutzbeauftragtem und MAV</b></td>
+      <td><b>Zustimmung von Datenschutzbeauftragtem und MAV</b><br><span class="pill gruen" style="margin-top:3px">erteilt am 17.10.2026</span></td>
       <td>Mit S0 beginnt die Verarbeitung der Daten aller rund 600 Beschäftigten; eine
         mitbestimmungspflichtige Maßnahme ohne Beteiligung wäre unwirksam (12.2). Nur S1 darf
-        vorher laufen, weil es keine neuen Beschäftigtendaten verarbeitet.</td>
+        vorher laufen, weil es keine neuen Beschäftigtendaten verarbeitet. Vor S0 außerdem offen: E-S25 (für die
+        drei GmbHs ggf. statt der MAV ein Betriebsrat) und E-S27 (DSG-EKD oder BDSG), beide mit dem
+        DSB (14).</td>
     </tr>
     <tr>
       <td><b>S3</b></td>
@@ -5069,7 +5081,8 @@ model SonderurlaubAnlass {
   <div class="kasten gruen">
     <p><b>Stand Fassung 6 vom 17.10.2026: Sechzehn Punkte sind entschieden, dreizehn offen — und
     keiner der offenen braucht noch eine Entscheidung des Trägers.</b> Es fehlen Abfragen, Zahlen,
-    Zusagen und die Abstimmung mit dem Datenschutzbeauftragten. Neu nach dem Code-Review sind E-S28
+    Zusagen und die Klärung von E-S25, E-S27 und E-S28 mit dem Datenschutzbeauftragten; seine
+    Zustimmung zum Plan und die der MAV sind am 17.10.2026 erteilt (12.2). Neu nach dem Code-Review sind E-S28
     (Chronik mit dem Vorgang löschen) und E-S29 (wer vertrauliche Anliegen zuerst sieht), beide mit
     Empfehlung.</p>
     <div class="tab-wrap">

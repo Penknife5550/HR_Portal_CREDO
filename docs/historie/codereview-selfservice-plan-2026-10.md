@@ -156,6 +156,10 @@ Keine offenen CRITICAL- oder MAJOR-Befunde. Offen sind Abstimmungen (DSB, MAV, I
 (DokuBit, LOGA), keine Mängel des Entwurfs. Vor dem Bau von S0 müssen die Vorbedingungen aus
 Abschnitt 13 erfüllt sein.
 
+> **Nachtrag 17.10.2026:** Personalabteilung, DSB und MAV haben dem Plan zugestimmt. Offen bleiben
+> die Zusagen der IT, die Abfragen sowie E-S25 und E-S27 (vor S0) und E-S28 (vor S3), siehe Plan
+> 12.2 und 14.
+
 ---
 
 ## Detaillierte Findings (Nummern F1–F83, auf die Plan und Designkonzept verweisen)
