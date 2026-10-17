@@ -784,7 +784,7 @@ table.tbl td b { font-weight: 600; }
             <b style="font-size:13px">Ihr Zugang ist noch nicht eingerichtet</b>
             <p>Die Personalabteilung ist informiert. Bis dahin erreichen Sie uns per E-Mail an <span class="tv">CREDO-Personal-intern@fes-credo.de</span>.</p>
             <div style="margin-top:12px"><span class="btn pri"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg>Abmelden</span></div>
-            <p style="font-size:9px">Damit melden Sie sich auch bei Microsoft ab.</p>
+            <p style="font-size:9px">Sie bleiben bei Microsoft angemeldet, etwa für Outlook.</p>
           </div>
         </div></div>
       </div>
@@ -810,8 +810,8 @@ table.tbl td b { font-weight: 600; }
               <span class="lic" style="width:36px;height:36px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:inline-flex;align-items:center;justify-content:center"><svg class="ic" style="width:17px;height:17px" aria-hidden="true"><use href="#i-checkc"/></svg></span>
               <div class="sk-titel" style="justify-content:center;margin-top:8px">Sie sind abgemeldet</div>
             </div>
-            <div class="hw info"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg><div><b>Sie sind auch bei Microsoft abgemeldet. <span class="anm">1</span></b><p>Das gilt für den ganzen Browser, also auch für Outlook im Web und Teams im Browser.</p></div></div>
-            <div class="gr"><div class="z"><b style="display:block;font-weight:600">Am gemeinsam genutzten Rechner</b><span style="color:var(--ink-2)">Schließen Sie zum Schluss alle Fenster des Browsers. Speichern Sie keine Passwörter auf diesem Rechner. <span class="anm">2</span></span></div></div>
+            <div class="hw info"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg><div><b>Ihre Microsoft-Anmeldung bleibt bestehen. <span class="anm">1</span></b><p>Outlook, Teams und andere Microsoft-Dienste in diesem Browser bleiben angemeldet.</p></div></div>
+            <div class="gr"><div class="z"><b style="display:block;font-weight:600">Am gemeinsam genutzten Rechner</b><span style="color:var(--ink-2)">Melden Sie sich zusätzlich bei Microsoft ab oder schließen Sie alle Fenster des Browsers. <span class="tv">Auch bei Microsoft abmelden</span> <span class="anm">2</span></span></div></div>
             <div style="text-align:center;margin-top:14px"><span class="btn sek">Erneut anmelden</span> <span class="anm">3</span></div>
           </div>
         </div></div>
@@ -822,15 +822,16 @@ table.tbl td b { font-weight: 600; }
           <ol style="margin:0;padding-left:18px">
             <li>„Abmelden“ ist eine <b>Weiterleitung des Browsers</b>, kein <code>fetch</code> (F11).</li>
             <li>Das Portal löscht sein Cookie und leitet auf den <code>end_session_endpoint</code> von Keycloak — mit <code>client_id</code> und fest hinterlegter <code>post_logout_redirect_uri</code>.</li>
-            <li>Keycloak reicht die Abmeldung an Microsoft weiter (generischer OIDC-Anbieter, „Send ID token on logout“ an).</li>
-            <li>Microsoft leitet zurück auf diese Seite. Der <code>ToastAnbieter</code> hat beim Aushängen alle Meldungen abgeräumt.</li>
+            <li>Keycloak beendet seine Sitzung und reicht die Abmeldung <b>nicht</b> an Microsoft weiter (Logout-URL am Entra-Anbieter leer; entschieden am 17.10.2026).</li>
+            <li>Keycloak leitet zurück auf diese Seite. Der <code>ToastAnbieter</code> hat beim Aushängen alle Meldungen abgeräumt.</li>
+            <li>Bei der nächsten Anmeldung schickt Keycloak <code>prompt=select_account</code>: Microsoft zeigt die Kontoauswahl statt still anzumelden.</li>
           </ol>
-          <p style="margin:8px 0 0">Abnahme in S1: Nach dem Abmelden verlangt „Anmelden“ am selben Browser wieder Konto und Passwort bei Microsoft.</p>
+          <p style="margin:8px 0 0">Abnahme in S1: Nach dem Abmelden zeigt „Anmelden“ am selben Browser die Kontoauswahl; Outlook im Web bleibt angemeldet.</p>
         </div>
       </div>
     </div>
     <figcaption>
-      <p><b>Was man hier sieht.</b> <span class="anm">1</span> Der Satz aus dem präzisierten Fix zu F11 — er ist nur wahr, wenn die Kette rechts vollständig gebaut ist; deshalb gehört die Prüfung in die Abnahme. <span class="anm">2</span> Ein ruhiger Rat für das Lehrerzimmer, kein Warnkasten. <span class="anm">3</span> „Erneut anmelden“ ist sekundär: Wer sich abmeldet, will in der Regel gehen.</p>
+      <p><b>Was man hier sieht.</b> <span class="anm">1</span> Abmelden beendet Portal und Keycloak, nicht Microsoft 365 (Plan 4.3, entschieden am 17.10.2026) — die Seite sagt das offen, damit niemand glaubt, er sei überall abgemeldet. <span class="anm">2</span> Ein ruhiger Rat für das Lehrerzimmer, kein Warnkasten; der Verweis führt auf die Abmeldeadresse des Tenants. Das verbleibende Risiko — ein Klick auf das fremde Konto in der Kontoauswahl — trägt der Träger bewusst (Plan 4.3). <span class="anm">3</span> „Erneut anmelden“ ist sekundär: Wer sich abmeldet, will in der Regel gehen.</p>
       <p class="bausteine"><b>Bausteine:</b> <code>Hinweis</code> ton info, <code>Gruppe</code>/<code>Zeile</code>, <code>Button</code> secondary.</p>
     </figcaption>
   </figure>
@@ -952,7 +953,7 @@ table.tbl td b { font-weight: 600; }
             <div class="gt">Angemeldet</div>
             <div class="gr">
               <div class="z zeile"><span class="avatar">MV</span><div class="t"><b>Maria Voth</b><small>Gymnasium</small></div></div>
-              <div class="z zeile"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg><div class="t"><b>Abmelden</b><small>meldet Sie auch bei Microsoft ab</small></div></div>
+              <div class="z zeile"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg><div class="t"><b>Abmelden</b><small>nur im Portal, Microsoft bleibt angemeldet</small></div></div>
             </div>
           </div>
         </div></div>
@@ -2144,7 +2145,7 @@ table.tbl td b { font-weight: 600; }
   <h3>Was für das Self-Service dazukommt</h3>
   <ul>
     <li><b>Eigener Rahmen:</b> Routengruppe für das Mitarbeiterportal mit eigenem Kopf und eigenem <code>ToastAnbieter</code>; die Genehmigungsseite liegt außerhalb davon und hat keinen.</li>
-    <li><b>Abmelden</b> ist eine Weiterleitung des Browsers bis zu Microsoft (F11); Anmelden und Abmelden laden die Seite voll neu (wie im UX-Umbau).</li>
+    <li><b>Abmelden</b> ist eine Weiterleitung des Browsers bis Keycloak, nicht bis Microsoft (Plan 4.3); die nächste Anmeldung zeigt die Kontoauswahl. Anmelden und Abmelden laden die Seite voll neu (wie im UX-Umbau).</li>
     <li><b>Statuskatalog</b> (B4) als eine Tabelle im Modul — Code → Text und Ton je Sicht —, gelesen von Liste, Detail, Mail und Test; Zurückgezogen und Verworfen über einen Code, nicht über Freitext.</li>
     <li><b>Texte</b> zentral im Code-Katalog (Bezeichnung für Beschäftigte vor der Norm, E-S23); keine Fachbegriffe als Feldbeschriftung; keine Rohcodes in der Oberfläche.</li>
     <li><b>Kein Optimistic Update</b>, auch nicht bei internen Notizen (Plan 9): gesperrt bis zum neuen Stand, dann Toast (J10).</li>

@@ -300,6 +300,9 @@ ul.zwei-spalten li { break-inside: avoid; }
       eine Kennzeichnung, verschlüsselte Freitexte, Chronik wird mit gelöscht (11.3, 12.3).</li>
     <li><b>Robuster Betrieb:</b> Stammabgleich legt nur ausdrücklich still, Fristen in Arbeitstagen,
       Postfachabruf mit festem Abstand auch nach Fehlern, Laufbudget und Ordnerprüfung, Grunddaten über Startmigration statt Seed.</li>
+    <li><b>Entscheidungen vom 17.10.2026:</b> Abmelden beendet Portal und Keycloak, nicht
+      Microsoft 365 — mit Kontoauswahl bei der nächsten Anmeldung (4.3); keine Optimistic Updates im
+      Self-Service, wie im UX-Umbau (9).</li>
     <li><b>Ehrlicher Umfang:</b> 46 bis 63 Arbeitstage statt 36 bis 53 (13). Neu: das
       <a href="selfservice-designkonzept.html">Designkonzept</a> mit allen Mockups.</li>
   </ul>
@@ -803,21 +806,24 @@ ul.zwei-spalten li { break-inside: avoid; }
       Geheimnis halten, deshalb läuft der vollständige Authorization-Code-Flow serverseitig ab und die
       Tokens erreichen den Browser nie. PKCE (S256) wird zusätzlich verwendet. In Keycloak heißt das:
       <i>Client authentication</i> an, <i>Standard flow</i> an, <i>Direct access grants</i> aus.</li>
-    <li><b>Abmelden heißt bis zu Microsoft abmelden.</b> Sonst führt ein Klick auf „Anmelden" sofort
-      wieder hinein — bei Weg C sogar ohne Passwort, weil die Microsoft-Sitzung im Browser bestehen
-      bleibt. Auf gemeinsam genutzten Rechnern im Lehrerzimmer arbeitete die nächste Person dann unter
-      fremdem Namen, bis hin zur Bankverbindung. Deshalb: (1) Entra ID ist in Keycloak als generischer
-      Anbieter „OpenID Connect v1.0" angelegt (4.5), nicht als eingebauter Anbieter „Microsoft", der
-      keine Abmeldung weiterreicht; Logout-URL ist der <code>end_session_endpoint</code> des Tenants,
-      „Backchannel logout" aus, „Send ID token on logout" an. (2) Die IT trägt in der
-      App-Registrierung die Rücksprungadresse von Keycloak für die Abmeldung
-      (<code>…/broker/&lt;alias&gt;/endpoint/logout_response</code>) ein. (3) „Abmelden" im Portal ist
-      eine Weiterleitung des Browsers, kein <code>fetch</code> wie heute
-      (<code>src/components/portal-header.tsx:174-177</code>): Das Portal löscht sein Cookie und
-      leitet auf den <code>end_session_endpoint</code> von Keycloak, mit <code>client_id</code> und
-      fest hinterlegter <code>post_logout_redirect_uri</code>. (4) Die Abmeldeseite sagt: „Sie sind
-      auch bei Microsoft abgemeldet." Das gilt für den ganzen Browser, also auch für Outlook im
-      Web.</li>
+    <li><b>Abmelden heißt: aus dem Portal und aus Keycloak — nicht aus Microsoft 365</b>
+      (entschieden am 17.10.2026). Wer sich im Portal abmeldet, soll nicht aus Outlook und Teams
+      fliegen. Deshalb: (1) „Abmelden" im Portal ist eine Weiterleitung des Browsers, kein
+      <code>fetch</code> wie heute (<code>src/components/portal-header.tsx:174-177</code>): Das Portal
+      löscht sein Cookie und leitet auf den <code>end_session_endpoint</code> von Keycloak, mit
+      <code>client_id</code> und fest hinterlegter <code>post_logout_redirect_uri</code>. Keycloak
+      beendet seine Sitzung. (2) Keycloak reicht die Abmeldung <b>nicht</b> an Microsoft weiter: Am
+      Entra-Anbieter bleibt die Logout-URL leer. Die Microsoft-Sitzung im Browser besteht weiter.
+      (3) Damit am gemeinsam genutzten Rechner im Lehrerzimmer ein Klick auf „Anmelden" nicht still
+      die vorige Person anmeldet, schickt Keycloak bei jeder Anmeldung <code>prompt=select_account</code>
+      an Microsoft: Es erscheint die Kontoauswahl, und wer sich anmeldet, wählt sein Konto bewusst.
+      (4) Die Abmeldeseite sagt: „Sie sind im Portal abgemeldet. Ihre Microsoft-Anmeldung, etwa für
+      Outlook, bleibt bestehen." Darunter für gemeinsam genutzte Rechner der Verweis „Auch bei
+      Microsoft abmelden" auf die Abmeldeadresse des Tenants. <b>Restrisiko, bewusst getragen:</b>
+      Wer an einem gemeinsam genutzten Rechner die Microsoft-Sitzung stehen lässt, ermöglicht der
+      nächsten Person, in der Kontoauswahl das fremde Konto anzuklicken — ohne Passwort. Dagegen hilft
+      nur, sich dort auch bei Microsoft abzumelden oder den Browser zu schließen; das sagt die
+      Abmeldeseite und die Kurzanleitung (S5).</li>
   </ul>
 
   <h3>4.4 · Was mit den bestehenden HR-Zugängen passiert</h3>
@@ -868,7 +874,7 @@ ul.zwei-spalten li { break-inside: avoid; }
   <table>
     <tr><th style="width:190px">Punkt</th><th>Festlegung und Begründung</th></tr>
     <tr><td><b>Version festnageln</b></td><td>Image von <code>quay.io/keycloak/keycloak</code> mit genauer Versionsangabe, nicht <code>latest</code>. Stand 16.10.2026: Zweig <b>26.8.x</b>, aktuell 26.8.1 vom 13.10.2026. <b>Keycloak hat keine LTS-Linie</b> — nur die jeweils neueste Version erhält Sicherheitskorrekturen; die Vorgängerlinie endet am Erscheinungstag der neuen.</td></tr>
-    <tr><td><b>Update im Quartalstakt</b></td><td>Neue Zweige erscheinen etwa alle drei Monate. <b>Termin:</b> je Quartal in der ersten Woche nach Erscheinen. <b>Verantwortlich:</b> eine benannte Person (offen, Zusage in Abschnitt 14). <b>Ablauf:</b> Vorabumgebung hochziehen → Anmeldemaske einschließlich „Mit Microsoft anmelden" und Abmeldung bis zu Microsoft prüfen (4.3) → Rücksicherung der Keycloak-Datenbank liegt bereit → Produktion. Ein Zweigwechsel verlangt das Herunterfahren aller Knoten; laufende Anmeldevorgänge gehen verloren, deshalb außerhalb der Kernzeit. Aufwand etwa ein halber Tag je Quartal — dauerhafte Betriebskosten, kein Projektaufwand. Der erste Durchlauf ist Teil der Abnahme von S1; in dieselbe Routine gehört der Wechsel der Geheimnisse aus 10.1.</td></tr>
+    <tr><td><b>Update im Quartalstakt</b></td><td>Neue Zweige erscheinen etwa alle drei Monate. <b>Termin:</b> je Quartal in der ersten Woche nach Erscheinen. <b>Verantwortlich:</b> eine benannte Person (offen, Zusage in Abschnitt 14). <b>Ablauf:</b> Vorabumgebung hochziehen → Anmeldemaske einschließlich „Mit Microsoft anmelden" und Abmeldung samt Kontoauswahl bei der nächsten Anmeldung prüfen (4.3) → Rücksicherung der Keycloak-Datenbank liegt bereit → Produktion. Ein Zweigwechsel verlangt das Herunterfahren aller Knoten; laufende Anmeldevorgänge gehen verloren, deshalb außerhalb der Kernzeit. Aufwand etwa ein halber Tag je Quartal — dauerhafte Betriebskosten, kein Projektaufwand. Der erste Durchlauf ist Teil der Abnahme von S1; in dieselbe Routine gehört der Wechsel der Geheimnisse aus 10.1.</td></tr>
     <tr><td><b><code>start</code>, nicht <code>start-dev</code></b></td><td>Der Entwicklungsmodus schaltet Sicherheitsmerkmale ab, unter anderem die HTTPS-Erzwingung und die Hostname-Prüfung.</td></tr>
     <tr><td><b><code>db=postgres</code> ausdrücklich setzen</b></td><td>Fehlt die Angabe, läuft Keycloak auf der dateibasierten H2-Datenbank <code>dev-file</code>. Einen Neustart des Containers überlebt sie; verloren ist sie beim Neuerzeugen — also beim nächsten Versionswechsel, den die Zeile darüber zur Pflicht macht. Das ist die gefährlichste Voreinstellung im Setup, weil sie erst beim ersten Update zuschlägt. Deshalb ist <code>KC_DB=postgres</code> Pflicht, und ihr Fehlen bricht den Start ab.</td></tr>
     <tr><td><b>Proxy-Kopfzeilen</b></td><td><code>proxy-headers=xforwarded</code> und <code>hostname</code> mit der vollständigen öffentlichen URL. Fehlt das, erzeugt Keycloak falsche Rücksprungadressen — die häufigste Fehlerquelle überhaupt. Zusätzlich <code>proxy-trusted-addresses</code> auf Caddy begrenzen, sonst lässt sich die protokollierte Client-IP von außen fälschen.</td></tr>
@@ -2500,7 +2506,7 @@ ul.zwei-spalten li { break-inside: avoid; }
         (<code>aria-disabled</code>), bis die Antwort da ist — ein Doppelklick erzeugt kein zweites
         Anliegen. Scheitert das Absenden, bleibt die Seite mit allen Eingaben stehen, oben die
         Fehlerzusammenfassung, am Feld die Meldung (6.6).</li>
-      <li><b>Keine Optimistic Updates.</b> Die Nummer eines Anliegens vergibt der Server. Nach jeder
+      <li><b>Keine Optimistic Updates</b> (entschieden am 17.10.2026). Die Nummer eines Anliegens vergibt der Server. Nach jeder
         Handlung — Antworten, Zurückziehen, im HR-Bereich jeder Statuswechsel — bleiben die
         Handlungen gesperrt, bis der neue Stand geladen ist; die Bestätigung kommt als
         <code>Toast</code>. Das ist das Muster des UX-Umbaus (stilles Neuladen); ein zweites Muster
@@ -4398,7 +4404,7 @@ model SonderurlaubAnlass {
     <tr><td><b>Protokoll über jede Änderung</b></td><td>Wer wann eine Bankverbindung gemeldet hat, über <code>AuditLog</code> mit <code>anliegenId</code>. <b>Die IBAN steht nicht im Protokoll</b>, auch nicht teilweise — welche gemeldet wurde, zeigt das Anliegen selbst. Das ist strenger als <code>maskValue</code> in der Personaldaten-Route (<code>src/app/api/onboarding/[id]/personal-data/route.ts:99</code>, sensible Felder als „***") und braucht keine gemeinsame Hilfsfunktion.</td></tr>
     <tr><td><b>Zweiter Faktor, soweit die Microsoft-Anmeldung ihn verlangt</b></td><td>Der Angriff lebt von gestohlenen Passwörtern. Der zweite Faktor kommt bei Weg C aus der Microsoft-Anmeldung, nicht aus Keycloak (5.2); ob er für alle verlangt wird, klärt E-S8. Er hält nur, weil das Portal Beschäftigte ausschließlich über den Entra-Anbieter hereinlässt und die Kontokonsole abgeschaltet ist (4.5, 11.1) — ein lokales Keycloak-Passwort führte an ihm vorbei.</td></tr>
     <tr><td><b>Keine Bindung an eine fremde Akte</b></td><td>Die Adresse für die erste Zuordnung ist in Keycloak schreibgeschützt und kommt aus Entra ID; gebunden wird nur ein eindeutiger, noch freier Datensatz (4.5, 11.1). Sonst könnte eine Beschäftigte im Namen einer Kollegin, die sich noch nicht angemeldet hat, eine Bankverbindung melden — ganz ohne fremdes Microsoft-Konto.</td></tr>
-    <tr><td><b>Abmelden bis zu Microsoft</b></td><td>Am gemeinsam genutzten Rechner meldete „Anmelden" sonst ohne Passwort als vorige Person an (4.3).</td></tr>
+    <tr><td><b>Kontoauswahl bei jeder Anmeldung</b></td><td>Abmelden beendet Portal und Keycloak, nicht die Microsoft-Sitzung (4.3, entschieden am 17.10.2026). Damit „Anmelden" am gemeinsam genutzten Rechner nicht still die vorige Person anmeldet, verlangt Microsoft die bewusste Kontoauswahl (<code>prompt=select_account</code>). Das Restrisiko — ein Klick auf das fremde Konto in der Auswahl — ist in 4.3 benannt; die Abmeldeseite bietet „Auch bei Microsoft abmelden".</td></tr>
     <tr><td><b>Zwei Statusnachrichten</b></td><td>Bei Eingang und bei Umsetzung, immer einzeln, nie zusammengefasst (8.6). Auf sie stützt E-S21 das getragene Restrisiko.</td></tr>
     <tr><td><b>Kein Mailweg für die Bankverbindung</b></td><td>Der zweite Angriffspfad ist eine Mail „von" einer Beschäftigten mit neuer IBAN. Aus einer Mail entsteht nie eine Bankverbindungsänderung (10.2); die Sachbearbeitung verweist auf das Formular. Hinter dem Formular steht die Microsoft-Anmeldung, hinter einer Mail nur eine Absenderadresse.</td></tr>
     <tr><td colspan="2" style="background:#fbfbfa"><b>Geprüft und bewusst nicht umgesetzt</b> (E-S7, E-S21)</td></tr>
@@ -4789,12 +4795,13 @@ model SonderurlaubAnlass {
         <code>scripts/backup.sh</code> mit nachgewiesenem Cronjob, Rücksicherung einmal geprobt. Realm,
         vertraulicher Client, Föderation an Entra ID als OIDC-Anbieter mit der Tenant-Id des eigenen
         Verzeichnisses (kein <code>common</code>), je Verzeichnis einer; die App-Registrierung samt
-        Rücksprungadresse für die Abmeldung legt die IT an (E-S5). Vor dem Umschalten gleicht die
+        Rücksprungadresse legt die IT an (E-S5). Vor dem Umschalten gleicht die
         HR-Leitung die Adressen der rund zwölf <code>User</code> mit ihren Microsoft-Adressen ab (4.4).
         Das HR-Team meldet sich ab hier mit dem Microsoft-Konto an; Zuordnung auf <code>User</code>
         nach 11.1. Die Sitzung läuft wie heute sieben Tage, aber mit fester Obergrenze ab Anmeldung
         (<code>angemeldetAm</code>) und mit <code>User.isActive</code> je Anfrage (4.3). Fehlerseite
-        <code>/login/fehler</code> (9.1). Abmelden bis zu Microsoft (4.3). Weg-A-Zugänge für externe
+        <code>/login/fehler</code> (9.1). Abmelden aus Portal und Keycloak, mit Kontoauswahl bei der
+        nächsten Anmeldung und dem Verweis „Auch bei Microsoft abmelden" (4.3). Weg-A-Zugänge für externe
         BEM-Beauftragte legt die IT an, mit bestätigter Adresse und Einmalkennwort (5.2); der
         Setup-Link des Bestands (<code>src/lib/passwort-setup.ts</code>, <code>/api/auth/setup</code>,
         <code>/konto-einrichten/[token]</code>, Versand in <code>src/app/api/users/route.ts</code>) wird
@@ -4804,8 +4811,9 @@ model SonderurlaubAnlass {
         CREDO-Look. Der erste Quartals-Update-Durchlauf ist Teil der Abnahme, dazu einmal in der
         Vorabumgebung: Ein manipulierter <code>state</code> und ein wiederverwendeter Code werden
         abgewiesen; ein Benutzer kann seine E-Mail-Adresse nicht selbst ändern; die lokale Anmeldung
-        eines föderierten Kontos weist das Portal ab; nach dem Abmelden verlangt „Anmelden" am selben
-        Browser wieder Konto und Passwort bei Microsoft.
+        eines föderierten Kontos weist das Portal ab; nach dem Abmelden zeigt „Anmelden" am selben
+        Browser die Kontoauswahl von Microsoft statt einer stillen Anmeldung, und Outlook im Web bleibt
+        angemeldet.
         <br><b>Tests:</b> <code>anmeldung-zuordnung.test.ts</code> für <code>User</code> (mehr als ein
         Treffer, <code>email_verified = false</code>, schon belegter <code>sub</code>, bedingtes
         Schreiben ohne Wirkung); ein Aufruf mit X-API-Key bleibt angemeldet;
@@ -5172,6 +5180,10 @@ model SonderurlaubAnlass {
       Dienst samt Datenbank, Sicherung, Theme, Härtung und Quartalsupdate; dafür entfielen die
       zentrale Anmeldestelle für weitere Anwendungen, die Anmeldestatistik und Weg A. Keycloak ist
       Vorgabe des Auftraggebers und bleibt.</p>
+    <p><b>Entschieden am 17.10.2026:</b> Abmelden beendet die Sitzung im Portal und in Keycloak, nicht
+      die Microsoft-Anmeldung. Bei jeder Anmeldung zeigt Microsoft die Kontoauswahl
+      (<code>prompt=select_account</code>); die Abmeldeseite bietet „Auch bei Microsoft abmelden" für
+      gemeinsam genutzte Rechner (4.3).</p>
   </div>
 
   <div class="ent">

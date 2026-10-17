@@ -122,7 +122,7 @@ geprüft wurden sie zentral. Das Schema-Delta ist danach erneut gegen das echte 
 | M1 Sitzungsverlängerung | Beschäftigte ohne Verlängerung (8 h), HR mit Obergrenze ab Anmeldung, `isActive` je Anfrage (nur Cookie-Sitzungen) | 4.3 |
 | M2 lokale Passwörter | Portal nimmt Keycloak-Anmeldungen nur über den Entra-Anbieter an; Weg A nur für externe BEM-Beauftragte, von der IT angelegt | 4.4, 5.2, 11.1 |
 | M3 besondere Kategorien | ein Feld `zugriffBeschraenkt`, erste Freigabe über `User.isAnliegenVertraulich`, Freitexte mit BEM-Schlüssel, Einstufung im Vorgang | 11.2, 11.3, 12.3, E-S29 |
-| M4 Abmelden | Abmeldung bis zu Microsoft (Weiterleitung des Browsers) | 4.3, 9.1 |
+| M4 Abmelden | Entscheidung des Auftraggebers vom 17.10.2026: Abmelden beendet Portal und Keycloak, nicht Microsoft 365. Gegen das stille Wiederanmelden am gemeinsam genutzten Rechner zeigt Microsoft bei jeder Anmeldung die Kontoauswahl (`prompt=select_account`); die Abmeldeseite bietet „Auch bei Microsoft abmelden". Restrisiko (Klick auf das fremde Konto) offen benannt und getragen | 4.3, 12.1, E-S5 |
 | M5 Statusmodell | Übergangstabelle mit Auslöser und Nachricht, Zurückziehen, Verwerfen (schließt, löscht nicht), Wiedereröffnung, Antwort nach Abschluss | 8.1 |
 | M6 Stammabgleich | Stilllegen nur bei ausdrücklichem Austritt je Anstellung, Protokoll je Aufruf, Block „Zu prüfen" | 5.1, S0 |
 | M7 Jahresverbrauch | je Anstellung nach Kalenderjahr der Freistellung, Höchstwert je Anlass, Index | 11.4, 11.2 |
