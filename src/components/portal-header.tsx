@@ -3,8 +3,9 @@
 /**
  * Shared Portal Header/Navigation
  *
- * 3 Hauptmenüpunkte mit Dropdown-Untermenüs:
+ * Hauptmenüpunkte, direkt oder mit Dropdown-Untermenü:
  * - Dashboard (direkt)
+ * - Personen (direkt, nur HR-Rollen): Personalstamm aus DokuBit, nur lesen (S0)
  * - Vorlagen (Dropdown: Formulare, Checklisten, Exit-Interview, Zeugnis)
  * - Verwaltung (Dropdown: Benutzer, Mandanten, Einstellungen)
  */
@@ -50,6 +51,13 @@ const NAV_GROUPS: NavGroup[] = [
     label: "🔒 BEM",
     href: "/dashboard/bem",
     roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER", "EINRICHTUNGSLEITUNG", "VORGESETZTER", "BEM_BEAUFTRAGTER"],
+  },
+  {
+    // Personalstamm aus DokuBit (Self-Service S0): Leseansicht mit „Zu prüfen“.
+    // Oberste Ebene, damit die Hervorhebung (startsWith) nicht „Dashboard“ trifft.
+    label: "Personen",
+    href: "/personen",
+    roles: ["SUPER_ADMIN", "HR_LEITUNG", "HR_SACHBEARBEITER"],
   },
   {
     label: "Vorlagen",

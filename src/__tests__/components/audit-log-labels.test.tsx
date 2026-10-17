@@ -18,6 +18,7 @@ import { UNTERLAGEN_AUDIT, UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
 import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
 import { AUSSTATTUNG_AUDIT, AUSSTATTUNG_AUDIT_LABELS } from "@/lib/ausstattung";
 import { AUSGABEN_AUDIT, AUSGABEN_AUDIT_LABELS } from "@/lib/ausgaben";
+import { PERSONALSTAMM_ACTIONS, PERSONALSTAMM_AUDIT_LABELS } from "@/lib/constants";
 
 describe("Protokoll-Beschriftungen", () => {
   // Paket 1b: Die Abteilungsaufgaben schreiben neue Codes (ABTEILUNGS_AUDIT).
@@ -198,6 +199,27 @@ describe("Protokoll-Beschriftungen", () => {
     expect(getActionLabel("RETURN_ITEM_CREATED")).toBe("Rückgabe-Gegenstand erfasst");
     expect(getActionLabel("RETURN_ITEM_UPDATED")).toBe("Rückgabe aktualisiert");
     expect(getActionLabel("RETURN_ITEM_DELETED")).toBe("Rückgabe-Gegenstand gelöscht");
+  });
+
+  // Personalstamm aus DokuBit (Self-Service S0): Lauf-Eintrag, Uebernahme,
+  // Vertragsumzug, Namenswechsel, Stilllegen, Reaktivieren.
+  test("jeder Code aus PERSONALSTAMM_ACTIONS ist uebersetzt, und keine Beschriftung ueberschreibt einen bestehenden", () => {
+    for (const code of Object.values(PERSONALSTAMM_ACTIONS)) {
+      expect(getActionLabel(code)).toBe(PERSONALSTAMM_AUDIT_LABELS[code]);
+    }
+    expect(Object.keys(PERSONALSTAMM_AUDIT_LABELS).sort()).toEqual(
+      [...new Set(Object.values(PERSONALSTAMM_ACTIONS))].sort(),
+    );
+    const bestehend = [
+      ...Object.keys(ABTEILUNGS_AUDIT_LABELS),
+      ...Object.keys(UNTERLAGEN_AUDIT_LABELS),
+      ...Object.keys(INDIVIDUELLE_MAIL_AUDIT_LABELS),
+      ...Object.keys(AUSSTATTUNG_AUDIT_LABELS),
+      ...Object.keys(AUSGABEN_AUDIT_LABELS),
+    ];
+    for (const code of Object.keys(PERSONALSTAMM_AUDIT_LABELS)) {
+      expect(bestehend).not.toContain(code);
+    }
   });
 
   test("ein unbekannter Code faellt auf sich selbst zurueck", () => {

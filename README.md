@@ -182,6 +182,7 @@ N8N_API_KEY=
 | `APP_URL`                 | Ja      | Oeffentliche URL des Portals. Wird fuer Magic Links in E-Mails verwendet.   |
 | `MAGIC_LINK_EXPIRY_HOURS` | Nein   | Gueltigkeit der Magic Links in Stunden (Standard: 720 = 30 Tage).           |
 | `N8N_API_KEY`             | Nein    | Optionaler API-Key fuer n8n-Service-Aufrufe.                                 |
+| `PERSONALSTAMM_SECRET`    | Nein    | Geheimnis des Webhooks `POST /api/webhooks/personalstamm` (Personalstamm aus DokuBit, n8n-Stammablauf). Eigenes Geheimnis, nicht `CRON_SECRET`; mindestens 24 Zeichen und verschieden von `CRON_SECRET`, sonst antwortet der Webhook mit 500. Generieren: `openssl rand -base64 24`. Nur fuer den Stammabgleich noetig; der Entrypoint prueft es nicht. |
 
 ### 3. Docker Compose starten
 
@@ -352,6 +353,14 @@ nach „Text auf Standard zuruecksetzen".
 | `POST /api/cron/reminders` | n8n, `Authorization: Bearer <CRON_SECRET>` | Der **bestehende** taegliche Lauf; Abschnitt 3 erinnert die informierten Abteilungen. Die Antwort traegt zusaetzlich `departmentReminders` (`{ remindersProcessed, errors, details[], uebersprungen[] }`), `total` bleibt Mitarbeiter + Vorgesetzte. Ein eigener Cron ist nicht noetig |
 
 Die Adressen der Abteilungen stehen unter **Einstellungen** > **Abteilungen** (`/api/settings/departments`), die Adresse der Fuehrungskraft am Vorgang (`supervisorEmail`, `supervisorName`) — im Onboarding immer die Adresse, die auch den Modalitaeten-Link bekommen hat.
+
+### Personalstamm aus DokuBit: eingehender Webhook (Self-Service S0)
+
+Anders als bei den Events oben ruft hier n8n das Portal auf: Der Stammablauf liest die Vertraege aus DokuBit und schickt sie in Stapeln, einen nach dem anderen (Schleife „Loop Over Items“; die Option „Batching“ wartet nicht auf die Antwort). Einrichtung, SQL-Abfrage und Checkliste vor dem ersten Produktivlauf: [`docs/module/selfservice/s0-personalstamm-n8n.md`](docs/module/selfservice/s0-personalstamm-n8n.md).
+
+| Route | Wer | Zweck |
+|-------|-----|-------|
+| `POST /api/webhooks/personalstamm` | n8n, `Authorization: Bearer <PERSONALSTAMM_SECRET>` (nicht `CRON_SECRET`) | Body: ein Eintrag oder ein Array mit hoechstens 200 Eintraegen; eine Zeile ist ein Vertrag (Schluessel Mandant + Abrechnungskreis + MANR), die Person wird ueber die dienstliche Adresse erkannt. 400 bei unlesbarem Body, leerem Stapel oder mehr als 200 Eintraegen; 413 bei einem Body ueber 1 MiB; 401 ohne oder mit falschem Geheimnis; 500 `Konfigurationsfehler`, wenn `PERSONALSTAMM_SECRET` fehlt, kuerzer als 24 Zeichen oder gleich `CRON_SECRET` ist. Sonst immer 200 mit `{ success, summary, results[] }`: `summary` zaehlt angelegt, aktualisiert, unveraendert, uebersprungen, stillgelegt, reaktiviert, zweifelsfall, fehler und zeilen; `results` je Zeile `{ index, status, schluessel?, code?, feld? }` (`feld` nur bei `FORMATFEHLER`: Pfad des Feldes, ohne Wert), ohne Namen und Adressen. Jeder Aufruf schreibt einen AuditLog-Eintrag `PERSONALSTAMM_LAUF`; der Lauf „Wartung" loescht diese Eintraege nach 365 Tagen |
 
 ### Konfiguration
 

@@ -272,7 +272,7 @@ ul.zwei-spalten li { break-inside: avoid; }
   </p>
   <div class="meta">
     <span><b>Stand:</b> 17.10.2026</span>
-    <span><b>Fassung:</b> 6 — nach Code-Review, 16 von 29 Entscheidungen getroffen, keine Trägerentscheidung mehr offen</span>
+    <span><b>Fassung:</b> 6 — nach Code-Review, 18 von 29 Entscheidungen getroffen, keine Trägerentscheidung mehr offen</span>
     <span><b>Grundlage:</b> main <code>5595cf7</code></span>
     <span><b>Status:</b> Umsetzungsrichtung festgelegt · Zustimmung von HR, Datenschutzbeauftragtem und MAV am 17.10.2026</span>
   </div>
@@ -308,6 +308,29 @@ ul.zwei-spalten li { break-inside: avoid; }
       E-S27 (DSG-EKD oder BDSG, je juristische Person) zu klären (12.2, 13, 14).</li>
     <li><b>Ehrlicher Umfang:</b> 46 bis 63 Arbeitstage statt 36 bis 53 (13). Neu: das
       <a href="selfservice-designkonzept.html">Designkonzept</a> mit allen Mockups.</li>
+  </ul>
+</div>
+
+<div class="kasten gruen" style="margin-top:0">
+  <p><b>Stand 17.10.2026: Ergebnisse der DokuBit-Abfragen.</b> Die Abfragen aus E-S10 und E-S15
+  sind gelaufen, der Auftraggeber hat die Ergebnisse bestätigt. Sie ändern vor allem den
+  Stammabgleich (S0):</p>
+  <ul style="margin-bottom:0">
+    <li><b>Eine DokuBit-Zeile ist ein Vertrag.</b> Schlüssel ist Mandant + Abrechnungskreis +
+      <code>MANR</code>, gespeichert an der Anstellung; die <code>MANR</code> allein bezeichnet keine
+      Person. Die Person erkennt der Abgleich an der dienstlichen Adresse; die Adresse ist die
+      Person, ein Datensatz wird nie auf einen anderen Menschen umgeschrieben (5.1, 11.1, E-S10).</li>
+    <li><b>Der Austritt kommt aus dem Vertragsende.</b> <code>VERTRAGSENDE</code> ist der letzte
+      Arbeitstag; <code>MASTATUS</code> ist leer, <code>EVTLLDA</code> ist kein letzter Arbeitstag
+      und wird nicht verwendet (5.1, E-S15).</li>
+    <li><b>343 Personen mit 362 laufenden Verträgen</b>; die bisher genannten „rund 600" waren eine
+      Schätzung. 18 Personen haben mehrere laufende Verträge (E-S11).</li>
+    <li><b>Leer sind auch <code>BESCHAEFTIGUNGSGRUPPE</code> und <code>MAPOSITION</code>.</b> Die
+      Steuerung der Anlässe der Arbeitsbefreiung nach Gruppe braucht eine andere Quelle — offen
+      für S4 (6.2).</li>
+    <li><b>Folgen im Plan:</b> 18 von 29 Entscheidungen getroffen (14); die Protokolle des Abgleichs
+      werden nach einem Jahr gelöscht (12.3); S0 bekommt eine Checkliste vor dem ersten
+      Produktivlauf, die Verknüpfung mit dem Onboarding ist aus S0 herausgenommen (13).</li>
   </ul>
 </div>
 
@@ -405,7 +428,9 @@ ul.zwei-spalten li { break-inside: avoid; }
     Vertragsende bezieht von dort seit Phase 2 wöchentlich seine Meldungen: Ein n8n-Ablauf liest die
     MS-SQL-Datenbank und schickt die Zeilen an einen Webhook des Portals. Die Abfrage liefert bereits
     Personalnummer, dienstliche E-Mail, Mandantennummer, Position, Entgeltgruppe und Stufe,
-    Wochenstunden, Beschäftigungsgruppe und den Mitarbeiterstatus. Aus „Mitarbeiterstamm aufbauen"
+    Wochenstunden, Beschäftigungsgruppe und den Mitarbeiterstatus — wobei Position,
+    Beschäftigungsgruppe und Mitarbeiterstatus in DokuBit leer sind (Abfragen vom 17.10.2026, 5.1).
+    Aus „Mitarbeiterstamm aufbauen"
     wird damit <b>„eine zweite Abfrage über einen vorhandenen Kanal"</b> — Abschnitt 5.1.</p>
   </div>
 
@@ -431,7 +456,7 @@ ul.zwei-spalten li { break-inside: avoid; }
     <tr><td><b>Beginnt</b></td><td>Mit dem Einreichen eines Anliegens im Mitarbeiterportal oder dem Eingang einer E-Mail im HR-Postfach. Maßgeblich für Frist und Durchlaufzeit ist der Zeitstempel des Eingangs, nicht der Anmeldung.</td></tr>
     <tr><td><b>Endet</b></td><td>Mit dem Abschluss des Tickets (erledigt, abgelehnt oder zurückgezogen) und der Abschlussnachricht an die Beschäftigte</td></tr>
     <tr><td><b>Dauerprozess</b></td><td>Ja — anders als alle bisherigen Vorgangsarten hat dieser Prozess kein Ende je Person. Ein Zugang besteht, solange ein Beschäftigungsverhältnis besteht.</td></tr>
-    <tr><td><b>Mengengerüst</b></td><td>Zu schätzen (Entscheidung E-S12). Als Anhaltspunkt: bei rund 600 Beschäftigten und erfahrungsgemäß 1–2 Anliegen je Person und Jahr sind das 600–1.200 Tickets jährlich, mit Spitzen zum Schuljahresbeginn und zum Jahreswechsel (Steuerklasse, Bescheinigungen).</td></tr>
+    <tr><td><b>Mengengerüst</b></td><td>Zu schätzen (Entscheidung E-S12). Als Anhaltspunkt: bei 343 Beschäftigten mit laufendem Vertrag (DokuBit, 17.10.2026, 5.1) und erfahrungsgemäß 1–2 Anliegen je Person und Jahr sind das rund 350–700 Tickets jährlich, mit Spitzen zum Schuljahresbeginn und zum Jahreswechsel (Steuerklasse, Bescheinigungen).</td></tr>
   </table>
   </div>
 
@@ -449,7 +474,7 @@ ul.zwei-spalten li { break-inside: avoid; }
     <tr><td>Ticket abschließen</td><td>I</td><td>I</td><td>D</td><td>A</td></tr>
     <tr><td>Katalog pflegen (Anliegen ein-/ausschalten, Formulare ändern)</td><td>–</td><td>–</td><td>M</td><td>D</td></tr>
     <tr><td>HR-Zugänge (<code>User</code>) sperren und entsperren</td><td>–</td><td>–</td><td>M</td><td>D</td></tr>
-    <tr><td>Zugänge von Beschäftigten — nur über den Status in DokuBit (5.1)</td><td>–</td><td>–</td><td>I</td><td>I</td></tr>
+    <tr><td>Zugänge von Beschäftigten — nur über die Verträge in DokuBit (5.1)</td><td>–</td><td>–</td><td>I</td><td>I</td></tr>
   </table>
   </div>
   <p class="unter"><b>D</b> durchführend · <b>A</b> verantwortlich/entscheidend · <b>M</b> mitwirkend · <b>I</b> zu informieren</p>
@@ -765,7 +790,7 @@ ul.zwei-spalten li { break-inside: avoid; }
     Mandantenrollen (<code>src/middleware.ts:90-100</code>), und mehrere Routen prüfen nur, ob
     überhaupt eine Sitzung besteht — etwa <code>/api/onboarding/[id]/notes</code> mit den internen
     HR-Notizen oder <code>/api/dashboard/stats</code> mit den Namen überfälliger Eintritte aller
-    Mandanten. Mit dem bestehenden Portal-JWT und nur einer neuen Rolle kämen rund 600 Beschäftigte
+    Mandanten. Mit dem bestehenden Portal-JWT und nur einer neuen Rolle kämen rund 340 Beschäftigte
     an all das. Deshalb:</p>
     <ul style="margin-bottom:0">
       <li><b>Eigene Rolle.</b> <code>BESCHAEFTIGTE</code> gibt es nur im Portal-JWT, nicht in
@@ -916,7 +941,8 @@ ul.zwei-spalten li { break-inside: avoid; }
         Anmeldung (11.1) und das Ziel aller Statusmails; darüber soll der Schlüssel der
         Erinnerungsläufe nicht verfügen.</li>
       <li>Der Körper ist <b>ein Eintrag oder ein Stapel</b> (Array, höchstens 200) — der ganze
-        Wochenlauf passt in einen Aufruf. Der Stammlauf mit rund 600 Personen braucht dagegen
+        Wochenlauf passt in einen Aufruf. Der Stammlauf mit 362 laufenden Verträgen und den
+        Vertragsenden der letzten 30 Tage braucht dagegen
         <b>mehrere Aufrufe</b>; deshalb ist dort jeder Stapel für sich gültig (unten, „Was der
         Lauf tut").</li>
       <li>Die Feldnamen sind <b>bewusst nah an den DokuBit-Spalten</b> gehalten, damit n8n
@@ -930,34 +956,41 @@ ul.zwei-spalten li { break-inside: avoid; }
   </div>
 
   <p>Für den Stamm kommt also ein zweiter Empfänger nach demselben Bauplan:
-    <code>POST /api/webhooks/personalstamm</code>, getaktet durch einen n8n-Ablauf, der statt der
-    auslaufenden Verträge <b>alle aktiven Beschäftigten und die Austritte der letzten 30 Tage</b>
-    abfragt. Und das Beste daran: Die
+    <code>POST /api/webhooks/personalstamm</code>, getaktet durch einen n8n-Ablauf, der täglich um
+    02:30 statt der auslaufenden Verträge <b>alle laufenden Verträge und die in den letzten 30 Tagen
+    beendeten</b> abfragt (E-S15). Und das Beste daran: Die
     Felder, die dafür gebraucht werden, liefert DokuBit schon heute — sie stehen in der
-    Spalten-Freigabeliste des Vertragsende-Webhooks:</p>
+    Spalten-Freigabeliste des Vertragsende-Webhooks. Die Tabelle gibt den Stand nach den Abfragen
+    vom 17.10.2026 wieder:</p>
 
   <div class="tab-wrap">
   <table>
     <tr><th style="width:175px">DokuBit-Spalte</th><th>Im Portal</th><th>Wofür im Self-Service</th></tr>
-    <tr><td><code>MANR</code></td><td><code>Employee.personalNumber</code></td><td><b>Der Schlüssel des Abgleichs.</b> Über ihn erkennt der Lauf, ob eine Person neu ist oder sich geändert hat.</td></tr>
-    <tr><td><code>MAEMAIL</code></td><td><code>Employee.email</code></td><td>Die einmalige Zuordnung der ersten Anmeldung (11.1) und die Zuordnung eingehender E-Mails an das HR-Postfach (Abschnitt 10)</td></tr>
+    <tr><td><code>MANDANTENNUMMER</code></td><td><code>Organization.mandantNumber</code>, an der Anstellung <code>Employment.mandantNumber</code></td><td><b>Die Mandantenzuordnung</b> und erster Teil des Vertragsschlüssels. Das Portal löst daraus die Einrichtung auf — genau wie der Vertragsende-Webhook es heute tut. Alle 16 Mandantennummern der laufenden Verträge sind im Portal angelegt.</td></tr>
+    <tr><td><code>ABRECHNUNGSKREIS</code></td><td><code>Employment.abrechnungskreis</code> (neu, 11.1)</td><td>Zweiter Teil des Vertragsschlüssels; 12 der 16 Mandanten haben zwei Abrechnungskreise. Zugleich der Hinweis auf den Abrechnungsstichtag, der bei Adress- und Bankänderungen die Frist setzt.</td></tr>
+    <tr><td><code>MANR</code></td><td><code>Employment.personalNumber</code> (neu, 11.1)</td><td>Dritter Teil des Vertragsschlüssels. <b>Allein bezeichnet die <code>MANR</code> keine Person:</b> 222 Nummern stehen in DokuBit für verschiedene Menschen, und 221 Menschen haben mehrere. <code>Employee.personalNumber</code> bleibt die LOGA-Nummer; der Abgleich liest und schreibt sie nicht.</td></tr>
+    <tr><td><code>MAEMAIL</code></td><td><code>Employee.email</code></td><td><b>Woran der Abgleich die Person erkennt</b> — die dienstliche Adresse, also das Microsoft-365-Konto, getrimmt und ohne Rücksicht auf Groß- und Kleinschreibung verglichen. Eine andere Adresse ist eine andere Person (E-S10). Zugleich die einmalige Zuordnung der ersten Anmeldung (11.1) und die Zuordnung eingehender E-Mails an das HR-Postfach (Abschnitt 10).</td></tr>
     <tr><td><code>MAVONAME</code>, <code>MANANAME</code></td><td><code>firstName</code>, <code>lastName</code></td><td>Anrede und Anzeige im Ticket</td></tr>
-    <tr><td><code>MANDANTENNUMMER</code></td><td><code>Organization.mandantNumber</code></td><td><b>Die Mandantenzuordnung.</b> Das Portal löst daraus die Einrichtung auf — genau wie der Vertragsende-Webhook es heute tut.</td></tr>
-    <tr><td><code>MAPOSITION</code></td><td><code>Employment.position</code></td><td>Anzeige im Ticket; beim Vertragsende belegt sie heute schon die Stellenbezeichnung vor</td></tr>
+    <tr><td><code>VERTRAGSBEGINN</code></td><td><code>Employment.startDate</code></td><td>Beginn des Vertrags</td></tr>
+    <tr><td><code>VERTRAGSENDE</code></td><td><code>Employment.endDate</code>, daraus <code>Employment.isActive</code> und <code>Employee.isActive</code></td><td><b>Der letzte Arbeitstag</b> (Auskunft des Auftraggebers) und damit der Austritt. Ein Vertrag läuft, solange das Feld leer ist oder auf heute oder später fällt (Europe/Berlin); leer heißt unbefristet und überschreibt ein früheres Ende. Verlängerung oder Entfristung ist in DokuBit eine neue Zeile (unten, „Was der Lauf tut").</td></tr>
     <tr><td><code>TEILZEITSTUNDEN</code></td><td><code>Employment.workingHoursWeek</code></td><td>Wochenstunden der Anstellung. Eine Umrechnung nach Arbeitstagen braucht zusätzlich die Wochenarbeitstage, die es an der Anstellung nicht gibt — sie kommt erst mit Welle 2 (6.3).</td></tr>
     <tr><td><code>TARIFGRUPPE</code>, <code>TARIFSTUFE</code></td><td>—</td><td>In Welle 1 ohne Verwendung und deshalb nicht übernommen.</td></tr>
-    <tr><td><code>MASTATUS</code>, <code>EVTLLDA</code></td><td><code>Employment.isActive</code>, daraus <code>Employee.isActive</code></td><td>Zugang anlegen oder sperren. Stillgelegt wird nur, wer <b>ausdrücklich</b> als ausgetreten kommt (unten, „Was der Lauf tut"). Ohne diese Spalten behielten Ausgetretene ihren Zugang.</td></tr>
     <tr><td><code>TARIF</code></td><td>—</td><td>Nicht übernommen. Das Regelwerk ordnet die Personalabteilung selbst zu, nicht über den Tarif (6.2); den Tarif sieht sie in DokuBit.</td></tr>
-    <tr><td><code>BESCHAEFTIGUNGSGRUPPE</code></td><td><code>Employment.beschaeftigungsgruppe</code> (neu, 11.1)</td><td>Rohwert je Anstellung. Bestimmt, welche Anlässe der Arbeitsbefreiung jemand sieht — ein Ehrenamtlicher sieht keine tariflichen (6.2). Bewusst <b>nicht</b> das Bestands-Enum <code>Personalgruppe</code> und nicht <code>contractType</code> (11.1).</td></tr>
-    <tr><td><code>KONZERNEINTRITT</code></td><td><code>Employment.startDate</code></td><td>Dienstjubiläen und damit der Jubiläumstag nach § 29 TV-L — ohne Antrag berechenbar (Welle 2)</td></tr>
-    <tr><td><code>ABRECHNUNGSKREIS</code></td><td>—</td><td>Hinweis auf den Abrechnungsstichtag, der bei Adress- und Bankänderungen die Frist setzt</td></tr>
+    <tr><td><code>MASTATUS</code></td><td>—</td><td>In DokuBit in allen Zeilen leer und deshalb kein Austrittssignal. Ob ein Vertrag läuft, sagt allein <code>VERTRAGSENDE</code>.</td></tr>
+    <tr><td><code>EVTLLDA</code></td><td>—</td><td>Nicht verwendet und nicht übernommen. Kein letzter Arbeitstag: 219 von 265 Werten liegen vor dem Vertragsbeginn. Die Bedeutung klärt die Personalabteilung.</td></tr>
+    <tr><td><code>MAPOSITION</code></td><td>—</td><td>In DokuBit in allen Zeilen leer; nicht übernommen. <code>Employment.position</code> bleibt unberührt.</td></tr>
+    <tr><td><code>BESCHAEFTIGUNGSGRUPPE</code></td><td>—</td><td>In DokuBit in allen Zeilen leer; nicht übernommen. Die geplante Spalte <code>Employment.beschaeftigungsgruppe</code> entfällt (11.1). Welche Anlässe der Arbeitsbefreiung jemand sieht, braucht damit eine andere Quelle — offener Punkt für S4 (6.2).</td></tr>
+    <tr><td><code>KONZERNEINTRITT</code></td><td>—</td><td>In S0 nicht übernommen. Für Dienstjubiläen und den Jubiläumstag nach § 29 TV-L (Welle 2) wieder aufzugreifen; <code>Employment.startDate</code> ist der Beginn des einzelnen Vertrags, nicht der Konzerneintritt.</td></tr>
     <tr><td><code>REGELSALTERSGRENZE</code></td><td>—</td><td>Nicht für dieses Modul, aber bemerkenswert: Das ist die Datengrundlage des geplanten Moduls Ruhestandsplanung.</td></tr>
   </table>
   </div>
 
   <p class="unter">Nicht übernommen werden, wie schon beim Vertragsende, die technischen Spalten
     <code>LFD_NR</code>, <code>MABENUTZER</code>, <code>MAKURZ</code>, <code>ARCHIVDATUM</code> und
-    <code>ARCHIVIERTVON</code>.</p>
+    <code>ARCHIVIERTVON</code>. In allen Zeilen leer sind außerdem <code>VERTRAGSART</code>,
+    <code>MABENUTZER</code> und <code>ARCHIVDATUM</code>. Die n8n-Abfrage holt nur neun Spalten:
+    Mandant, Abrechnungskreis, <code>MANR</code>, Vor- und Nachname, dienstliche Adresse,
+    Teilzeitstunden, Vertragsbeginn und Vertragsende.</p>
 
   <div class="kasten">
     <p><b>Was das Verzeichnis der Verarbeitungstätigkeiten über n8n braucht</b> — drei Angaben, vor
@@ -969,8 +1002,8 @@ ul.zwei-spalten li { break-inside: avoid; }
         der durchgelaufenen Datensätze. Für den Stammabgleich wird das für erfolgreiche Läufe
         abgeschaltet (Einstellung des Ablaufs „Save successful production executions"); Fehlläufe
         räumt die instanzweite Bereinigung nach kurzer Frist.</li>
-      <li><b>Feste Spaltenliste.</b> Der Webhook nimmt nur die Spalten aus der Tabelle oben an und
-        verwirft alles andere.</li>
+      <li><b>Feste Spaltenliste.</b> Der Webhook nimmt nur die neun Spalten der Abfrage an (oben)
+        und verwirft alles andere.</li>
     </ul>
     <p style="margin-top:8px">Das ist auch der Grund, warum n8n hier Inhalte transportieren darf, beim
     Postfach (10.1) aber nicht: Hier sind es feste Spalten ohne Freitext und ohne Anhänge, dort wären
@@ -989,50 +1022,100 @@ ul.zwei-spalten li { break-inside: avoid; }
     unmissverständlich: „DokuBit liefert derzeit keine vollständige personal_mandanten-Zuordnung je
     Person." Der Ablauf liegt bewusst nicht im Repository; für S0 wird die SQL-Abfrage der
     Dokumentation beigelegt.</p>
-    <p><b>Was daraus folgt — und es ist eine gute Nachricht:</b> Die Liste ist heute unvollständig,
-    weil die Abfrage nur Verträge mit Ende in 1 bis 12 Monaten sieht. Ein Abgleich über <b>alle
-    aktiven Beschäftigten</b> hat dieses Fenster nicht. Da <code>MANDANTENNUMMER</code> eine Spalte
-    der Mitarbeitertabelle ist und dieselbe <code>MANR</code> bei mehreren Mandanten vorkommt, führt
-    <code>dokubitmitarbeiter</code> offenbar <b>eine Zeile je Person und Mandant</b> — dann ergibt
-    die Gruppierung nach <code>MANR</code> über den vollen Bestand die vollständige Zuordnung von
-    selbst. <b>Zu verifizieren mit einer einzigen Abfrage</b>, bevor S0 gebaut wird:
-    <code>SELECT MANR, COUNT(*) FROM dokubitmitarbeiter GROUP BY MANR HAVING COUNT(*) &gt; 1</code>.
-    Kommt dort etwas zurück, ist die Annahme richtig und <code>Employee</code> steht 1:n zu
-    <code>Employment</code> wie vorgesehen.</p>
+    <p><b>Was daraus folgt — geprüft am 17.10.2026:</b> Die Annahme an dieser Stelle, DokuBit führe
+    <b>eine Zeile je Person und Mandant</b>, trifft nicht zu. <code>dokubitmitarbeiter</code> führt
+    <b>eine Zeile je Vertrag</b> — 1.257 Zeilen, beendete Verträge eingeschlossen. Eindeutig ist eine
+    Zeile erst über <code>MANDANTENNUMMER</code> + <code>ABRECHNUNGSKREIS</code> + <code>MANR</code>;
+    die <code>MANR</code> allein steht in 222 Fällen für verschiedene Menschen, und 221 Menschen haben
+    mehrere. Eine Gruppierung nach <code>MANR</code> taugt für den Stamm deshalb nicht. Der
+    Stammabgleich gruppiert nicht: Jede Zeile wird eine eigene Anstellung, und die Person dazu erkennt
+    er an der dienstlichen Adresse. <code>Employee</code> steht damit 1:n zu <code>Employment</code>
+    wie vorgesehen; 18 Personen haben mehrere laufende Verträge.</p>
   </div>
 
   <h4>Was der Lauf tut</h4>
   <div class="ablauf" style="grid-template-columns:repeat(4,1fr)">
-    <div><span class="wer">neu</span><b>Anlegen</b><span><code>Employee</code> mit <code>importSource = "DOKUBIT"</code> und <code>importedAt</code>, dazu je Mandantenzuordnung eine <code>Employment</code>-Zeile.</span></div>
-    <div><span class="wer">geändert</span><b>Auffrischen</b><span>Nur belegte Werte überschreiben — leere Felder aus DokuBit löschen nichts. Dieselbe Regel, die der Vertragsende-Webhook bei den Stammdaten anwendet. Eine geänderte E-Mail-Adresse wird übernommen und mit altem und neuem Wert im <code>AuditLog</code> protokolliert.</span></div>
-    <div><span class="wer">ausgetreten</span><b>Stilllegen</b><span>Nur wer <b>ausdrücklich</b> als ausgetreten kommt, nie wer in einer Lieferung fehlt: <code>isActive = false</code> — ab dann weist das Portal Anmeldung und jede Anfrage ab (4.3). Keycloak selbst bleibt unberührt; die Anmeldung endet mit dem Dienstkonto in Microsoft. Nicht gelöscht, denn die Tickets bleiben in der Akte.</span></div>
-    <div><span class="wer">unklar</span><b>Melden, nicht raten</b><span>Fehlt die Personalnummer und ist die E-Mail mehrdeutig, wird die Zeile <b>nicht</b> zugeordnet, sondern zur Prüfung gemeldet (Block „Zu prüfen", unten). Still falsch zuordnen ist hier der teure Fehler.</span></div>
+    <div><span class="wer">neu</span><b>Anlegen</b><span>Je DokuBit-Vertrag genau eine <code>Employment</code>-Zeile, erkannt am Vertragsschlüssel. Die Person dazu über die dienstliche Adresse: Gibt es sie noch nicht, entsteht ein <code>Employee</code> mit <code>importSource = "DOKUBIT"</code> und <code>importedAt</code>; gibt es sie genau einmal, kommt der Vertrag zu ihr. Ein beendeter Vertrag, den das Portal nicht kennt, wird nicht angelegt.</span></div>
+    <div><span class="wer">geändert</span><b>Auffrischen</b><span>Beginn, Ende, Wochenstunden und Aktiv-Stand des Vertrags. Leere Felder aus DokuBit löschen nichts — mit einer Ausnahme: Ein leeres <code>VERTRAGSENDE</code> heißt unbefristet und überschreibt ein früheres Ende. Die Adresse einer Person schreibt der Abgleich nie um: Nennt ein laufender Vertrag eine andere Adresse, wechselt er zu der Person mit dieser Adresse, und gibt es sie nicht, wird sie angelegt (unten). Einen geänderten Namen übernimmt er nur bei gleicher Adresse, nur, wenn jeder laufende Vertrag der Person ihn im selben Lauf nennt, und nur, wenn Vor- oder Nachname bleibt; hat die Person keinen laufenden Vertrag mehr, nur über einen laufenden Anschlussvertrag, und nur mit Nachweis: Auch die Zeile ihres höchstens 30 Tage zuvor beendeten Vertrags trägt unter derselben Adresse den neuen Namen (unten). Sonst wird gemeldet, nicht geändert. Dafür legt n8n alle Zeilen einer Adresse in denselben Stapel.</span></div>
+    <div><span class="wer">beendet</span><b>Stilllegen</b><span>Liegt <code>VERTRAGSENDE</code> vor heute, ist der Vertrag beendet: <code>Employment.isActive = false</code>. Die Person wird erst stillgelegt, wenn ihr kein laufender Vertrag aus DokuBit mehr bleibt, weil er beendet oder zu einer anderen Adresse gewechselt ist — nie, weil sie in einer Lieferung fehlt. Ab dann weist das Portal Anmeldung und jede Anfrage ab (4.3). Keycloak selbst bleibt unberührt; die Anmeldung endet mit dem Dienstkonto in Microsoft. Nicht gelöscht, denn die Tickets bleiben in der Akte.</span></div>
+    <div><span class="wer">unklar</span><b>Melden, nicht raten</b><span>Ein Vertrag ohne Adresse, eine Adresse, die im Stapel bei mehreren Namen steht, eine Adresse bei mehreren Personen oder bei einer Person mit anderem Namen, eine von Hand angelegte Person oder eine aus einer anderen Quelle: Die Zeile wird <b>nicht</b> zugeordnet, sondern zur Prüfung gemeldet (Block „Zu prüfen", unten); ein bekannter Vertrag bleibt bei seiner Person. <b>Ein Zweifel verschafft nie Zugang</b> (Entscheidung vom 17.10.2026): Ein Vertragsende kommt immer an, ein laufender Vertrag wird aufgefrischt, aber nie verlängert oder entfristet, ein beendeter oder inaktiver bleibt unberührt, auch wenn die Zeile ihn wieder laufen lässt. Still falsch zuordnen ist hier der teure Fehler.</span></div>
+  </div>
+
+  <div class="kasten">
+    <p><b>Die Adresse ist die Person</b> (Entscheidung vom 17.10.2026, Begründung in E-S10). Ein
+    Personendatensatz wird nie auf einen anderen Menschen umgeschrieben. Die dienstliche Adresse,
+    getrimmt und kleingeschrieben, ist die Person; der Vertrag folgt der Adresse, die DokuBit bei ihm
+    nennt. Was das in den typischen Fällen heißt:</p>
+    <ul style="margin-bottom:0">
+      <li><b>Neue Adresse bei einem Vertrag:</b> Der laufende Vertrag wechselt zu der Person mit der
+        neuen Adresse, gibt es sie nicht, wird sie angelegt — auch dann, wenn in DokuBit die falsche
+        Zeile bearbeitet oder ein Vertragsschlüssel für einen neuen Kollegen wiederverwendet wurde.
+        Die bisherige Person wird stillgelegt, sobald ihr kein laufender Vertrag bleibt. Nach einer
+        Korrektur in DokuBit wandert der Vertrag zurück, und die Person wird wieder aktiv.</li>
+      <li><b>Heirat bei gleicher Adresse:</b> Der Name wird geändert, wenn alle laufenden Verträge der
+        Person ihn im selben Stapel nennen. Nennt ihn nur ein Teil, wird gemeldet
+        (<code>EMAIL_ANDERER_NAME</code>), der Name bleibt. Ebenso bei einem ganz anderen Namen (Vor-
+        und Nachname neu): Das ist ein anderer Mensch, kein neuer Name. <b>Restrisiko, offen:</b>
+        Vergibt DokuBit einen Vertragsschlüssel samt Postfach neu, solange der Vertrag der
+        bisherigen Person im Portal noch läuft, und teilt der neue Name Vor- oder Nachnamen mit
+        ihr, ist das von einer Heirat nicht zu unterscheiden; ist es ihr einziger laufender
+        Vertrag, bekommt ihr Datensatz den neuen Namen und bleibt aktiv (Anleitung zum
+        n8n-Ablauf, Abschnitt 4).</li>
+      <li><b>Heirat und Anschlussvertrag nach dem Ende des alten, nur mit Nachweis</b>
+        (Entscheidungen vom 17.10.2026): Hat die Person keinen laufenden Vertrag mehr, etwa weil der
+        alte gestern endete, übernimmt ein laufender Anschlussvertrag mit ihrer Adresse den neuen
+        Namen und kommt zu ihr; sie bleibt aktiv oder wird es wieder. Das gilt nur, wenn sie aus
+        DokuBit kommt (Bestand ohne Herkunft nie), der Vorname bleibt, alle Zeilen der Adresse im
+        Stapel denselben Namen tragen und als <b>Nachweis</b> die Zeile ihres alten Vertrags im
+        selben Stapel unter derselben Adresse kommt und ihn höchstens 30 Kalendertage vor heute
+        enden lässt (wie das Fenster der Abfrage) und den gespeicherten Vertragsbeginn nennt; mit
+        anderem Beginn ist der Schlüssel neu vergeben. Diese Zeile trägt dann den neuen Namen, DokuBit
+        führt ihn also auch am alten Vertrag. Sie wird in der ersten Nacht noch gemeldet, danach
+        passt der Name. Fehlt der Nachweis, bleibt es bei <code>EMAIL_ANDERER_NAME</code>, und die
+        Person bleibt unverändert und inaktiv. Das ist so, wenn die alte Zeile noch den alten Namen
+        trägt, ohne oder mit einer anderen Adresse kommt, gelöscht ist oder länger als 30 Tage
+        zurückliegt. Abhilfe: den neuen Namen in DokuBit auch am alten Vertrag eintragen, mit der
+        Adresse. Eine Nachfolgerin mit demselben Vornamen, der DokuBit das Postfach gibt, übernimmt
+        den Datensatz deshalb nicht (Anleitung zum n8n-Ablauf, Abschnitt 4).</li>
+      <li><b>Heirat mit neuer Adresse:</b> Es gibt danach zwei Datensätze. Der neue ist aktiv; der
+        alte wird inaktiv und behält Namen und Adresse. Anliegen am alten Datensatz verknüpft erst S3
+        mit dem neuen; wie, ist offen (E-S10).</li>
+      <li><b>Adresse einer ausgeschiedenen Person für einen Nachfolger</b> mit anderem Namen: Es wird
+        gemeldet (<code>EMAIL_ANDERER_NAME</code>), die ausgeschiedene Person bleibt unverändert und
+        inaktiv. Das gilt auch, wenn DokuBit ihm den Vertragsschlüssel der ausgeschiedenen Person samt
+        Postfach gibt, und auch nach mehr als 30 Tagen: Ihr beendeter Vertrag bleibt beendet, denn ein
+        Zweifel verschafft nie Zugang (Entscheidung vom 17.10.2026).</li>
+    </ul>
   </div>
 
   <div class="kasten rot">
-    <p><b>Ein Austritt wird gemeldet, nie aus dem Fehlen geschlossen.</b> Anders als beim
-    Vertragsende passt der Stamm nicht in einen Aufruf: rund 600 Personen, eine Zeile je Person und
-    Mandant, höchstens 200 Zeilen je Aufruf. Wer in einem Aufruf fehlt, steht vielleicht im
-    nächsten — oder der Lauf brach ab. Gälte Fehlen als Austritt, sperrte jeder Teillauf Hunderte
-    aus. Deshalb gilt:</p>
+    <p><b>Ein Austritt kommt aus dem Vertragsende, nie aus dem Fehlen.</b> Anders als beim
+    Vertragsende-Modul passt der Stamm nicht in einen Aufruf: 362 laufende Verträge und die
+    Vertragsenden der letzten 30 Tage, eine Zeile je Vertrag, höchstens 200 Zeilen je Aufruf. Wer in
+    einem Aufruf fehlt, steht vielleicht im nächsten — oder der Lauf brach ab. Gälte Fehlen als
+    Austritt, sperrte jeder Teillauf Hunderte aus. Deshalb gilt:</p>
     <ul style="margin-bottom:0">
-      <li><b>Die Abfrage liefert die Aktiven und die Austritte der letzten 30 Tage</b>, jede Zeile
-        mit <code>MASTATUS</code> und <code>EVTLLDA</code>. Stillgelegt wird nur auf ein Signal in
-        der Zeile selbst: einen Statuswert, der in der geschlossenen Wertliste als „ausgetreten"
-        steht (<code>src/lib/constants.ts</code>, Werte aus E-S15, mit Test). Bestätigt E-S15
-        <code>EVTLLDA</code> als letzten Arbeitstag, wartet die Stilllegung bis nach diesem Tag;
-        allein legt die Spalte niemanden still. Ein unbekannter Statuswert ändert nichts und wird
-        als Zweifelsfall gemeldet.</li>
-      <li><b>Eine Zeile gilt für eine Anstellung.</b> „Ausgetreten" setzt
-        <code>Employment.isActive = false</code> für diesen Mandanten. <code>Employee.isActive</code>
-        wird erst <code>false</code>, wenn keine aktive Anstellung bleibt — wer nur den Minijob beim
-        Förderverein beendet, behält seinen Zugang.</li>
+      <li><b>Die Abfrage liefert alle laufenden Verträge und die in den letzten 30 Tagen beendeten</b>,
+        jede Zeile mit <code>VERTRAGSENDE</code>. Das ist der letzte Arbeitstag (Auskunft des
+        Auftraggebers vom 17.10.2026). Ein Vertrag läuft, solange das Feld leer ist oder auf heute oder
+        später fällt, gerechnet in Europe/Berlin — am letzten Arbeitstag also noch, am Tag danach nicht
+        mehr. Andere Signale gibt es nicht: <code>MASTATUS</code> ist in DokuBit leer, und
+        <code>EVTLLDA</code> ist kein letzter Arbeitstag (E-S15).</li>
+      <li><b>Eine Zeile gilt für einen Vertrag.</b> Ein beendeter Vertrag setzt
+        <code>Employment.isActive = false</code> für diesen Vertrag. <code>Employee.isActive</code>
+        wird erst <code>false</code>, wenn kein Vertrag aus DokuBit mehr läuft — wer nur den Minijob
+        beim Förderverein beendet, behält seinen Zugang. Anstellungen aus dem Bestand ohne
+        Vertragsschlüssel zählen dafür nicht; sonst bliebe ein Ausgeschiedener über eine alte
+        Anstellung für immer aktiv.</li>
       <li><b>Jeder Stapel ist für sich gültig und wiederholbar.</b> Ein halber, abgebrochener oder
         leerer Lauf legt niemanden still; er lässt nur Anlegen und Auffrischen unvollständig, und
-        der nächste Lauf holt es nach. Derselbe Stapel zweimal ändert nichts.</li>
-      <li><b>Wer wieder als aktiv kommt, wird wieder aktiv.</b> Eine irrtümliche Stilllegung heilt
-        der nächste Lauf. Wer nur als ausgetreten kommt und dem Portal unbekannt ist, wird nicht
-        angelegt.</li>
+        der nächste Lauf holt es nach. Derselbe Stapel zweimal ändert nichts außer dem Zeitpunkt der
+        letzten Lieferung (<code>lastSyncAt</code>). n8n hält alle Zeilen derselben Adresse,
+        desselben Vertragsschlüssels und desselben Namens im selben Stapel.</li>
+      <li><b>Wer wieder einen laufenden Vertrag hat, wird wieder aktiv.</b> Eine irrtümliche
+        Stilllegung heilt der nächste Lauf. Verlängerung oder Entfristung kommen in DokuBit als neue
+        Zeile und damit als neuer Vertrag. Ein beendeter Vertrag, den das Portal nicht kennt, wird
+        nicht angelegt.</li>
     </ul>
   </div>
 
@@ -1043,15 +1126,20 @@ ul.zwei-spalten li { break-inside: avoid; }
     ausgebliebener Lauf trotzdem auffallen, hält das Portal sie selbst fest — ohne neues Modell:</p>
     <ul style="margin-bottom:0">
       <li><b>Jeder Aufruf schreibt einen Protokolleintrag:</b> <code>AuditLog</code> mit
-        <code>processType = "PERSONALSTAMM"</code>, darin die Zahlen angelegt, aufgefrischt,
-        stillgelegt, Fehler und Zweifelsfall, dazu jeder Fehler und Zweifelsfall als
-        <code>MANR</code> (fehlt sie: die dienstliche Adresse) mit Grundcode, etwa
-        <code>MANDANT_UNBEKANNT</code>, <code>EMAIL_MEHRDEUTIG</code>, <code>STATUS_UNBEKANNT</code>,
-        <code>GRUPPE_UNBEKANNT</code> oder <code>MANUELLER_DATENSATZ</code>. Keine Namen.</li>
+        <code>processType = "PERSONALSTAMM"</code> und <code>action = "PERSONALSTAMM_LAUF"</code>,
+        darin die Zahlen angelegt, aktualisiert, unverändert, übersprungen, stillgelegt, reaktiviert,
+        Zweifelsfall und Fehler, dazu jeder Fehler und Zweifelsfall als Vertragsschlüssel
+        (Mandant|Abrechnungskreis|<code>MANR</code>; bei einer unlesbaren Zeile deren Nummer) mit
+        Grundcode, etwa <code>MANDANT_UNBEKANNT</code>, <code>MAIL_FEHLT</code>,
+        <code>EMAIL_MEHRDEUTIG</code>, <code>EMAIL_ANDERER_NAME</code> oder
+        <code>MANUELLER_DATENSATZ</code>. Keine Namen und keine Adressen. Übernahme einer
+        Bestandsperson, Namensänderung, Wechsel eines Vertrags zu einer anderen Person
+        (Vertragsschlüssel und beide Personenkennungen), Stilllegen und Reaktivieren schreiben je einen
+        eigenen Eintrag, ebenfalls ohne Namen und Adressen. Gelöscht wird nach einem Jahr (12.3).</li>
       <li><b>Die Leseansicht „Personen" zeigt einen Block „Zu prüfen"</b> mit drei Gruppen:
         aktive DokuBit-Personen, die seit mehr als 26 Stunden nicht geliefert wurden
-        (<code>lastSyncAt</code>); die Fehler und Zweifelsfälle der letzten 24 Stunden, je Person
-        einmal; die abgewiesenen Anmeldungen (<code>ANMELDUNG_ABGEWIESEN</code>) der letzten 14 Tage,
+        (<code>lastSyncAt</code>); die Fehler und Zweifelsfälle der letzten 24 Stunden, je Vertrag
+        und Grundcode einmal; die abgewiesenen Anmeldungen (<code>ANMELDUNG_ABGEWIESEN</code>) der letzten 14 Tage,
         je Adresse zusammengefasst (11.1). Behoben wird an der
         Quelle, meist in DokuBit — eine Zuordnung von Hand gibt es weiterhin nicht. Der nächste
         Lauf räumt den Eintrag von selbst ab. Die erste Gruppe ist zugleich die
@@ -1066,43 +1154,63 @@ ul.zwei-spalten li { break-inside: avoid; }
   </div>
 
   <div class="kasten">
-    <p><b>Eine Lücke, die der Vertragsende-Webhook offen benennt und die hier wiederkommt:</b>
-    „DokuBit liefert nicht immer beides" — also nicht immer Personalnummer <i>und</i> E-Mail.
-    Deshalb fährt die bestehende Route eine Kette: Personalnummer, sonst E-Mail (ohne Rücksicht auf
-    Groß- und Kleinschreibung), sonst Vor- und Nachname. Für den Stammabgleich wird dieselbe Kette
-    verwendet — <b>mit einem Unterschied</b>: Die Namensstufe darf anlegen, aber nicht
-    <i>zusammenführen</i>. Zwei Personen mit gleichem Namen in derselben Einrichtung sind selten,
-    aber wenn es sie gibt, wäre eine automatische Zusammenführung ein Datenschutzvorfall, nicht ein
-    Schönheitsfehler.</p>
+    <p><b>Eine Lücke, die der Vertragsende-Webhook offen benennt — und warum der Stammabgleich sie
+    anders schließt:</b> „DokuBit liefert nicht immer beides" — also nicht immer Personalnummer
+    <i>und</i> E-Mail. Deshalb fährt die bestehende Route eine Kette: Personalnummer, sonst E-Mail
+    (ohne Rücksicht auf Groß- und Kleinschreibung), sonst Vor- und Nachname. Für den Stammabgleich
+    taugt diese Kette nicht, weil die <code>MANR</code> allein keine Person bezeichnet (oben). Er
+    erkennt den Vertrag an Mandant, Abrechnungskreis und <code>MANR</code> und die Person an der
+    dienstlichen Adresse — und an nichts sonst: Ein neuer Vertrag ohne Adresse wird gemeldet
+    (<code>MAIL_FEHLT</code>), nicht angelegt, und über den Namen wird weder angelegt noch
+    zusammengeführt. Heute haben alle laufenden Verträge eine Adresse. Zwei Personen mit gleichem
+    Namen in derselben Einrichtung sind selten, aber wenn es sie gibt, wäre eine automatische
+    Zusammenführung ein Datenschutzvorfall, nicht ein Schönheitsfehler.</p>
   </div>
 
   <div class="kasten gelb">
-    <p><b>Was für die neue Abfrage noch zu klären ist</b> (E-S15). Die bestehende filtert auf
-    <code>VERTRAGSENDE</code> in 1 bis 12 Monaten — für den Stamm braucht es stattdessen einen
-    Filter auf „aktiv beschäftigt oder in den letzten 30 Tagen ausgetreten", und dafür fehlen
-    vier Angaben; die fünfte (Werte von <code>BESCHAEFTIGUNGSGRUPPE</code>) und die Frage, ob
-    <code>MANR</code> mehrfach vorkommt, stehen in E-S15:</p>
+    <p><b>Was die Abfragen vom 17.10.2026 ergeben haben</b> (E-S10, E-S15; vom Auftraggeber
+    bestätigt). Die bestehende Abfrage filtert auf <code>VERTRAGSENDE</code> in 1 bis 12 Monaten; für
+    den Stamm fehlten fünf Angaben. Sie liegen jetzt vor:</p>
     <ul style="margin-bottom:0">
-      <li><b>Welche Werte stehen in <code>MASTATUS</code>?</b> Daraus entsteht die geschlossene
-        Wertliste, die „aktiv" von „ausgetreten" trennt — und damit der Filter und der
-        Sperrzeitpunkt. Ein Zugang, der erst drei Wochen nach dem letzten Arbeitstag zugeht, ist ein
-        Befund für die nächste Innenrevision. Kommt kein Wert für „ausgetreten" vor, führt DokuBit
-        Ausgetretene nicht; dann ist die Austrittsregel vor S0 neu zu entscheiden, nicht beim Bau.</li>
-      <li><b>Welche Werte stehen in <code>BESCHAEFTIGUNGSGRUPPE</code>?</b> Daraus entsteht die
-        Wertliste für <code>Employment.beschaeftigungsgruppe</code> und für die Anlässe der
-        Arbeitsbefreiung (6.2, 11.1).</li>
-      <li><b>Was bedeutet <code>EVTLLDA</code>?</b> Die Abfrage holt die Spalte, das Portal nimmt sie
-        als Datum entgegen — wenn das der letzte Arbeitstag ist, wäre sie der sauberere
-        Sperrzeitpunkt als ein Statuswert.</li>
-      <li><b>Ist <code>MAEMAIL</code> immer gefüllt und immer die Microsoft-365-Adresse?</b> Daran
-        hängt die Zuordnung sowohl der Anmeldung als auch der eingehenden E-Mails (Abschnitt 10).
-        Für den <b>Zugang</b> braucht es keine private Adresse — nach Auskunft des Auftraggebers
-        vom 16.10.2026 haben alle Beschäftigten ohne Ausnahme ein Microsoft-365-Konto; die Abfrage
-        bestätigt das zugleich. <b>Für den Kontakt nach dem Austritt</b> aber schon: Wer ein Zeugnis
-        oder eine Bescheinigung anfordert, nachdem das Dienstkonto gelöscht ist, erreicht ein
-        Magic Link nur noch an eine private Adresse (E-S6). <code>Employee.privateEmail</code>
-        existiert im Schema; sie wird beim Austritt im Offboarding erfragt, nicht vorher.</li>
+      <li><b>Welche Werte stehen in <code>MASTATUS</code>?</b> Keine — die Spalte ist in allen Zeilen
+        leer. Damit trat der vorhergesehene Fall ein, und die Austrittsregel war vor S0 neu zu
+        entscheiden: Ob ein Vertrag läuft, sagt <code>VERTRAGSENDE</code>, der letzte Arbeitstag
+        (oben).</li>
+      <li><b>Kommt <code>MANR</code> mehrfach vor?</b> Ja, aber anders als angenommen: Eine Zeile ist
+        ein Vertrag, eindeutig über Mandant, Abrechnungskreis und <code>MANR</code>; die
+        <code>MANR</code> allein bezeichnet keine Person (E-S10). Mehrfachbeschäftigung gibt es:
+        18 Personen haben mehrere laufende Verträge (E-S11).</li>
+      <li><b>Was bedeutet <code>EVTLLDA</code>?</b> Jedenfalls nicht den letzten Arbeitstag: 219 von
+        265 Werten liegen vor dem Vertragsbeginn. Die Bedeutung klärt die Personalabteilung; S0
+        nutzt und übernimmt die Spalte nicht. Das 30-Tage-Fenster der Abfrage misst
+        <code>VERTRAGSENDE</code>.</li>
+      <li><b>Ist <code>MAEMAIL</code> immer gefüllt und immer die Microsoft-365-Adresse?</b> Gefüllt
+        ist sie bei allen laufenden Verträgen, mit den Domänen <code>fes-minden.de</code>,
+        <code>cfh-minden.de</code>, <code>mvs-minden.de</code> und <code>fes-credo.de</code>. Fünf
+        Personen haben eine andere Domäne, vermutlich eine private Adresse. Eine Adresse steht bei
+        zwei Namen — der Abgleich ordnet keine dieser Zeilen zu, auch nicht die erste, und meldet sie
+        als Zweifelsfall (<code>EMAIL_ANDERER_NAME</code>); das geht, weil alle Zeilen einer Adresse im
+        selben Stapel liegen —, und
+        fünf Namen haben je zwei Adressen; sie ergeben je zwei Personen, weil über den Namen nie
+        zusammengeführt wird. Die fünf fremden Adressen und die doppelt belegte werden vor dem ersten
+        Produktivlauf in DokuBit bereinigt (13). Offen bleibt der Abgleich gegen eine Benutzerliste
+        aus Entra ID; er ist erst für S2 und S3b nötig. Für den <b>Zugang</b> braucht es keine
+        private Adresse — nach Auskunft des Auftraggebers vom 16.10.2026 haben alle Beschäftigten
+        ohne Ausnahme ein Microsoft-365-Konto. <b>Für den Kontakt nach dem Austritt</b> aber schon:
+        Wer ein Zeugnis oder eine Bescheinigung anfordert, nachdem das Dienstkonto gelöscht ist,
+        erreicht ein Magic Link nur noch an eine private Adresse (E-S6).
+        <code>Employee.privateEmail</code> existiert im Schema; sie wird beim Austritt im Offboarding
+        erfragt, nicht vorher.</li>
+      <li><b>Welche Werte stehen in <code>BESCHAEFTIGUNGSGRUPPE</code>?</b> Keine — die Spalte ist
+        leer, ebenso <code>MAPOSITION</code>. Die Wertliste und die Spalte
+        <code>Employment.beschaeftigungsgruppe</code> entfallen (11.1); woher die Gruppe für die
+        Anlässe der Arbeitsbefreiung kommt, ist offen für S4 (6.2).</li>
     </ul>
+    <p style="margin-top:8px"><b>Die Zahlen:</b> 1.257 Zeilen, beendete Verträge eingeschlossen;
+    <b>343 Personen mit 362 laufenden Verträgen</b>, vom Auftraggeber bestätigt. Die bisher in
+    diesem Plan genannten „rund 600 Beschäftigten" waren eine Schätzung; belegt sind die 343 Personen
+    mit laufendem Vertrag. Alle 16 Mandantennummern der laufenden Verträge sind im Portal angelegt
+    (712, 719, 721, 728, 734, 735, 736, 737, 742, 743, 747, 764, 766, 767, 768, 769).</p>
   </div>
 
   <h3>5.2 · Drei Wege zum Zugang</h3>
@@ -1153,7 +1261,7 @@ ul.zwei-spalten li { break-inside: avoid; }
   <div class="ablauf" style="grid-template-columns:repeat(4,1fr)">
     <div><span class="wer">Eintritt</span><b>Nichts zu tun</b><span>Mit dem Dienstkonto steht der Zugang. Das Portal kennt die Person schon aus dem nächtlichen Abgleich — es wartet nur auf die erste Anmeldung. Keine Einladung, kein Erstpasswort, kein Checklistenpunkt.</span></div>
     <div><span class="wer">Laufend</span><b>Nutzen</b><span>Passwort, Zurücksetzen und zweiter Faktor liegen vollständig bei der Microsoft-Anmeldung. Weder Portal noch Personalabteilung werden damit behelligt.</span></div>
-    <div><span class="wer">Austritt</span><b>Doppelt gesichert</b><span>Mit dem Dienstkonto endet jede neue Anmeldung — das Portal nimmt Beschäftigte nur über Microsoft an. Zusätzlich stellt der Abgleich die Person still, sobald DokuBit sie ausdrücklich als ausgetreten meldet — nie, weil sie in einer Lieferung fehlt (5.1); ab dann weist das Portal jede Anfrage ab. Keycloak selbst wird dabei nicht angefasst. Offene Tickets bleiben für die Akte erhalten.</span></div>
+    <div><span class="wer">Austritt</span><b>Doppelt gesichert</b><span>Mit dem Dienstkonto endet jede neue Anmeldung — das Portal nimmt Beschäftigte nur über Microsoft an. Zusätzlich stellt der Abgleich die Person still, sobald keiner ihrer Verträge in DokuBit mehr läuft — am Tag nach dem letzten Arbeitstag, nie, weil sie in einer Lieferung fehlt (5.1); ab dann weist das Portal jede Anfrage ab. Keycloak selbst wird dabei nicht angefasst. Offene Tickets bleiben für die Akte erhalten.</span></div>
     <div class="spaeter"><span class="wer">Später</span><b>Aufräumen</b><span>Tickets und Nachweise nach Ablauf der Aufbewahrungsfrist löschen — über den Zeitplaner, zusammen mit den übrigen Löschfristen.</span></div>
   </div>
 
@@ -1354,12 +1462,15 @@ ul.zwei-spalten li { break-inside: avoid; }
       Anspruch steht fest), manche brauchen die Schulleitung (Ermessensfälle), manche die
       Geschäftsführung (unbezahlter Sonderurlaub über Monate). Je Anlass hinterlegt, nicht pauschal
       je Mandant.</li>
-    <li><b>Für wen es gilt</b> — je Anlass eine Liste von <b>Beschäftigungsgruppen</b> (Werte aus
-      DokuBit <code>BESCHAEFTIGUNGSGRUPPE</code>, leer = alle), denn ein Ehrenamtlicher hat keinen
-      Anspruch auf tarifliche Arbeitsbefreiung. Verglichen wird mit
-      <code>Employment.beschaeftigungsgruppe</code> der Anstellung (11.1); eine Anstellung ohne Wert
-      sieht nur Anlässe ohne Liste. Eine Umrechnung nach Wochenarbeitstagen, falls ein Regelwerk
-      sie verlangt, kommt erst mit Welle 2 (6.3).</li>
+    <li><b>Für wen es gilt</b> — je Anlass eine Liste von <b>Beschäftigungsgruppen</b> (leer = alle),
+      denn ein Ehrenamtlicher hat keinen Anspruch auf tarifliche Arbeitsbefreiung. Verglichen wird
+      mit der Gruppe der Anstellung; eine Anstellung ohne Wert sieht nur Anlässe ohne Liste. Eine
+      Umrechnung nach Wochenarbeitstagen, falls ein Regelwerk sie verlangt, kommt erst mit Welle 2
+      (6.3). <b>Offen für S4 (Befund vom 17.10.2026):</b> Vorgesehen war die DokuBit-Spalte
+      <code>BESCHAEFTIGUNGSGRUPPE</code>, gespeichert als <code>Employment.beschaeftigungsgruppe</code>.
+      Die Spalte ist in DokuBit in allen Zeilen leer, das Feld entfällt (5.1, 11.1). Woher die Gruppe
+      einer Anstellung kommt, ist vor S4 zu klären — bis dahin hätte keine Anstellung einen Wert, und
+      jede sähe nur Anlässe ohne Liste.</li>
   </ul>
 
   <h4>Wie das Regelwerk gefunden wird</h4>
@@ -3730,7 +3841,8 @@ ul.zwei-spalten li { break-inside: avoid; }
     Modelle Felder — alle nullbar, mit Vorgabewert oder als Liste, also rein additiv und für
     <code>db push --accept-data-loss</code> unbedenklich:</p>
   <pre>model Employee {
-  // ... bestehende Felder
+  // ... bestehende Felder; personalNumber (@unique) bleibt die LOGA-Nummer,
+  // der Stammabgleich liest und schreibt sie nicht (5.1)
   keycloakSub String?    @unique   // unveränderliche Kennung aus Keycloak (sub)
   anliegen    Anliegen[]
 }
@@ -3753,10 +3865,13 @@ model Organization {
 }
 
 model Employment {
-  // ... bestehende Felder
-  beschaeftigungsgruppe   String? // DokuBit BESCHAEFTIGUNGSGRUPPE, Rohwert; Wertliste BESCHAEFTIGUNGSGRUPPEN (5.1)
+  // ... bestehende Felder, darunter mandantNumber
+  // Stammabgleich (S0): eine Zeile je DokuBit-Vertrag; gesetzt = vom Abgleich verwaltet (5.1)
+  abrechnungskreis        String? // DokuBit ABRECHNUNGSKREIS
+  personalNumber          String? // DokuBit MANR, je Mandant und Abrechnungskreis vergeben
   sonderurlaubRegelwerkId String?
   sonderurlaubRegelwerk   SonderurlaubRegelwerk? @relation(fields: [sonderurlaubRegelwerkId], references: [id])
+  @@unique([mandantNumber, abrechnungskreis, personalNumber], map: "employments_dokubit_vertrag_key")
 }
 
 model AuditLog {
@@ -3771,19 +3886,26 @@ model AuditLog {
 }</pre>
 
   <div class="kasten">
-    <p><b>Warum ein eigenes Feld <code>beschaeftigungsgruppe</code>?</b> Zwei vorhandene Felder
-    liegen nahe, und beide passen nicht. Das Enum <code>Personalgruppe</code>
-    (<code>prisma/schema.prisma:3610</code>: <code>TARIF_TV_L</code>, <code>BEAMTER</code>,
-    <code>PLANSTELLENINHABER</code>) steuert Mutterschutz und Elternzeit und kennt weder Minijob
-    noch Ehrenamt; es wird hier <b>nicht</b> verwendet. <code>Employment.contractType</code>
-    (<code>:201</code>) mischt Befristung und Gruppe. Deshalb steht der DokuBit-Wert roh an der
-    Anstellung — je Mandant, weil DokuBit eine Zeile je Person und Mandant führt. Die Wertliste
-    <code>BESCHAEFTIGUNGSGRUPPEN</code> steht in <code>src/lib/constants.ts</code> und kommt aus
-    der fünften Abfrage in E-S15. Die Pflegemaske 9.9 nimmt für einen Anlass nur Werte aus dieser
-    Liste an, und der Filter ist derselbe wie bei der Ausstattung — leere Liste = alle
-    (<code>src/lib/ausstattung.ts:1028</code> und <code>:1082</code>). Ein Wert aus DokuBit, der
-    nicht in der Liste steht, wird trotzdem gespeichert und als Zweifelsfall
-    <code>GRUPPE_UNBEKANNT</code> gemeldet (5.1).</p>
+    <p><b>Warum der Schlüssel an der Anstellung steht und nicht an <code>Employee</code>.</b> Eine
+    DokuBit-Zeile ist ein Vertrag, eindeutig erst über Mandant, Abrechnungskreis und
+    <code>MANR</code>; die <code>MANR</code> allein steht in 222 Fällen für verschiedene Menschen, und
+    221 Menschen haben mehrere (5.1, E-S10). An <code>Employee.personalNumber</code> — global
+    eindeutig und heute mit der LOGA-Nummer belegt — ließe sich das nicht abbilden: Entweder scheiterte
+    die Eindeutigkeit, oder verschiedene Menschen würden zu einer Person. Deshalb tragen die zwei neuen
+    Spalten an <code>Employment</code> den Vertrag, abgesichert durch
+    <code>@@unique([mandantNumber, abrechnungskreis, personalNumber])</code>. Sind beide gesetzt, ist
+    die Anstellung vom Abgleich verwaltet; Anstellungen aus dem Bestand haben dort null. PostgreSQL
+    wertet null in einem eindeutigen Index als verschieden; deshalb berührt der Index den Bestand
+    nicht, und <code>db push</code> legt ihn an, ohne an vorhandenen Zeilen zu scheitern.</p>
+    <p><b>Entfallen: <code>Employment.beschaeftigungsgruppe</code>.</b> Die Spalte
+    <code>BESCHAEFTIGUNGSGRUPPE</code> ist in DokuBit in allen Zeilen leer; damit gibt es weder das
+    Feld noch die Wertliste <code>BESCHAEFTIGUNGSGRUPPEN</code> noch den Grundcode
+    <code>GRUPPE_UNBEKANNT</code>. Die Überlegung dazu bleibt für S4 gültig: Das Enum
+    <code>Personalgruppe</code> (<code>prisma/schema.prisma</code>: <code>TARIF_TV_L</code>,
+    <code>BEAMTER</code>, <code>PLANSTELLENINHABER</code>) steuert Mutterschutz und Elternzeit und
+    kennt weder Minijob noch Ehrenamt; <code>Employment.contractType</code> (<code>:201</code>) mischt
+    Befristung und Gruppe. Woher die Gruppe für die Anlässe der Arbeitsbefreiung kommt, ist offen für
+    S4 (6.2).</p>
   </div>
 
   <div class="kasten">
@@ -3826,7 +3948,14 @@ model AuditLog {
     <code>AuditLog</code>-Eintrag <code>ANMELDUNG_ABGEWIESEN</code> mit Adresse, Zeitpunkt und
     Fehlerkennung geschrieben (<code>userId = null</code>), die Ansicht fasst sie je Adresse
     zusammen. Keine Mail je Versuch, so flutet ein wiederholter Versuch kein Postfach. Wie oft
-    DokuBit und Entra ID in der Schreibweise abweichen, zeigt die vierte Abfrage aus E-S15.</p>
+    DokuBit und Entra ID in der Schreibweise abweichen, zeigt erst der Abgleich der Adressen gegen
+    eine Benutzerliste aus Entra ID; er steht nach den DokuBit-Abfragen noch aus (E-S15).</p>
+    <p><b>Offen vor S2, Folge aus E-S10:</b> Nach einer Heirat mit neuer Adresse führt der Abgleich
+    zwei Datensätze, der alte ist inaktiv (5.1). Das Konto in Entra ID und damit in Keycloak bleibt
+    dasselbe, der <code>sub</code> hängt also am alten Datensatz. Die nächste Anmeldung wird
+    abgewiesen, weil die Person nicht aktiv ist, und erscheint unter „Zu prüfen". Ob und unter
+    welcher Bedingung der <code>sub</code> auf den neuen Datensatz übergeht, ist vor S2 zu
+    entscheiden; nach der Regel oben wird ein vorhandener <code>sub</code> nie überschrieben.</p>
   </div>
 
   <h3>11.2 · Das Anliegen selbst</h3>
@@ -4228,7 +4357,7 @@ model SonderurlaubAnlass {
   nachweisText    String?
   nachweisPflicht Boolean @default(false)
   genehmigungsweg String  @default("NUR_HR") // "NUR_HR" | "LEITUNG" — Wertliste mit Test; "GESCHAEFTSFUEHRUNG" erst mit Welle 2 (E-S13)
-  beschaeftigungsgruppen String[] @default([]) // Werte aus BESCHAEFTIGUNGSGRUPPEN (11.1); leer = alle
+  beschaeftigungsgruppen String[] @default([]) // Quelle der Gruppen offen, vor S4 zu klären (6.2); leer = alle
   rechtsgrundlage String?
   hinweis         String?
   besondereKategorie Boolean @default(false) // Art. 9 (Erkrankung, Gewerkschaft): setzt beim Anlegen Anliegen.zugriffBeschraenkt (11.3)
@@ -4438,7 +4567,7 @@ model SonderurlaubAnlass {
     Haus schon gegangen worden — dort liegen die Zustimmungen von Datenschutzbeauftragtem und MAV
     vom 14.10.2026 vor. Dasselbe Verfahren hier, und zwar <b>vor dem ersten Paket, das
     Beschäftigtendaten verarbeitet — also vor S0</b>. Die Pflicht löst nicht der Zugang aus, sondern
-    die Verarbeitung, und die beginnt mit dem Abgleich des Stamms aller rund 600 Beschäftigten.
+    die Verarbeitung, und die beginnt mit dem Abgleich des Stamms aller 343 Beschäftigten (5.1).
     Einzig S1 kann davor laufen: Es stellt nur die Anmeldung des HR-Teams um und verarbeitet keine
     neuen Beschäftigtendaten.</p>
     <p><b>Stand 17.10.2026: Die Zustimmungen sind erteilt.</b> Personalabteilung,
@@ -4464,7 +4593,8 @@ model SonderurlaubAnlass {
     Vorabprüfung ist trotzdem festzuhalten. Die Beteiligung der MAV aus 12.2 wird dabei als
     Einholung des Standpunkts der Betroffenen nach Art. 35 Abs. 9 dokumentiert.</p>
     <p><b>Stand 17.10.2026:</b> Der Datenschutzbeauftragte hat dem Plan zugestimmt. Mit ihm offen
-    bleiben E-S27 (vor S0) und E-S28 mit der Löschtabelle (vor S3); die gezeichnete Vorabprüfung
+    bleiben E-S27 (vor S0), die Bestätigung der Löschfrist für die Protokolle des Stammabgleichs
+    (vor dem ersten Produktivlauf von S0) und E-S28 mit der Löschtabelle (vor S3); die gezeichnete Vorabprüfung
     wird hier vermerkt, sobald sie vorliegt.</p>
   </div>
 
@@ -4562,6 +4692,7 @@ model SonderurlaubAnlass {
     <tr><td>Auskunft und Betroffenenrechte</td><td>3 Jahre nach Abschluss</td><td>Nachweis der Erfüllung</td></tr>
     <tr><td>Verworfene Tickets (<code>abschlussGrund = "VERWORFEN"</code>, 9.10)</td><td>90 Tage nach Abschluss</td><td>kein Zweck über die Sichtung hinaus</td></tr>
     <tr><td>Keycloak-Anmelde- und Verwaltungsereignisse</td><td>90 Tage</td><td>Nachweis bei einem Vorfall (4.5)</td></tr>
+    <tr><td>Protokolleinträge des Stammabgleichs (<code>AuditLog</code> mit <code>processType = "PERSONALSTAMM"</code>, 5.1)</td><td>1 Jahr nach dem Eintrag</td><td>Entscheidung vom 17.10.2026, mit dem DSB zu bestätigen: Fehler und Zweifelsfälle des Abgleichs nachvollziehen. Die Einträge tragen Vertragsschlüssel und Kennungen der Personen, keine Namen und keine Adressen. Gelöscht vom Lauf „Wartung" im Zeitplaner (<code>src/lib/laeufe/wartung.ts</code>); der Probelauf zählt nur.</td></tr>
     <tr><td>Postfachordner „Aussortiert" (Automatik-Mails und verworfene Nachrichten, 9.10)</td><td>90 Tage nach Eingang</td><td>kein Zweck über die Sichtung hinaus</td></tr>
     <tr><td><b>Postfachordner „Übernommen" und „Nicht verarbeitet"</b></td><td>wie das zugehörige Anliegen</td><td>Ohne diese Frist wäre jede Löschung im Portal wirkungslos — die Mail läge im Postfach weiter</td></tr>
     <tr><td>Chronik (<code>AuditLog</code> des Anliegens)</td><td>wie das zugehörige Anliegen</td><td>Sie ist Teil des Vorgangs; danach bleibt nur ein Löschnachweis ohne Inhalt</td></tr>
@@ -4651,7 +4782,7 @@ model SonderurlaubAnlass {
 
   <h3>12.5 · Barrierefreiheit</h3>
 
-  <p>Das Mitarbeiterportal richtet sich erstmals an alle rund 600 Beschäftigten, und die haben keine
+  <p>Das Mitarbeiterportal richtet sich erstmals an alle rund 340 Beschäftigten, und die haben keine
     Wahl, welches Werkzeug sie benutzen. Zielniveau ist <b>WCAG 2.1 AA</b> für <b>jede Seite, die
     Beschäftigte oder Schulleitungen sehen</b>: die Masken 9.2 bis 9.5 samt Zusammenfassung,
     Bestätigungsseite und Detailseite, die Fehlerseite der Anmeldung (9.1), die Genehmigungsseite
@@ -4700,7 +4831,7 @@ model SonderurlaubAnlass {
     <tr>
       <td><b>S0</b></td>
       <td><b>Zustimmung von Datenschutzbeauftragtem und MAV</b><br><span class="pill gruen" style="margin-top:3px">erteilt am 17.10.2026</span></td>
-      <td>Mit S0 beginnt die Verarbeitung der Daten aller rund 600 Beschäftigten; eine
+      <td>Mit S0 beginnt die Verarbeitung der Daten aller 343 Beschäftigten (5.1); eine
         mitbestimmungspflichtige Maßnahme ohne Beteiligung wäre unwirksam (12.2). Nur S1 darf
         vorher laufen, weil es keine neuen Beschäftigtendaten verarbeitet. Vor S0 außerdem offen: E-S25 (für die
         drei GmbHs ggf. statt der MAV ein Betriebsrat) und E-S27 (DSG-EKD oder BDSG), beide mit dem
@@ -4763,39 +4894,150 @@ model SonderurlaubAnlass {
       <td><b>Personalstamm aus DokuBit</b><br><span class="pill gruen" style="margin-top:3px">Muster steht</span></td>
       <td>Ein zweiter Webhook nach dem Bauplan des Vertragsende-Empfängers:
         <code>POST /api/webhooks/personalstamm</code>, Bearer <code>PERSONALSTAMM_SECRET</code> (eigenes
-        Geheimnis, nicht der Cron-Schlüssel, 5.1), Stapel bis 200, Zod-Schema mit
-        <code>.strip()</code>, Eintragsfehler brechen den Stapel nicht ab. Dazu ein n8n-Ablauf, der die
-        aktiven Beschäftigten und die Austritte der letzten 30 Tage abfragt (5.1), mit abgeschalteter
-        Speicherung erfolgreicher Ausführungen, und die Abgleichlogik: anlegen, auffrischen,
-        stilllegen — <b>nur ausdrücklich und je Anstellung, nie aus dem Fehlen in einer
-        Lieferung</b> —, Zweifelsfälle melden. <code>importedAt</code> nur beim Anlegen, jeder Lauf
-        schreibt <code>lastSyncAt</code>. Personen mit <code>importSource</code> „MANUELL" werden nicht
-        überschrieben, sondern gemeldet; Altbestand ohne <code>importSource</code> übernimmt der erste
-        Lauf, wenn er ihn über Personalnummer oder eindeutige E-Mail trifft — die Namensstufe führt nie
-        zusammen. Eine geänderte E-Mail-Adresse wird übernommen und mit altem und neuem Wert
-        protokolliert. Dazu das Feld <code>Employment.beschaeftigungsgruppe</code> und die Wertlisten
-        für <code>MASTATUS</code> und <code>BESCHAEFTIGUNGSGRUPPE</code> in
-        <code>src/lib/constants.ts</code> (E-S15). Jeder Aufruf schreibt einen Protokolleintrag
-        <code>PERSONALSTAMM</code> mit Zahlen, <code>MANR</code> und Grundcode, ohne Namen. Eine
-        schlichte Leseansicht „Personen" — eine Maske auf das vorhandene <code>GET
-        /api/employees</code> und eine schmale Leseroute für den Block „Zu prüfen" (Protokolleinträge
-        <code>PERSONALSTAMM</code> und <code>ANMELDUNG_ABGEWIESEN</code>, <code>lastSyncAt</code>),
-        freigegeben für dieselben Rollen — mit dem Block „Zu prüfen" (Zweifelsfälle, ab S1/S2
-        auch abgewiesene Anmeldungen) und einer Hinweiszeile, rot, solange aktive Personen seit mehr
-        als 26 Stunden nicht geliefert wurden; beides wird beim Laden berechnet. <b>Keine Zuordnung
-        von Hand.</b> Ergänzend: <code>employeeId</code> beim Abschluss eines Onboardings setzen.
-        <br><b>Tests:</b> <code>personalstamm-abgleich.test.ts</code> — anlegen, auffrischen,
-        stilllegen, Zweifelsfall; leere Felder löschen nichts; „MANUELL" bleibt; Altbestand wird über
-        die Personalnummer übernommen; ein Stapel ohne eine Person, ein leerer Lauf und eine Zeile mit
-        Formatfehler legen niemanden still; derselbe Stapel zweimal ändert nichts; ein unbekannter
-        Statuswert wird gemeldet; ein Austritt bei einem von zwei Mandanten lässt die Person aktiv;
-        eine Adressänderung wird protokolliert. <code>personalstamm-webhook.test.ts</code> nach dem
-        Vorbild von <code>contract-end-webhook.test.ts</code> — 401 ohne, mit falschem Bearer und mit
-        <code>CRON_SECRET</code>, 400 bei leerem oder zu großem Stapel, eine kaputte Zeile bricht den
-        Stapel nicht ab.
-        <br><b>Rücknahme:</b> n8n-Ablauf ausschalten. Angelegte Personen bleiben und sind an
-        <code>importSource = "DOKUBIT"</code> erkennbar; eine irrtümliche Stilllegung heilt der nächste
-        Lauf, sobald DokuBit die Person wieder als aktiv führt.</td>
+        Geheimnis von mindestens 24 Zeichen, nicht der Cron-Schlüssel, verglichen mit
+        <code>gleichZeitkonstant</code>, 5.1), ein Eintrag oder ein Stapel bis 200, Zod-Schema mit
+        <code>.strip()</code>, das Zahlen und Text gleichermaßen annimmt; Eintragsfehler brechen den
+        Stapel nicht ab, die Antwort ist HTTP 200 mit dem Ergebnis je Zeile, ohne Namen und Adressen.
+        Dazu ein n8n-Ablauf, täglich um 02:30, der alle laufenden Verträge und die in den letzten 30
+        Tagen beendeten abfragt — neun feste Spalten, Zeilen derselben Adresse, desselben
+        Vertragsschlüssels und desselben Namens im selben Stapel, ein Stapel
+        nach dem anderen (Schleife „Loop Over Items"; die Option „Batching" wartet nicht auf die
+        Antwort), ohne Speicherung erfolgreicher Ausführungen (Abfrage und Einrichtung in
+        <code>docs/module/selfservice/s0-personalstamm-n8n.md</code>). Die Abgleichlogik
+        (<code>src/lib/personalstamm/abgleich.ts</code>): <b>je DokuBit-Vertrag genau eine
+        <code>Employment</code>-Zeile</b>, Schlüssel Mandant + Abrechnungskreis + <code>MANR</code> in
+        den neuen Spalten <code>Employment.abrechnungskreis</code> und
+        <code>Employment.personalNumber</code> mit <code>@@unique</code> (11.1); <b>die Person über die
+        dienstliche Adresse</b>; <code>Employee.personalNumber</code> (LOGA) wird weder gelesen noch
+        geschrieben. Ein Vertrag läuft, solange <code>VERTRAGSENDE</code> leer ist oder heute oder
+        später liegt (Europe/Berlin); die Person ist aktiv, solange einer ihrer Verträge aus DokuBit
+        läuft — <b>stillgelegt wird nur über das Vertragsende, nie aus dem Fehlen in einer
+        Lieferung</b>. <code>VERTRAGSENDE</code> überschreibt auch mit leerem Wert; sonst löschen leere
+        Felder nichts. <code>importedAt</code> nur beim Anlegen, jeder Lauf schreibt
+        <code>lastSyncAt</code>. Personen mit <code>importSource</code> „MANUELL" oder aus einer anderen
+        Quelle werden nicht überschrieben, sondern gemeldet, auch wenn schon ein bekannter Vertrag an
+        ihnen hängt (der Vertrag selbst wird weiter aufgefrischt); Altbestand ohne <code>importSource</code>
+        übernimmt der erste Lauf, wenn genau eine Person die Adresse hat und der Name passt. Ein neuer
+        Vertrag ohne Adresse wird gemeldet, nicht angelegt; eine Zuordnung über den Namen gibt es
+        nicht. <b>Die Adresse ist die Person</b> (E-S10): Der Abgleich schreibt die Adresse einer
+        Person nie um. Nennt ein laufender bekannter Vertrag eine andere Adresse, wechselt er zu der
+        Person mit dieser Adresse oder zu einer neu angelegten, protokolliert mit
+        <code>PERSONALSTAMM_VERTRAG_UMGEZOGEN</code> (Vertragsschlüssel und beide Personenkennungen,
+        ohne Adressen). Einen Namen ändert er nur bei gleicher Adresse, nur, wenn alle laufenden
+        Verträge der Person ihn im selben Stapel nennen, und nur, wenn Vor- oder Nachname bleibt;
+        hat sie keinen laufenden Vertrag mehr, nur über einen laufenden Anschlussvertrag mit gleichem
+        Vornamen und nur mit Nachweis: Im selben Stapel kommt unter derselben Adresse die Zeile eines
+        ihrer Verträge, die ihn höchstens 30 Tage vor heute enden lässt und den gespeicherten
+        Vertragsbeginn nennt (Entscheidungen vom
+        17.10.2026, <code>PERSONALSTAMM_ANSCHLUSS_TAGE</code>); zieht im selben Lauf ein Vertrag der
+        Person zu einer neuen Adresse um, folgt der Name am alten Datensatz erst im nächsten Lauf. Steht die Adresse im Stapel bei mehreren
+        Namen, im Portal bei mehreren Personen, bei einer von Hand geführten Person, einer aus anderer
+        Quelle oder einer mit anderem Namen, wird gemeldet; ein bekannter Vertrag bleibt dann bei
+        seiner Person, und ein Zweifel verschafft nie Zugang (Entscheidung vom 17.10.2026): Das
+        Vertragsende kommt immer an, und nur das Ende; ein laufender Vertrag wird aufgefrischt, aber
+        nie verlängert oder entfristet, sein Beginn nie geändert; ein gespeichert nicht laufender
+        bleibt unberührt. Dasselbe gilt für eine Zeile ohne oder mit ungültiger Adresse; sie
+        ändert nie einen Namen. Ein doppelter
+        Vertragsschlüssel im Stapel (auch neben einer fehlerhaften Zeile), Steuerzeichen und einzelne
+        UTF-16-Surrogate sind Formatfehler. Den Aktiv-Stand rechnet der Abgleich am Ende des Stapels
+        einmal je betroffener Person und je Person, deren Adresse im Stapel steht; stehen ihre Adresse
+        und ihr Name im Stapel bei einem laufenden Vertrag, der nur wegen eines Zweifelsfalls nicht
+        zugeordnet wurde, legt er sie nicht still — die Zeile eines anderen Namens mit derselben
+        Adresse schützt nicht. Die Zeilen bekannter Verträge laufen zuerst; gleichzeitige Aufrufe
+        arbeitet der Abgleich nacheinander ab. Jeder Aufruf schreibt genau einen
+        Protokolleintrag <code>PERSONALSTAMM_LAUF</code> mit Zahlen, Vertragsschlüssel und Grundcode,
+        ohne Namen und Adressen, auch wenn der ganze Stapel scheitert; der Lauf „Wartung" löscht die
+        Protokolleinträge nach einem Jahr (12.3). Eine
+        schlichte Leseansicht „Personen" (<code>/personen</code>, für <code>SUPER_ADMIN</code>,
+        <code>HR_LEITUNG</code> und <code>HR_SACHBEARBEITER</code>) — eine Maske auf die schlanke Leseroute
+        <code>GET /api/personalstamm/personen</code> (nur die angezeigten Felder; Suche über Name,
+        Adresse und <code>MANR</code>, nie über die LOGA-Nummer) mit Anstellungen samt
+        Vertragsschlüssel, Status und Quelle, dazu eine schmale
+        Leseroute <code>GET /api/personalstamm/pruefen</code> für dieselben drei Rollen, ohne
+        Dienstzugang per API-Schlüssel — mit dem Block „Zu prüfen" (nicht gelieferte aktive Personen,
+        Meldungen der letzten 24 Stunden je Vertrag und Grundcode, ab S1/S2 auch abgewiesene
+        Anmeldungen) und einer Hinweiszeile, rot, solange aktive Personen seit mehr als 26 Stunden
+        nicht geliefert wurden, sonst gelb bei offenen Einträgen; beides wird beim Laden berechnet.
+        <b>Keine Bearbeitung und keine Zuordnung von Hand.</b> Nicht übernommen werden
+        <code>MASTATUS</code>, <code>BESCHAEFTIGUNGSGRUPPE</code> und <code>MAPOSITION</code> (in
+        DokuBit leer), <code>EVTLLDA</code> und <code>KONZERNEINTRITT</code> (5.1).
+        <br><b>Nicht mehr in S0, offen:</b> <code>employeeId</code> beim Abschluss eines Onboardings
+        setzen. Das Onboarding kennt nur die Adresse, weder <code>MANR</code> noch Abrechnungskreis,
+        und eine Regel für die Verknüpfung fehlt. Vor S3 zu klären, sofern der Hauptarbeitgeber nach
+        8.2 aus den Einstellungsmodalitäten kommen soll; legt HR ihn stattdessen einmal je Person fest
+        (E-S11), braucht es die Verknüpfung dafür nicht. Welcher Weg gilt, ist vor S3 zu entscheiden.
+        Ebenfalls vor S3 offen: wie die Anliegen am alten Datensatz nach einer Heirat mit neuer
+        Adresse mit dem neuen verknüpft werden (E-S10).
+        <br><b>Tests:</b> <code>personalstamm-abgleich.test.ts</code> — anlegen; zwei laufende
+        Verträge mit derselben Adresse ergeben eine Person mit zwei Anstellungen; dieselbe
+        <code>MANR</code> bei verschiedenen Mandanten oder Abrechnungskreisen und verschiedenen
+        Adressen ergibt nie eine zusammengeführte Person; ein Vertragsende bei einem von zwei
+        Verträgen lässt die Person aktiv, beide beendet legt still, ein wieder laufender Vertrag
+        reaktiviert; ein Vertragsende heute gilt als laufend, geprüft über Mitternacht in Berlin; ein
+        leer gewordenes Vertragsende wird übernommen; leere Felder löschen nichts; derselbe Stapel
+        zweimal ändert nur <code>lastSyncAt</code>; ein leerer Stapel, ein Stapel ohne eine Person und
+        eine Zeile mit Formatfehler legen niemanden still; ein unbekannter beendeter Vertrag wird
+        übersprungen; die Grundcodes <code>MANDANT_UNBEKANNT</code>, <code>MAIL_FEHLT</code>,
+        <code>EMAIL_MEHRDEUTIG</code>, <code>EMAIL_ANDERER_NAME</code>,
+        <code>MANUELLER_DATENSATZ</code> und <code>FREMDE_QUELLE</code>; Altbestand wird über die
+        Adresse übernommen, nur bei gleichem Namen, auch bei gespeicherter Adresse mit Leerzeichen und
+        Großbuchstaben, <code>Employee.personalNumber</code> bleibt unverändert; ein Vertrag mit neuer
+        Adresse wechselt zu einer neuen Person, die alte wird stillgelegt, protokolliert ohne Adressen;
+        Heirat bei gleicher Adresse mit allen und mit nur einem Teil der Verträge im Stapel; Heirat mit
+        neuer Adresse, ohne dass eine Identität umgeschrieben wird; eine falsch bearbeitete Zeile, deren
+        Vertrag nach der Korrektur zurückwandert; ein wiederverwendeter Schlüssel; die Adresse einer
+        ausgeschiedenen Person für einen Nachfolger; ein bekannter Vertrag ohne oder mit ungültiger
+        Adresse, dessen Vertragsende ankommt; ein doppelter Schlüssel; eine Zeile mit Formatfehler,
+        die das Anlegen bei geteilter Adresse sperrt; ein Steuerzeichen und ein einzelnes Surrogat in
+        der <code>MANR</code>; ein scheiternder Vorlauf; ein Anschlussvertrag ohne Stilllegen und
+        Reaktivieren im selben Stapel; eine Adresse mit zwei Namen im Stapel samt Schutz vor falscher
+        Stilllegung, der nur für den eigenen Namen gilt und mit seinem Grund endet; ein doppelter
+        Schlüssel neben einer fehlerhaften Zeile; ein ganz anderer Name im Konsens; eine Heirat mit
+        Anschlussvertrag nach dem Ende des alten, nur mit Nachweis: an der Grenze von 30 Tagen, mit
+        neuem Vornamen, bei Altbestand, bei geteilter Adresse, ohne laufende Zeile, neben einem
+        laufenden Vertrag, dessen Zeile nicht unter der Adresse kommt, mit einem in derselben
+        Lieferung korrigierten Vertragsende und mit der alten Zeile unter altem Namen samt Abhilfe;
+        gesperrt ohne Nachweis (alte Zeile ohne, mit anderer oder ungültiger Adresse, fehlend, zu
+        keinem Vertrag der Person gehörend, alter Vertrag lief vor dem Lauf noch) samt Abhilfe; eine
+        Nachfolgerin gleichen Vornamens mit eigenem Datensatz und ein neu vergebener Schlüssel samt
+        Postfach innerhalb und nach 30 Tagen, die nie übernehmen oder reaktivieren; je Zweifelsfall-
+        und Fehlerzweig ein gespeichert nicht laufender Vertrag mit laufender Zeile (nichts geändert),
+        ein laufender mit beendender Zeile (nur das Ende kommt an, stillgelegt), ein laufender mit
+        laufender Zeile (aufgefrischt) und ein befristet laufender, den die Zeile verlängern oder
+        entfristen würde (Ende und Beginn bleiben, am Tag danach stillgelegt, außer die eigene
+        Zeile schützt), dazu ein Vertrag mit verstrichenem Ende und ein neu vergebener Schlüssel
+        mit anderem Beginn, der kein Nachweis ist, auch nicht in der zweiten Nacht; zwei gleichzeitige Aufrufe; ein Anschluss bei unbekanntem Mandanten; eine von Hand
+        geführte Person mit bekanntem Vertrag; eine Bestandsanstellung ohne Schlüssel zählt nicht für
+        den Aktiv-Stand; genau ein Lauf-Protokoll je Aufruf, ohne Namen und Adressen; eine Ausnahme in
+        einer Zeile lässt die übrigen weiterlaufen; die Reihenfolge im Stapel; jeder Endzustand ist
+        wiederholbar.
+        <code>personalstamm-n8n-stapel.test.ts</code> — der Code-Knoten „Stapel bilden" steht in
+        Anleitung und Importvorlage gleich und legt die Zeilen einer Adresse, eines
+        Vertragsschlüssels und eines Namens in denselben Stapel, auch eine Zeile ohne Adresse.
+        <code>personalstamm-validierung.test.ts</code> — Zahl oder Text bei Mandant, Abrechnungskreis,
+        <code>MANR</code> und Stunden, führende Nullen, Kalendertage, Pflichtschlüssel
+        <code>vertragsende</code> mit erlaubtem null, ungültige und leere Adresse,
+        <code>.strip()</code>. <code>personalstamm-webhook.test.ts</code> nach dem Vorbild von
+        <code>contract-end-webhook.test.ts</code> — 500 ohne oder mit zu kurzem Geheimnis, 401 ohne,
+        mit falschem Bearer und mit <code>CRON_SECRET</code>, 500 bei gleichem Wert beider Geheimnisse, 400 bei unlesbarem Körper, leerem Stapel
+        und 201 Einträgen, ein einzelnes Objekt wird zum Stapel, keine Namen im Log.
+        <code>personalstamm-pruefen.test.ts</code> — 401 ohne Sitzung, 403 für alle übrigen Rollen
+        einschließlich <code>SERVICE</code>, Hinweis rot, gelb und keiner, Meldungen je Schlüssel und
+        Grundcode zusammengefasst. <code>personalstamm-personen.test.ts</code> — dieselben Rollen,
+        nur die angezeigten Felder, Suche über die <code>MANR</code>. <code>wartung-personalstamm.test.ts</code> — Löschgrenze 365 Tage,
+        der Probelauf zählt nur.
+        <br><b>Vor dem ersten Produktivlauf</b> (organisatorisch, kein Code): (1) den Bestand der
+        Portal-Datenbank prüfen — Herkunft der Personen und doppelte Adressen; die Abfragen stehen in
+        <code>docs/module/selfservice/s0-personalstamm-n8n.md</code>; (2) die drei n8n-Angaben im
+        Verzeichnis der Verarbeitungstätigkeiten nachtragen — Betreiber und Standort, Aufbewahrung der
+        Ausführungen, feste Spaltenliste (5.1); (3) E-S25 und E-S27 mit dem DSB klären; (4) die
+        Löschfrist von einem Jahr mit dem DSB bestätigen (12.3); (5) in DokuBit die fünf Adressen mit
+        fremder Domäne und die eine Adresse mit zwei Namen bereinigen; (6)
+        <code>PERSONALSTAMM_SECRET</code> setzen und das n8n-Credential nur im Stammablauf anlegen.
+        <br><b>Rücknahme:</b> n8n-Ablauf ausschalten. Angelegte Personen und Anstellungen bleiben und
+        sind an <code>importSource = "DOKUBIT"</code> bzw. am gesetzten Vertragsschlüssel erkennbar;
+        eine irrtümliche Stilllegung heilt der nächste Lauf, sobald der Vertrag in DokuBit wieder
+        läuft. Die zwei neuen Spalten sind nullbar und bleiben bei einem Code-Rollback stehen (oben).</td>
       <td>4–6 Tage</td>
     </tr>
     <tr>
@@ -4826,6 +5068,17 @@ model SonderurlaubAnlass {
         eines föderierten Kontos weist das Portal ab; nach dem Abmelden zeigt „Anmelden" am selben
         Browser die Kontoauswahl von Microsoft statt einer stillen Anmeldung, und Outlook im Web bleibt
         angemeldet.
+        <br><b>Vorbedingung aus S0:</b> Die bestehenden Schreibrouten
+        <code>PATCH /api/employees/[id]</code> und
+        <code>PATCH /api/employees/[id]/employments/[employmentId]</code> sind für vom Abgleich
+        verwaltete Datensätze nicht gesperrt, erlauben auch <code>SERVICE</code> (den gemeinsamen
+        n8n-Schlüssel) und protokollieren nichts. Vor S1 für Personen mit
+        <code>importSource = "DOKUBIT"</code> die Felder <code>email</code>, <code>isActive</code> und
+        <code>importSource</code>, für Anstellungen mit Vertragsschlüssel <code>mandantNumber</code>,
+        <code>abrechnungskreis</code>, <code>personalNumber</code> und <code>isActive</code> mit 409
+        abweisen, mindestens aber <code>SERVICE</code> ausschließen und jede Änderung im
+        <code>AuditLog</code> festhalten — ab S1 hängen Zugang und Zuordnung an
+        <code>Employee.email</code> und <code>Employee.isActive</code>.
         <br><b>Tests:</b> <code>anmeldung-zuordnung.test.ts</code> für <code>User</code> (mehr als ein
         Treffer, <code>email_verified = false</code>, schon belegter <code>sub</code>, bedingtes
         Schreiben ohne Wirkung); ein Aufruf mit X-API-Key bleibt angemeldet;
@@ -5001,6 +5254,8 @@ model SonderurlaubAnlass {
         <code>Organization.ezDefaultLeiterEmail</code>, Entscheidungsseite (GET zeigt, POST
         entscheidet, ohne Nachweise und ohne <code>datenBesonders</code>), Gültigkeit 7 Tage, Ablauf mit
         Rücksprung an HR. Und der Wissensartikel zur Steuerklasse.
+        <br><b>Offen vor S4:</b> woher die Beschäftigungsgruppe einer Anstellung kommt — DokuBit führt
+        sie nicht (6.2, Befund vom 17.10.2026).
         <br><b>Tests:</b> <code>regelwerk.test.ts</code> (Kette, Gruppendeckel, Höchstwert je Anlass,
         Tagesautomatik, Antrag vom 4.1. für Ende Dezember zählt aufs Vorjahr, Zeitraum über den
         Jahreswechsel → 400, zweite Anstellung zählt nicht auf den Deckel der ersten,
@@ -5079,10 +5334,13 @@ model SonderurlaubAnlass {
   <h2><span class="nr">14</span>Entscheidungen</h2>
 
   <div class="kasten gruen">
-    <p><b>Stand Fassung 6 vom 17.10.2026: Sechzehn Punkte sind entschieden, dreizehn offen — und
-    keiner der offenen braucht noch eine Entscheidung des Trägers.</b> Es fehlen Abfragen, Zahlen,
+    <p><b>Stand Fassung 6 vom 17.10.2026: Achtzehn Punkte sind entschieden, elf offen — und
+    keiner der offenen braucht noch eine Entscheidung des Trägers.</b> Es fehlen Zahlen aus LOGA,
     Zusagen und die Klärung von E-S25, E-S27 und E-S28 mit dem Datenschutzbeauftragten; seine
-    Zustimmung zum Plan und die der MAV sind am 17.10.2026 erteilt (12.2). Neu nach dem Code-Review sind E-S28
+    Zustimmung zum Plan und die der MAV sind am 17.10.2026 erteilt (12.2). Nach den
+    DokuBit-Abfragen vom 17.10.2026 entschieden sind E-S10 und E-S15; E-S11 ist um ihr Ergebnis
+    ergänzt, E-S10 um die Entscheidung „Die Adresse ist die Person" und die Namens- und
+    Zweifelsregeln R1, R2, F und P2 vom selben Tag. Neu nach dem Code-Review sind E-S28
     (Chronik mit dem Vorgang löschen) und E-S29 (wer vertrauliche Anliegen zuerst sieht), beide mit
     Empfehlung.</p>
     <div class="tab-wrap">
@@ -5090,11 +5348,11 @@ model SonderurlaubAnlass {
       <tr><th style="width:150px">Status</th><th>Punkte</th></tr>
       <tr>
         <td><span class="pill gruen">entschieden</span></td>
-        <td>E-S2 ein Realm · E-S3 <code>openid-client</code> · E-S4 Notfallzugang · <b>E-S5 Weg C, Föderation an Entra ID</b> · E-S6 Magic Link für ruhende Konten · <b>E-S7 Bankverbindung rein digital</b> · E-S9 „Sie" · E-S11 Hauptarbeitgeber mit Durchschrift · <b>E-S13 Genehmigung per Magic Link an die Schulleitung</b> · E-S14 Krankmeldung nicht in Welle 1 · E-S18 Eingangsbestätigung knapp und täglich · <b>E-S19 Bearbeiterin mit Namen</b> · E-S21 keine zusätzliche IBAN-Kontrolle, Restrisiko getragen · E-S20 HinSchG verweisend, AGG nach hinten · E-S23 klare deutsche Sprache · <b>E-S24 Mandant bleibt Filter</b></td>
+        <td>E-S2 ein Realm · E-S3 <code>openid-client</code> · E-S4 Notfallzugang · <b>E-S5 Weg C, Föderation an Entra ID</b> · E-S6 Magic Link für ruhende Konten · <b>E-S7 Bankverbindung rein digital</b> · E-S9 „Sie" · <b>E-S10 Vertrag als Schlüssel, Person über die Adresse</b> · E-S11 Hauptarbeitgeber mit Durchschrift · <b>E-S13 Genehmigung per Magic Link an die Schulleitung</b> · E-S14 Krankmeldung nicht in Welle 1 · <b>E-S15 Abfrage täglich, Austritt über das Vertragsende</b> · E-S18 Eingangsbestätigung knapp und täglich · <b>E-S19 Bearbeiterin mit Namen</b> · E-S21 keine zusätzliche IBAN-Kontrolle, Restrisiko getragen · E-S20 HinSchG verweisend, AGG nach hinten · E-S23 klare deutsche Sprache · <b>E-S24 Mandant bleibt Filter</b></td>
       </tr>
       <tr>
         <td><span class="pill blau">Abfrage</span></td>
-        <td>E-S10 und E-S15 — fünf Abfragen gegen DokuBit (<code>MANR</code> mehrfach? Werte von <code>MASTATUS</code>? Bedeutung von <code>EVTLLDA</code>? <code>MAEMAIL</code> immer gefüllt? Werte von <code>BESCHAEFTIGUNGSGRUPPE</code>?) · E-S12 und E-S22 — zwei Zahlen aus LOGA (aktive Beschäftigte je Mandant und je juristische Person; E-S22 zuerst)</td>
+        <td>E-S12 und E-S22 — zwei Zahlen aus LOGA (aktive Beschäftigte je Mandant und je juristische Person; E-S22 zuerst)</td>
       </tr>
       <tr>
         <td><span class="pill gelb">Zusage</span></td>
@@ -5265,23 +5523,88 @@ model SonderurlaubAnlass {
   </div>
 
   <div class="ent">
-    <span class="kennung">E-S10</span> <span class="pill rot">blockierend für S0</span>
+    <span class="kennung">E-S10</span> <span class="pill gruen">entschieden 17.10.2026</span>
     <b class="frage">Liefert die Quelle eine Personalnummer — und ist sie dort eindeutig?</b>
     <p>Heute ist <code>Employee.personalNumber</code> optional. Für den Abgleich braucht es einen
       stabilen Schlüssel: Über ihn erkennt der nächtliche Lauf, ob eine Person neu ist oder sich
       geändert hat. Die E-Mail-Adresse taugt dafür nicht — sie ändert sich bei Heirat und bei
       Domänenwechsel.</p>
-    <p class="empf">Empfehlung: <b><code>MANR</code> als Schlüssel des Abgleichs</b>; der
-      Eindeutigkeitsindex besteht bereits (<code>personalNumber String? @unique</code>,
-      <code>prisma/schema.prisma:153</code>). Für die Fälle, in denen DokuBit sie nicht mitliefert — der
-      Vertragsende-Webhook hält ausdrücklich fest, dass das vorkommt — dieselbe Kette wie dort:
-      Personalnummer, sonst E-Mail, sonst Name. <b>Mit einer Verschärfung:</b> Die Namensstufe darf
-      anlegen, aber zwei Datensätze nie zusammenführen. Still falsch zuordnen ist hier kein
-      Schönheitsfehler, sondern ein Datenschutzvorfall.</p>
+    <p><b>Ergebnis der Abfragen vom 17.10.2026:</b> DokuBit liefert die <code>MANR</code>, aber sie
+      ist <b>kein Personenschlüssel</b>. Eine Zeile in <code>dokubitmitarbeiter</code> ist ein
+      Vertrag; eindeutig ist erst <code>MANDANTENNUMMER</code> + <code>ABRECHNUNGSKREIS</code> +
+      <code>MANR</code> — je Zeile eindeutig und nie mit mehreren Namen. Die <code>MANR</code> allein
+      steht in 222 Fällen für verschiedene Menschen, 221 Menschen haben mehrere, und ein
+      Anschlussvertrag ist eine neue Zeile mit eigenem Schlüssel. Die frühere Empfehlung — die
+      <code>MANR</code> in <code>Employee.personalNumber</code>, dazu die Kette Personalnummer,
+      E-Mail, Name — ist damit verworfen.</p>
+    <p class="empf">Entscheidung: <b>Schlüssel des Abgleichs ist der Vertrag</b> — Mandant +
+      Abrechnungskreis + <code>MANR</code>, gespeichert an der Anstellung
+      (<code>Employment.abrechnungskreis</code>, <code>Employment.personalNumber</code>, eindeutig
+      über <code>@@unique</code>, 11.1). <b>Die Person erkennt der Abgleich an der dienstlichen
+      Adresse</b> (<code>MAEMAIL</code>, das Microsoft-365-Konto), ohne Rücksicht auf Groß- und
+      Kleinschreibung. Eine neue Adresse schreibt der Abgleich nicht um; sie ist eine andere Person
+      (Ergänzung unten). <code>Employee.personalNumber</code> bleibt die LOGA-Nummer; der Abgleich
+      liest und schreibt sie nicht. Über den Namen wird weder angelegt noch zusammengeführt — still
+      falsch zuordnen wäre kein Schönheitsfehler, sondern ein Datenschutzvorfall.</p>
+    <p><b>Ergänzung vom 17.10.2026: Die Adresse ist die Person.</b> Bis dahin sah der Plan vor, eine
+      neue Adresse oder einen neuen Namen in den bestehenden Datensatz zu übernehmen, wenn alle
+      laufenden Verträge der Person ihn nennen. Die zweite Gegenprüfung des S0-Codes hat gezeigt, dass
+      diese Regel und ihre engeren Varianten in Einzelfällen die Identität eines anderen Menschen
+      übernehmen: bei einer in DokuBit versehentlich bearbeiteten falschen Zeile, bei einem
+      Vertragsschlüssel, den DokuBit für einen neuen Kollegen wiederverwendet, bei einem geteilten
+      Postfach. Der Datensatz trüge dann Adresse und Name eines anderen Menschen, samt Verlauf der
+      ersten Person, ab S2 auch den Zugang; nach der Korrektur in DokuBit heilt das nicht.
+      Entschieden hat der Auftraggeber:</p>
+    <ul>
+      <li>Ein Personendatensatz wird <b>nie</b> auf einen anderen Menschen umgeschrieben. Seine
+        Adresse ändert der Abgleich nie.</li>
+      <li>Die dienstliche Adresse, getrimmt und kleingeschrieben, ist die Person.</li>
+      <li>Nennt ein laufender Vertrag eine andere Adresse, <b>wechselt der Vertrag</b> zu der Person
+        mit dieser Adresse; gibt es sie nicht, wird sie angelegt. Ein solcher Wechsel ist umkehrbar:
+        Nach der Korrektur in DokuBit wandert der Vertrag zurück, und die Person wird wieder aktiv.</li>
+      <li>Den Namen ändert der Abgleich nur bei gleicher Adresse und nur, wenn alle laufenden
+        Verträge der Person ihn im selben Stapel nennen; sonst meldet er. Am selben Tag, dem
+        17.10.2026, hat der Auftraggeber nach den Gegenprüfungen ergänzt:
+        <ul>
+          <li><b>R1:</b> Umbenannt wird nur, wenn Vor- oder Nachname bleibt. Ein ganz anderer Name
+            ist ein anderer Mensch. Restrisiko, offen: Vergibt DokuBit einen Vertragsschlüssel samt
+            Postfach neu, solange der Vertrag der bisherigen Person noch läuft, und teilt der neue
+            Name Vor- oder Nachnamen mit ihr, wird ihr Datensatz umbenannt, es sei denn, die Zeile
+            nennt einen anderen als den gespeicherten Vertragsbeginn; dann gilt der Schlüssel als
+            neu vergeben, und es wird gemeldet (5.1).</li>
+          <li><b>R2:</b> Ohne laufenden Vertrag benennt auch ein laufender Anschlussvertrag mit
+            gleichem Vornamen um, wenn der letzte Vertrag höchstens 30 Tage vor heute endete (5.1).</li>
+          <li><b>F:</b> R2 greift nur mit Nachweis. Im selben Stapel muss unter derselben Adresse die
+            Zeile eines Vertrags der Person kommen, die ihn in diesen 30 Tagen enden lässt; sie trägt
+            dann den neuen Namen. Fehlt sie, wird gemeldet. Abhilfe ist, den Namen in DokuBit auch am
+            alten Vertrag zu ändern. So übernimmt eine Nachfolgerin mit demselben Vornamen den
+            Datensatz nicht, wenn die alte Zeile ohne Adresse kommt oder fehlt. Umgesetzt mit dem
+            gespeicherten Vertragsbeginn als Merkmal: Nennt die Zeile einen anderen, ist der
+            Schlüssel neu vergeben, und sie ist kein Nachweis.</li>
+          <li><b>P2:</b> Ein Zweifel verschafft nie Zugang. Endet die Zeile eines bekannten Vertrags
+            als Zweifelsfall oder Fehler, wechselt der Vertrag nie die Person. Ein Vertragsende kommt
+            immer an, ein laufender Vertrag wird aufgefrischt, ein gespeichert nicht laufender bleibt
+            unberührt. So reaktiviert auch ein neu vergebener Vertragsschlüssel samt Postfach die
+            ausgeschiedene Person nicht, auch nicht nach mehr als 30 Tagen. Umgesetzt so, dass ein
+            Zweifel nur ändert, was keinen Zugang verschafft: Eine beendende Zeile bringt nur das
+            Ende, eine laufende die Stunden und ein früheres Ende, nie ein späteres oder leeres und
+            nie einen neuen Beginn; nennt sie einen anderen Beginn als gespeichert, auch keine
+            Stunden und keine andere Organisation, denn dann beschreibt sie vermutlich den Vertrag
+            eines anderen Menschen. Offen: Eine zweifelhafte laufende Zeile mit Adresse und Namen
+            der Person schützt sie weiter vor der Stilllegung, auch wenn ihr Vertrag im Portal
+            schon beendet ist (Anleitung zum n8n-Ablauf, Abschnitt 4).</li>
+        </ul></li>
+      <li>Nach einer Heirat mit neuer Adresse gibt es <b>zwei Datensätze</b>; der alte wird inaktiv
+        und behält Namen und Adresse.</li>
+    </ul>
+    <p>Der Preis: Die Geschichte eines Menschen kann auf zwei Datensätze verteilt sein. Ein Wechsel
+      der Domäne hätte dieselbe Folge für alle Betroffenen. <b>Offen vor S3:</b> wie Anliegen am
+      alten Datensatz mit dem neuen verknüpft werden. <b>Offen vor S2:</b> wie die Anmeldung auf den
+      neuen Datensatz übergeht (11.1).</p>
   </div>
 
   <div class="ent">
-    <span class="kennung">E-S11</span> <span class="pill gruen">entschieden 16.10.2026</span>
+    <span class="kennung">E-S11</span> <span class="pill gruen">entschieden 16. und 17.10.2026</span>
     <b class="frage">Wie wird bei zwei Anstellungen zugeordnet?</b>
     <p><b>Korrektur gegenüber der ersten Fassung:</b> <code>personal_mandanten</code> ist in DokuBit
       eine Mandanten-Stammtabelle, keine Zuordnung je Person — die Liste im Payload berechnet der
@@ -5299,6 +5622,22 @@ model SonderurlaubAnlass {
       gezählt über <code>employmentId</code> (11.4); eine Freistellung im Minijob verbraucht nicht den
       TV-L-Deckel der Hauptanstellung. Ob bei zwei Anstellungen beim selben Arbeitgeber ein
       gemeinsamer Deckel gilt, bildet das Portal nicht ab; HR prüft den seltenen Fall im Antrag.</p>
+    <p><b>Ergebnis der Abfragen vom 17.10.2026:</b> Die Zuordnung kommt aus allen laufenden
+      Verträgen statt aus einem Abfragefenster, ist aber anders gebaut als in 5.1 angenommen — nicht
+      eine Zeile je Person und Mandant, sondern eine Zeile je Vertrag. Jeder Vertrag wird eine eigene Anstellung (E-S10);
+      auch beim selben Mandanten kann eine Person mehrere haben, etwa nach einem Anschlussvertrag.
+      18 der 343 Personen haben mehrere laufende Verträge, der Auftraggeber selbst drei. Die Person
+      bleibt aktiv, solange einer davon läuft (5.1). Einen Hauptarbeitgeber liefert der Abgleich
+      nicht, und S0 legt keinen fest. Offen bleibt, woher er kommt: aus den Einstellungsmodalitäten
+      über eine Verknüpfung des Onboardings mit der Person (8.2, Zeile S0 in 13) oder nach der
+      Empfehlung oben einmal je Person von HR festgelegt. Zu entscheiden vor S3, wo er erst gebraucht
+      wird (8.2).</p>
+    <p><b>Ergänzung vom 17.10.2026</b> (E-S10, „Die Adresse ist die Person"): Mehrere Anstellungen
+      gehören zu einer Person, wenn ihre Verträge dieselbe Adresse nennen. Nennt ein Vertrag eine
+      andere Adresse, gehört er zu einer anderen Person; bei den fünf Namen mit zwei Adressen ist das
+      heute schon so. Was HR je Person festlegt, etwa den Hauptarbeitgeber, hängt deshalb am
+      Datensatz der Adresse und fehlt nach einer Heirat mit neuer Adresse am neuen. Das gehört zur
+      Verknüpfung, die vor S3 zu klären ist (E-S10).</p>
   </div>
 
   <div class="ent">
@@ -5309,6 +5648,9 @@ model SonderurlaubAnlass {
     <p class="empf">Empfehlung: Zahl der aktiven Beschäftigten je Mandant aus LOGA ziehen und das
       heutige Aufkommen an HR-E-Mails für einen Monat grob zählen. Diese Zahl ist später auch der
       Nachweis, dass sich das Portal gelohnt hat.</p>
+    <p><b>Anhaltspunkt seit 17.10.2026:</b> DokuBit führt 343 Personen mit 362 laufenden Verträgen
+      (5.1). Offen bleiben die Zahl je Mandant aus LOGA als Gegenprobe und das Aufkommen an
+      HR-E-Mails.</p>
   </div>
 
   <div class="ent">
@@ -5351,34 +5693,37 @@ model SonderurlaubAnlass {
   </div>
 
   <div class="ent">
-    <span class="kennung">E-S15</span> <span class="pill rot">blockierend für S0</span>
+    <span class="kennung">E-S15</span> <span class="pill gruen">entschieden 17.10.2026</span>
     <b class="frage">Taktung und Feldumfang der DokuBit-Abfrage für den Personalstamm</b>
-    <p><b>Quelle, Weg und Format sind geklärt</b> (Abschnitt 5.1). Was fehlt, sind fünf Antworten aus
-      der Datenbank selbst — alle über je eine Abfrage zu haben, keine Projektarbeit:</p>
+    <p><b>Quelle, Weg und Format sind geklärt</b> (Abschnitt 5.1). Offen waren fünf Antworten aus
+      der Datenbank selbst. Die Abfragen sind am 17.10.2026 gelaufen, der Auftraggeber hat die
+      Ergebnisse bestätigt:</p>
     <ul>
-      <li><code>SELECT DISTINCT MASTATUS FROM dokubitmitarbeiter</code> — welche Werte es gibt, welche
-        „aktiv" und welche „ausgetreten" bedeuten. Daraus entsteht die geschlossene Wertliste in
-        <code>src/lib/constants.ts</code> (mit Test). Die neue Abfrage liefert die Aktiven und die
-        Austritte der letzten 30 Tage, und stillgelegt wird nur auf einen Wert „ausgetreten" (5.1).
-        Kommt kein solcher Wert vor, führt DokuBit Ausgetretene nicht; dann ist die Austrittsregel vor
-        S0 neu zu entscheiden.</li>
-      <li><code>SELECT MANR, COUNT(*) ... GROUP BY MANR HAVING COUNT(*) &gt; 1</code> — ob eine
-        Person mehrere Zeilen hat (eine je Mandant). Davon hängt die Mehrfachbeschäftigung ab (E-S11).</li>
-      <li>Was <code>EVTLLDA</code> fachlich ist. Ist es der letzte Arbeitstag, wartet eine Stilllegung
-        bis nach diesem Tag; allein legt die Spalte niemanden still (5.1). Dieselbe Antwort sagt, woran
-        das 30-Tage-Fenster der Austritte gemessen wird.</li>
-      <li>Ist <code>MAEMAIL</code> bei allen Aktiven gefüllt und gleich der Microsoft-365-Adresse
-        (Abgleich gegen eine Benutzerliste aus Entra ID)? Davon hängt die Erstzuordnung ab (11.1). Dazu:
-        Gibt es eine Spalte für die <b>private</b> E-Mail? Die braucht es nur für Ausgetretene, die
-        nach dem Austritt noch schreiben (E-S6, 10.2).</li>
-      <li><code>SELECT BESCHAEFTIGUNGSGRUPPE, COUNT(*) FROM dokubitmitarbeiter GROUP BY
-        BESCHAEFTIGUNGSGRUPPE</code> — welche Gruppen es gibt. Daraus entsteht die Wertliste
-        <code>BESCHAEFTIGUNGSGRUPPEN</code> in <code>src/lib/constants.ts</code> (11.1). Mit ihr legt
-        die Personalabteilung fest, für welche Gruppen die Anlässe der TV-L-Vorlage gelten (6.2).</li>
+      <li><b><code>MASTATUS</code></b> ist in allen Zeilen leer — es gibt keine Werte „aktiv" und
+        „ausgetreten". Damit war die Austrittsregel vor S0 neu zu entscheiden (unten).</li>
+      <li><b><code>MANR</code> kommt mehrfach vor</b>, aber nicht als eine Zeile je Person und
+        Mandant: Eine Zeile ist ein Vertrag, eindeutig über Mandant, Abrechnungskreis und
+        <code>MANR</code> (E-S10, E-S11).</li>
+      <li><b><code>EVTLLDA</code></b> ist kein letzter Arbeitstag: 219 von 265 Werten liegen vor dem
+        Vertragsbeginn. Was die Spalte bedeutet, klärt die Personalabteilung; S0 nutzt und übernimmt
+        sie nicht. Der letzte Arbeitstag ist <code>VERTRAGSENDE</code> (Aussage des Auftraggebers).</li>
+      <li><b><code>MAEMAIL</code></b> ist bei allen laufenden Verträgen gefüllt; fünf Personen haben
+        eine Adresse außerhalb der vier dienstlichen Domänen, und eine Adresse steht bei zwei Namen
+        (5.1). Offen, aber erst für S2 und S3b nötig: der Abgleich gegen eine Benutzerliste aus Entra
+        ID und die Frage nach einer Spalte für die <b>private</b> Adresse (E-S6, 10.2).</li>
+      <li><b><code>BESCHAEFTIGUNGSGRUPPE</code></b> ist in allen Zeilen leer. Die Wertliste
+        <code>BESCHAEFTIGUNGSGRUPPEN</code> entfällt; woher die Gruppe für die Anlässe der
+        Arbeitsbefreiung kommt, ist offen für S4 (6.2).</li>
     </ul>
-    <p class="empf">Empfehlung zur Taktung: <b>täglich nachts</b>. Wöchentlich genügt für auslaufende
-      Verträge mit zwölf Monaten Vorlauf, aber nicht für Zugänge — sonst wartet eine neue Kollegin
-      bis zu sieben Tage auf den ihren.</p>
+    <p class="empf">Entscheidung: <b>täglich um 02:30</b>, wie empfohlen nachts — wöchentlich genügt
+      für auslaufende Verträge mit zwölf Monaten Vorlauf, aber nicht für Zugänge, sonst wartet eine
+      neue Kollegin bis zu sieben Tage auf den ihren. Die Abfrage liefert <b>alle laufenden Verträge
+      und die in den letzten 30 Tagen beendeten</b>, gemessen an <code>VERTRAGSENDE</code>, mit neun
+      festen Spalten: Mandant, Abrechnungskreis, <code>MANR</code>, Vor- und Nachname, dienstliche
+      Adresse, Teilzeitstunden, Vertragsbeginn und Vertragsende. <b>Ein Vertrag läuft, solange
+      <code>VERTRAGSENDE</code> leer ist oder heute oder später liegt</b>; stillgelegt wird nur über
+      das Vertragsende (5.1). <code>KONZERNEINTRITT</code> wird in S0 nicht übernommen. Abfrage und
+      Einrichtung des Ablaufs stehen in <code>docs/module/selfservice/s0-personalstamm-n8n.md</code>.</p>
   </div>
 
   <div class="ent">

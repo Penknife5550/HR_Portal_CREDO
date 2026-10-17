@@ -553,3 +553,101 @@ export const CIVIL_SERVICE_UPLOAD_TYPES: string[] = [
   ...Object.keys(CIVIL_SERVICE_DOC_TYPES),
   "SONSTIGES",
 ];
+
+// =============================================
+// Personalstamm aus DokuBit (Self-Service, Paket S0)
+// =============================================
+// Eine DokuBit-Zeile ist ein Vertrag, eindeutig ueber Mandant +
+// Abrechnungskreis + Personalnummer (MANR); die MANR allein ist es nicht.
+// Die dienstliche Adresse ist die Person: Steht bei einem Vertrag eine andere
+// Adresse, wandert er zur Person mit dieser Adresse. Ein Vertrag laeuft,
+// solange VERTRAGSENDE leer ist oder heute bzw. spaeter liegt (VERTRAGSENDE =
+// letzter Arbeitstag). Plan: docs/module/selfservice/selfservice-portal-plan.html, 5.1.
+
+/** AuditLog.processType aller Eintraege des Stammabgleichs. */
+export const PERSONALSTAMM_PROCESS_TYPE = "PERSONALSTAMM";
+
+/** Employee.importSource einer vom Abgleich verwalteten Person. */
+export const PERSONALSTAMM_QUELLE = "DOKUBIT";
+
+/** Employee.importSource einer von Hand angelegten Person: Der Abgleich aendert sie nie. */
+export const IMPORT_QUELLE_MANUELL = "MANUELL";
+
+/** Hoechstzahl Zeilen je Aufruf des Webhooks. */
+export const PERSONALSTAMM_MAX_STAPEL = 200;
+
+/**
+ * Anschluss nach dem Vertragsende (Entscheidung 17.10.2026): Eine Person ohne
+ * laufenden Vertrag benennt ein laufender Anschlussvertrag mit neuem Nachnamen
+ * nur um, wenn ihr letzter Vertrag hoechstens so viele Kalendertage vor heute
+ * endete — wie das 30-Tage-Fenster der n8n-Abfrage.
+ */
+export const PERSONALSTAMM_ANSCHLUSS_TAGE = 30;
+
+/** Aufbewahrung der Protokolleintraege des Abgleichs (Entscheidung 17.10.2026, mit dem DSB abzustimmen). */
+export const PERSONALSTAMM_AUFBEWAHRUNG_TAGE = 365;
+
+/** „Zu pruefen": Meldungen der letzten Stunden, je Vertrag und Grundcode einmal. */
+export const PERSONALSTAMM_MELDUNGEN_STUNDEN = 24;
+
+/** „Zu pruefen": abgewiesene Anmeldungen der letzten Tage (Inhalt erst ab S1/S2). */
+export const PERSONALSTAMM_ABGEWIESEN_TAGE = 14;
+
+/** „Zu pruefen": hoechstens so viele nicht gelieferte Personen mit Namen (die Zahl stimmt trotzdem). */
+export const PERSONALSTAMM_NICHT_GELIEFERT_LISTE = 50;
+
+export const PERSONALSTAMM_ACTIONS = {
+  LAUF: "PERSONALSTAMM_LAUF",
+  PERSON_UEBERNOMMEN: "PERSONALSTAMM_PERSON_UEBERNOMMEN",
+  VERTRAG_UMGEZOGEN: "PERSONALSTAMM_VERTRAG_UMGEZOGEN",
+  NAME_GEAENDERT: "PERSONALSTAMM_NAME_GEAENDERT",
+  STILLGELEGT: "PERSONALSTAMM_STILLGELEGT",
+  REAKTIVIERT: "PERSONALSTAMM_REAKTIVIERT",
+} as const;
+
+/** Schreibt die Anmeldung ab S1/S2; „Zu pruefen" liest ihn schon jetzt. */
+export const ANMELDUNG_ABGEWIESEN_ACTION = "ANMELDUNG_ABGEWIESEN";
+
+export const PERSONALSTAMM_AUDIT_LABELS: Record<string, string> = {
+  [PERSONALSTAMM_ACTIONS.LAUF]: "Personalstamm: Abgleich aus DokuBit",
+  [PERSONALSTAMM_ACTIONS.PERSON_UEBERNOMMEN]: "Personalstamm: Bestandsperson übernommen",
+  [PERSONALSTAMM_ACTIONS.VERTRAG_UMGEZOGEN]: "Personalstamm: Vertrag einer anderen Person zugeordnet (neue Adresse)",
+  [PERSONALSTAMM_ACTIONS.NAME_GEAENDERT]: "Personalstamm: Name geändert",
+  [PERSONALSTAMM_ACTIONS.STILLGELEGT]: "Personalstamm: Person stillgelegt",
+  [PERSONALSTAMM_ACTIONS.REAKTIVIERT]: "Personalstamm: Person wieder aktiv",
+};
+
+/** Grundcodes je Zeile. Die ersten drei sind Fehler (Status „fehler"), der Rest Zweifelsfaelle. */
+export const PERSONALSTAMM_GRUNDCODES = [
+  "FORMATFEHLER",
+  "MANDANT_UNBEKANNT",
+  "INTERNER_FEHLER",
+  "MAIL_FEHLT",
+  "EMAIL_MEHRDEUTIG",
+  "EMAIL_ANDERER_NAME",
+  "MANUELLER_DATENSATZ",
+  "FREMDE_QUELLE",
+] as const;
+export type PersonalstammGrundcode = (typeof PERSONALSTAMM_GRUNDCODES)[number];
+
+export const PERSONALSTAMM_GRUNDCODE_LABELS: Record<PersonalstammGrundcode, string> = {
+  FORMATFEHLER: "Zeile unvollständig oder im falschen Format",
+  MANDANT_UNBEKANNT: "Mandant im Portal unbekannt",
+  INTERNER_FEHLER: "Interner Fehler bei dieser Zeile",
+  MAIL_FEHLT: "Vertrag ohne dienstliche Adresse",
+  EMAIL_MEHRDEUTIG: "Adresse gehört im Portal zu mehreren Personen",
+  EMAIL_ANDERER_NAME: "Adresse und Name passen nicht zu derselben Person — in DokuBit prüfen",
+  MANUELLER_DATENSATZ: "Person von Hand angelegt, wird nicht überschrieben",
+  FREMDE_QUELLE: "Person aus einer anderen Quelle, wird nicht überschrieben",
+};
+
+/** Ergebnis einer Zeile in der Antwort an n8n. */
+export const PERSONALSTAMM_ZEILENSTATUS = [
+  "angelegt",
+  "aktualisiert",
+  "unveraendert",
+  "uebersprungen",
+  "zweifelsfall",
+  "fehler",
+] as const;
+export type PersonalstammZeilenstatus = (typeof PERSONALSTAMM_ZEILENSTATUS)[number];
