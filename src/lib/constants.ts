@@ -603,6 +603,13 @@ export const PERSONALSTAMM_ACTIONS = {
   NAME_GEAENDERT: "PERSONALSTAMM_NAME_GEAENDERT",
   STILLGELEGT: "PERSONALSTAMM_STILLGELEGT",
   REAKTIVIERT: "PERSONALSTAMM_REAKTIVIERT",
+  // Aenderungen von Hand ueber /api/employees (src/lib/personalstamm/schreibschutz.ts)
+  PERSON_ANGELEGT: "PERSONALSTAMM_PERSON_ANGELEGT",
+  PERSON_GEAENDERT: "PERSONALSTAMM_PERSON_GEAENDERT",
+  PERSON_DEAKTIVIERT: "PERSONALSTAMM_PERSON_DEAKTIVIERT",
+  ANSTELLUNG_ANGELEGT: "PERSONALSTAMM_ANSTELLUNG_ANGELEGT",
+  ANSTELLUNG_GEAENDERT: "PERSONALSTAMM_ANSTELLUNG_GEAENDERT",
+  ANSTELLUNG_GELOESCHT: "PERSONALSTAMM_ANSTELLUNG_GELOESCHT",
 } as const;
 
 /** Schreibt die Anmeldung ab S1/S2; „Zu pruefen" liest ihn schon jetzt. */
@@ -615,6 +622,12 @@ export const PERSONALSTAMM_AUDIT_LABELS: Record<string, string> = {
   [PERSONALSTAMM_ACTIONS.NAME_GEAENDERT]: "Personalstamm: Name geändert",
   [PERSONALSTAMM_ACTIONS.STILLGELEGT]: "Personalstamm: Person stillgelegt",
   [PERSONALSTAMM_ACTIONS.REAKTIVIERT]: "Personalstamm: Person wieder aktiv",
+  [PERSONALSTAMM_ACTIONS.PERSON_ANGELEGT]: "Personalstamm: Person von Hand angelegt",
+  [PERSONALSTAMM_ACTIONS.PERSON_GEAENDERT]: "Personalstamm: Person von Hand geändert",
+  [PERSONALSTAMM_ACTIONS.PERSON_DEAKTIVIERT]: "Personalstamm: Person von Hand deaktiviert",
+  [PERSONALSTAMM_ACTIONS.ANSTELLUNG_ANGELEGT]: "Personalstamm: Anstellung von Hand angelegt",
+  [PERSONALSTAMM_ACTIONS.ANSTELLUNG_GEAENDERT]: "Personalstamm: Anstellung von Hand geändert",
+  [PERSONALSTAMM_ACTIONS.ANSTELLUNG_GELOESCHT]: "Personalstamm: Anstellung von Hand gelöscht",
 };
 
 /** Grundcodes je Zeile. Die ersten drei sind Fehler (Status „fehler"), der Rest Zweifelsfaelle. */

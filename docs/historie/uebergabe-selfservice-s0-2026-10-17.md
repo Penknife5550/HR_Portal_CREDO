@@ -1,7 +1,8 @@
 # Self-Service S0 „Personalstamm aus DokuBit“ — Übergabe
 
 > **Stand:** 17.10.2026, abends · **Zweig:** `feat/selfservice-s0-personalstamm` · **Commit:** `24a8d11`
-> „Self-Service S0: Personalstamm aus DokuBit“, dazu diese Übergabe.
+> „Self-Service S0: Personalstamm aus DokuBit“, dazu diese Übergabe und der Schreibschutz der
+> Beschäftigtenrouten (Abschnitt 2.6, Nachtrag vom selben Abend).
 > **Nicht deployt.** Der n8n-Ablauf ist nicht eingerichtet. Beim Schreiben war der Zweig noch nicht
 > gepusht; Push und Pull Request folgen mit dieser Übergabe (Abschnitt 8.4).
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was gebaut ist, was
@@ -59,6 +60,7 @@ Die Einzelheiten stehen in `s0-personalstamm-n8n.md`, Abschnitte 1 und 4.
 | `POST /api/webhooks/personalstamm` | n8n, `Authorization: Bearer <PERSONALSTAMM_SECRET>` | Ein Eintrag oder ein Stapel bis 200 Zeilen, Körper bis 1 MiB. Antwort immer 200 mit Ergebnis je Zeile, ohne Namen und Adressen; 400/401/413/500 nur, wenn der ganze Aufruf scheitert. Gleichzeitige Aufrufe laufen nacheinander |
 | `GET /api/personalstamm/personen` | SUPER_ADMIN, HR_LEITUNG, HR_SACHBEARBEITER (ohne SERVICE) | Schlanke Liste für die Ansicht: nur die angezeigten Felder, Suche über Name, Adresse und MANR, nie über die LOGA-Nummer |
 | `GET /api/personalstamm/pruefen` | dieselben drei Rollen | „Zu prüfen“: nicht gelieferte aktive Personen, Meldungen der letzten 24 Stunden je Vertrag und Grundcode, ab S1/S2 abgewiesene Anmeldungen; dazu die Hinweiszeile |
+| `POST`/`PATCH`/`DELETE` unter `/api/employees` | nur noch dieselben drei Rollen (bisher auch SERVICE) | Bestandsrouten, jetzt mit Schreibschutz für vom Abgleich verwaltete Datensätze und AuditLog (Abschnitt 2.6). Lesen darf SERVICE weiter |
 | `/personen` | dieselben drei Rollen | Leseansicht mit Hinweiszeile (rot, solange eine aktive Person seit mehr als 26 Stunden nicht geliefert wurde, sonst gelb bei offenen Einträgen), „Zu prüfen“ und Liste. Keine Bearbeitung, keine Zuordnung von Hand |
 
 ### 2.3 Dateien
@@ -70,19 +72,21 @@ Neu:
 | `src/app/api/webhooks/personalstamm/route.ts` | Webhook: Geheimnis prüfen (zeitkonstant, mind. 24 Zeichen, nicht gleich `CRON_SECRET`), Körper lesen, an den Abgleich reichen |
 | `src/lib/personalstamm/abgleich.ts` | Abgleichlogik: Vorlauf, je Zeile eine Transaktion, Aktiv-Stand am Ende des Stapels, Protokoll |
 | `src/lib/personalstamm/pruefen.ts` | Rechnung für „Zu prüfen“ und die Hinweiszeile |
+| `src/lib/personalstamm/schreibschutz.ts` | Schreibschutz der Beschäftigtenrouten: gesperrte Felder, Meldungen (Abschnitt 2.6) |
 | `src/lib/validations/personalstamm.ts` | Zod-Schema der Zeile (Zahl oder Text, `.strip()`), Vertragsschlüssel |
 | `src/app/api/personalstamm/personen/route.ts` | Leseroute der Liste |
 | `src/app/api/personalstamm/pruefen/route.ts` | Leseroute „Zu prüfen“ |
 | `src/app/(portal)/personen/page.tsx`, `personen-content.tsx` | Seite „Personen“ |
 | `src/components/personen/zu-pruefen.tsx` | Hinweiszeile und Block „Zu prüfen“ |
 | `docs/module/selfservice/s0-personalstamm-n8n.md`, `.json` | Anleitung und Importvorlage des n8n-Stammablaufs (n8n 2.x, ohne Credentials) |
-| Tests | `src/__tests__/lib/personalstamm-abgleich.test.ts`, `personalstamm-validierung.test.ts`, `personalstamm-n8n-stapel.test.ts`, `wartung-personalstamm.test.ts`; `src/__tests__/api/personalstamm-webhook.test.ts`, `personalstamm-personen.test.ts`, `personalstamm-pruefen.test.ts`; `src/__tests__/components/personen-ansicht.test.tsx`; Fake-Datenbank `src/__tests__/hilfen/personalstamm-fake-db.ts` |
+| Tests | `src/__tests__/lib/personalstamm-abgleich.test.ts`, `personalstamm-validierung.test.ts`, `personalstamm-n8n-stapel.test.ts`, `wartung-personalstamm.test.ts`; `src/__tests__/api/personalstamm-webhook.test.ts`, `personalstamm-personen.test.ts`, `personalstamm-pruefen.test.ts`; `src/__tests__/components/personen-ansicht.test.tsx`; Fake-Datenbank `src/__tests__/hilfen/personalstamm-fake-db.ts`; Schreibschutz `src/__tests__/api/employees-schreibschutz.test.ts`, `src/__tests__/lib/personalstamm-schreibschutz.test.ts` |
 
 Geändert:
 
 | Datei | Änderung |
 |---|---|
 | `prisma/schema.prisma` | Schema-Delta, Abschnitt 2.4 |
+| `src/app/api/employees/route.ts`, `[id]/route.ts`, `[id]/employments/route.ts`, `[id]/employments/[employmentId]/route.ts` | Schreiben nur die HR-Rollen, Schreibschutz und AuditLog (Abschnitt 2.6) |
 | `src/lib/constants.ts` | Block „Personalstamm aus DokuBit“: Quelle `DOKUBIT`, Grundcodes, Zeilenstatus, Audit-Aktionen und -Beschriftungen, `PERSONALSTAMM_ANSCHLUSS_TAGE` (30), `PERSONALSTAMM_AUFBEWAHRUNG_TAGE` (365) |
 | `src/lib/laeufe/wartung.ts`, `src/lib/zeitplaner/katalog.ts`, `src/lib/zeitplaner/bericht.ts` | Lauf „Wartung“ löscht Protokolleinträge des Abgleichs nach 365 Tagen; Probelauf zählt nur |
 | `src/lib/laeufe/cron-anmeldung.ts` | `gleichZeitkonstant` exportiert, damit der Webhook ihn nutzt |
@@ -115,7 +119,31 @@ Geändert:
 - Eigene Einträge bekommen: Übernahme einer Bestandsperson, Vertrag zu anderer Person, Namensänderung,
   Stilllegen und Reaktivieren.
 - Kein Eintrag enthält Namen oder Adressen; in die Konsole kommen nur Zeilenindex und Fehlerkennung.
-- Der Lauf „Wartung“ löscht alle Einträge mit `processType` `PERSONALSTAMM` nach 365 Tagen.
+- Der Lauf „Wartung“ löscht alle Einträge mit `processType` `PERSONALSTAMM` nach 365 Tagen,
+  auch die der Änderungen von Hand (Abschnitt 2.6).
+
+### 2.6 Schreibschutz der Beschäftigtenrouten (Nachtrag 17.10.2026)
+
+Vorbedingung für S1 (Plan 13, Zeile S1), auf Wunsch des Auftraggebers noch in S0 gebaut. Regeln in
+`src/lib/personalstamm/schreibschutz.ts`, Anleitung Abschnitt 1:
+
+- **Schreiben nur die HR-Rollen** (SUPER_ADMIN, HR_LEITUNG, HR_SACHBEARBEITER) auf allen fünf
+  Schreibwegen unter `/api/employees`. Der n8n-Schlüssel (SERVICE) bekommt 403; lesen darf er weiter.
+  Laut Auftraggeber schreibt heute kein n8n-Ablauf dorthin.
+- **Person aus DokuBit:** `email`, `isActive`, `importSource` → 409 mit `felder`, auch mit `null`;
+  `DELETE` (setzt `isActive = false`) → 409. Name und private Angaben bleiben frei, denn das ist die
+  Abhilfe bei `EMAIL_ANDERER_NAME`.
+- **Vertrag aus DokuBit:** alles, was der Abgleich schreibt (`organizationId`, `mandantNumber`,
+  `startDate`, `endDate`, `workingHoursWeek`, `isActive`) → 409; `DELETE` → 409. Ein Wächtertest
+  hält die Liste gegen `vertragAnlegen` und `vertragsAenderung` in `abgleich.ts`.
+- **`POST` mit `importSource` `DOKUBIT`** → 400. Eine Person einer anderen Quelle darf HR auf
+  `DOKUBIT` umstellen (D1); zurück geht es nicht.
+- **Bedingt geschrieben:** Die Änderung an einer Person steht unter der gelesenen Quelle im WHERE.
+  Übernimmt der Abgleich die Person gleichzeitig, antwortet die Route 409 statt am Schutz vorbei
+  zu schreiben.
+- **Protokoll:** je Änderung ein Eintrag (`PERSONALSTAMM_PERSON_ANGELEGT`, `_GEAENDERT`,
+  `_DEAKTIVIERT`, `PERSONALSTAMM_ANSTELLUNG_ANGELEGT`, `_GEAENDERT`, `_GELOESCHT`) in derselben
+  Transaktion, nur IDs und Feldnamen, bei der Quelle von/nach.
 
 ## 3 · Entscheidungen
 
@@ -132,6 +160,7 @@ Geändert:
 | 17.10.2026 | **R2:** Anschluss nach dem jüngsten Ende, höchstens 30 Tage, Vorname gleich | Heirat mit Anschlussvertrag soll ankommen. Die 30 Tage passen zum Fenster der n8n-Abfrage |
 | 17.10.2026 | **F:** Der Anschluss nur mit Nachweis: Im selben Stapel kommt unter derselben Adresse die Zeile eines alten Vertrags der Person, die ihn in den letzten 30 Tagen enden lässt. Weil alle Zeilen einer Adresse denselben Namen tragen müssen, trägt sie den neuen Namen | Unterscheidet die Heirat von einer Nachfolgerin, der DokuBit das Postfach gibt |
 | 17.10.2026 | **P2:** Zweifelsfälle verschaffen nie Zugang; ein Vertragsende kommt immer an | Der teure Fehler ist ein Zugang, der nicht mehr bestehen dürfte. Ein Zweifel darf deshalb nichts verlängern, entfristen oder reaktivieren |
+| 17.10.2026 | **Schreibschutz noch in S0** (Abschnitt 2.6): SERVICE schreibt nicht mehr unter `/api/employees`, gesperrt ist alles, was der Abgleich schreibt, samt Deaktivieren, Löschen und `POST` mit Quelle `DOKUBIT` | Ab S1 hängen Zugang und Zuordnung an Adresse und Aktiv-Status. Die Liste im Plan ließ Beginn und Ende offen; ein von Hand verlängertes Ende hielte einen Vertrag laufen, den DokuBit beendet hat. Kein n8n-Ablauf schreibt dorthin |
 | 17.10.2026 | Löschfrist der Protokolleinträge 1 Jahr, mit dem DSB zu bestätigen | Die Einträge tragen MANR und Personenkennungen. Ohne Frist blieben sie unbefristet (Plan 12.3) |
 | 17.10.2026 | Verknüpfung mit dem Onboarding aus S0 herausgenommen | Das Onboarding kennt nur die Adresse, weder MANR noch Abrechnungskreis; eine Regel fehlt. Vor S3 zu entscheiden (Plan 13, E-S11) |
 | 17.10.2026 | Im Portal stehen schon Beschäftigtendatensätze unbekannter Herkunft. Sie werden vor dem ersten Produktivlauf geprüft, nicht vor dem Bau | Der Abgleich übernimmt Altbestand nur bei eindeutiger Adresse und passendem Namen und meldet alles andere. Die Abfragen stehen in `s0-personalstamm-n8n.md`, Abschnitt 6 |
@@ -154,6 +183,15 @@ Prüfprotokoll [`codereview-s0-personalstamm-2026-10.md`](codereview-s0-personal
 
 **Gates (17.10.2026, Endstand `24a8d11`):** `npm run pruefen` grün: Typprüfung und Lint ohne Fehler
 (die 5 bekannten Warnungen in fremden Bestandsdateien), **244 Suites, 7.487 Tests**.
+Nach dem Schreibschutz (Abschnitt 2.6): **246 Suites, 7.523 Tests**, dieselben 5 Warnungen.
+
+**Schreibschutz (Abschnitt 2.6).** Mutationsprobe: Vertragssperre, bedingtes Schreiben, Rolle
+SERVICE, gesperrtes `endDate`, Deaktivieren und `POST` mit Quelle `DOKUBIT` einzeln ausgebaut, alle
+sechs von den Tests erkannt. Gegen die lokale Datenbank geprobt: 409 bei Adresse, Aktiv-Status und
+Deaktivieren einer Person aus DokuBit, 409 bei Ende und Löschen ihres Vertrags, 400 beim Anlegen mit
+Quelle `DOKUBIT`; eine Bestandsperson ließ sich ändern und auf `DOKUBIT` umstellen, danach war ihre
+Adresse gesperrt. Im Audit-Log je erfolgreicher Änderung ein Eintrag, nur mit Feldnamen; die
+Probeperson ist danach wieder entfernt.
 
 **Review und Gegenprüfung.** Drei Review-Runden und vier adversariale Gegenprüfrunden, so die
 Zählung im Commit. Das Prüfprotokoll
@@ -243,10 +281,9 @@ Stand der lokalen Datenbank danach: 5 Personen aus DokuBit (4 aktiv), 5 verwalte
   `Employee.personalNumber` = MANR. Die MANR ist je Person aber nicht eindeutig, und S0 schreibt sie
   bewusst nicht dorthin. Der Adressvergleich dort läuft außerdem ohne Maskierung (`_` wirkt als
   Platzhalter). Als eigene Aufgabe vorgeschlagen.
-- **Vor S1:** `PATCH /api/employees/[id]` und `PATCH /api/employees/[id]/employments/[employmentId]`
-  sind für vom Abgleich verwaltete Datensätze nicht gesperrt, erlauben SERVICE und protokollieren
-  nichts. Ab S1 hängen Zugang und Zuordnung an `Employee.email` und `Employee.isActive` (Plan 13,
-  Zeile S1).
+- **Vor S1, erledigt am 17.10.2026:** Die Schreibrouten unter `/api/employees` sind für vom Abgleich
+  verwaltete Datensätze gesperrt, SERVICE schreibt dort nicht mehr, jede Änderung steht im AuditLog
+  (Abschnitt 2.6).
 - **`GET /api/employees`** liefert volle Datensätze an den Browser. S0 umgeht das mit der eigenen
   Leseroute; die Bestandsroute ist unverändert.
 - **`BESCHAEFTIGUNGSGRUPPE`** ist in DokuBit leer. Die Sichtbarkeit der Arbeitsbefreiung in S4
@@ -267,7 +304,7 @@ meisten Voraussetzungen.
 | Paket | Inhalt | Umfang | Vorbedingungen | Stand |
 |---|---|---|---|---|
 | S0 | Personalstamm aus DokuBit | 4–6 Tage | Zustimmung DSB und MAV (erteilt 17.10.2026); Checkliste in Abschnitt 5 | gebaut, nicht deployt |
-| S1 | Keycloak und Anmeldung des HR-Teams | 6–8 Tage | unabhängig von S0, parallel möglich. App-Registrierung durch die IT (E-S5). Vorbedingung aus S0: PATCH-Routen absichern (Abschnitt 6) | geplant |
+| S1 | Keycloak und Anmeldung des HR-Teams | 6–8 Tage | unabhängig von S0, parallel möglich. App-Registrierung durch die IT (E-S5). Vorbedingung aus S0 (Schreibschutz der Beschäftigtenrouten) erledigt, Abschnitt 2.6 | geplant |
 | S3 | Ticketsystem | 12–16 Tage | S0 im Betrieb; Versand auf OAuth2 umgestellt (eigene Aufgabe, fällig bis Ende Dezember 2026); Zweig `ux-umbau` nach `main`; zwei Personen für vertrauliche Anliegen benannt (E-S29); E-S28 entschieden. Außerdem vor S3: Onboarding-Verknüpfung oder Hauptarbeitgeber je Person (E-S11) und Verknüpfung alter Anliegen nach Heirat mit neuer Adresse (E-S10) | geplant |
 | S3b | HR-Postfach als zweiter Eingang | 7–9 Tage | S0 (sonst wird jede Mail „Person nicht zugeordnet“) und das Ticketsystem aus S3; Vorlauf von einem halben Tag an echten Mails; doppelte Berechtigungsprüfung nach Plan 10.1 vor dem Einschalten | geplant |
 | S2 | Mitarbeiterportal | 5–7 Tage | S0, S1, `ux-umbau` in `main`, Formulare aus S3. Vor S2 zu entscheiden: wie die Anmeldung nach einer Heirat mit neuer Adresse auf den neuen Datensatz übergeht (E-S10, Plan 11.1) | geplant |
@@ -278,7 +315,7 @@ Für jedes Paket gilt dieselbe Abnahme: `npm run pruefen` grün, bei Schemaände
 `npx prisma validate` und `npx prisma generate` fehlerfrei, die UI-Sperrklinke steigt nicht.
 
 **Unmittelbar als Nächstes:** Pull Request zu S0 prüfen und mergen, Deploy-Ablaufplan schreiben,
-Checkliste aus Abschnitt 5 abarbeiten. Parallel kann S1 beginnen; vorher die PATCH-Routen absichern.
+Checkliste aus Abschnitt 5 abarbeiten. Parallel kann S1 beginnen; seine Vorbedingung aus S0 ist erfüllt.
 
 ## 8 · Wiedereinstieg
 

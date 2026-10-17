@@ -64,7 +64,19 @@ Im Portal: Webhook `src/app/api/webhooks/personalstamm/route.ts`, Abgleich
   Stapel scheitert. Wird eine Bestandsperson übernommen, wechselt ein Vertrag die Person, ändert
   sich ein Name oder wird jemand stillgelegt oder wieder aktiv, kommt je ein eigener Eintrag dazu,
   ebenfalls ohne Namen und Adressen. Alle Einträge
-  des Abgleichs löscht der Lauf „Wartung“ nach 365 Tagen.
+  des Abgleichs und der Änderungen von Hand (nächster Punkt) löscht der Lauf „Wartung“ nach 365 Tagen.
+- **Von Hand nur, was DokuBit nicht liefert** (Schreibschutz, `src/lib/personalstamm/schreibschutz.ts`).
+  Über `/api/employees` schreiben nur die HR-Rollen, nicht der n8n-Schlüssel; lesen darf er weiter.
+  - Person aus DokuBit (`importSource` `DOKUBIT`): Adresse, Aktiv-Status und Quelle weist das Portal
+    mit 409 ab, ebenso das Deaktivieren (`DELETE`). Name und private Angaben bleiben frei.
+  - Vertrag aus DokuBit (Abrechnungskreis und MANR gesetzt): Mandant, Einrichtung, Beginn, Ende,
+    Stunden und Aktiv-Status weist das Portal mit 409 ab, ebenso das Löschen. Position, Abteilung
+    und Vertragsart bleiben frei.
+  - Eine Person mit Quelle `DOKUBIT` legt nur der Abgleich an (`POST` → 400). Eine Person einer
+    anderen Quelle darf HR auf `DOKUBIT` umstellen; zurück geht es nicht, sonst bliebe ihr
+    Aktiv-Status nach dem Vertragsende stehen.
+  - Jede Änderung von Hand kommt als eigener Eintrag ins Audit-Log („Personalstamm: … von Hand …“),
+    nur mit Feldnamen, nie mit Werten.
 
 ## 2. SQL-Abfrage (feste Spaltenliste)
 
@@ -302,9 +314,9 @@ Behoben wird immer an der Quelle, meist in DokuBit. Der nächste Lauf räumt die
 | `MANDANT_UNBEKANNT` | Mandantennummer im Portal unbekannt | Mandant im Portal anlegen oder Nummer prüfen |
 | `INTERNER_FEHLER` | Ausnahme bei dieser Zeile. Scheitert schon das Lesen vor der Verarbeitung, tragen alle Zeilen des Stapels diesen Code. Mit Schlüssel `person`: Der Aktiv-Status einer Person ließ sich am Ende des Stapels nicht schreiben | Log des Portals ansehen; der nächste Lauf versucht es erneut |
 | `MAIL_FEHLT` | Vertrag ohne dienstliche Adresse. Ein neuer laufender wird nicht angelegt; ein bekannter bleibt bei seiner Person, sein Vertragsende kommt an (Regel unter der Tabelle), der Name bleibt | `MAEMAIL` in DokuBit nachtragen |
-| `EMAIL_MEHRDEUTIG` | Die Adresse gehört im Portal mehreren Personen. Angelegt oder zugeordnet wird nichts; ein bekannter Vertrag bleibt bei seiner Person (Regel unter der Tabelle) | Dublette im Portal bereinigen; welche es sind, zeigt Abschnitt 6, Abfrage 4. Die Ansicht „Personen“ bearbeitet nichts: bei der überzähligen Person die Adresse über `PATCH /api/employees/[id]` (Feld `email`) korrigieren oder leeren. **Nie löschen:** Ein DELETE entfernt per Cascade auch die Anstellungen und alles, was an der Person hängt |
+| `EMAIL_MEHRDEUTIG` | Die Adresse gehört im Portal mehreren Personen. Angelegt oder zugeordnet wird nichts; ein bekannter Vertrag bleibt bei seiner Person (Regel unter der Tabelle) | Dublette im Portal bereinigen; welche es sind, zeigt Abschnitt 6, Abfrage 4. Die Ansicht „Personen“ bearbeitet nichts: bei der überzähligen Person die Adresse über `PATCH /api/employees/[id]` (Feld `email`) korrigieren oder leeren. Bei einer Person aus DokuBit sperrt das Portal die Adresse (409, Abschnitt 1); überzählig ist dann die andere. **Nie löschen:** Ein DELETE entfernt per Cascade auch die Anstellungen und alles, was an der Person hängt |
 | `EMAIL_ANDERER_NAME` | Adresse und Name passen nicht zu derselben Person: Dieselbe Adresse steht im Stapel bei mehreren Namen; oder sie gehört im Portal einer Person mit anderem Namen, deren Namen der Abgleich nicht ändern darf (nicht alle ihre laufenden Verträge nennen den neuen Namen, Vor- und Nachname sind beide neu, sie hat keinen laufenden Vertrag mehr und für einen Anschluss fehlt der Nachweis nach der Regel unter der Tabelle, oder sie stammt aus dem Bestand ohne Herkunft). Angelegt oder zugeordnet wird nichts; ein bekannter Vertrag bleibt bei seiner Person (Regel unter der Tabelle). Die Person mit dieser Adresse bleibt nur aktiv, wenn die gemeldete Zeile ihren eigenen Namen trägt | In DokuBit prüfen: geteiltes Postfach, eine Adresse oder ein Vertragsschlüssel für einen anderen Menschen wiederverwendet, oder ein neuer Name erst bei einem Teil der Verträge. Adresse oder Name korrigieren; einen neuen Namen bei allen Verträgen der Person, die n8n liefert, auch bei den in den letzten 30 Tagen beendeten. **Anschluss nach einer Heirat ohne Nachweis** (Regel unter der Tabelle): den neuen Namen in DokuBit auch am alten Vertrag eintragen, und dort die Adresse stehen lassen oder wieder eintragen; der nächste Lauf ordnet den Anschluss zu und reaktiviert die Person. Ein `PATCH` des Namens hilft nicht, solange n8n die alte Zeile mit dem alten Namen unter der Adresse liefert. Nur wenn das in DokuBit nicht geht (Zeile gelöscht, neuer Vorname, Ende vor mehr als 30 Tagen, Anschluss auf demselben Vertragsschlüssel) und es wirklich dieselbe Person ist: den Namen im Portal über `PATCH /api/employees/[id]` (Felder `firstName`, `lastName`) nachziehen. Das wirkt, sobald alle Zeilen der Adresse im Stapel diesen Namen tragen; dann ordnet der nächste Lauf den Anschluss zu und reaktiviert die Person |
-| `MANUELLER_DATENSATZ` | Die Adresse gehört im Portal einer von Hand geführten Person (`importSource` `MANUELL`, auch nachträglich umgestellt). Ihr wird kein Vertrag zugeordnet, weder ein neuer noch ein bekannter einer anderen Person; ein bekannter Vertrag bleibt, wo er ist (Regel unter der Tabelle). Adresse, Name und Aktiv-Status der Person bleiben | HR entscheidet. Soll der Abgleich die Person führen, `importSource` auf `DOKUBIT` setzen |
+| `MANUELLER_DATENSATZ` | Die Adresse gehört im Portal einer von Hand geführten Person (`importSource` `MANUELL`, auch nachträglich umgestellt; eine Person aus DokuBit lässt sich nicht zurückstellen). Ihr wird kein Vertrag zugeordnet, weder ein neuer noch ein bekannter einer anderen Person; ein bekannter Vertrag bleibt, wo er ist (Regel unter der Tabelle). Adresse, Name und Aktiv-Status der Person bleiben | HR entscheidet. Soll der Abgleich die Person führen, `importSource` auf `DOKUBIT` setzen |
 | `FREMDE_QUELLE` | Person aus einer anderen Quelle, z. B. LOGA; sonst wie `MANUELLER_DATENSATZ` | wie `MANUELLER_DATENSATZ` |
 
 **Zweifel verschafft nie Zugang** (Entscheidung des Auftraggebers vom 17.10.2026). Das gilt für

@@ -54,5 +54,6 @@ und S3b, danach S2 und S4, zuletzt S5.
 - Abgleich: `src/lib/personalstamm/abgleich.ts`. Der Kopfkommentar fasst die Regeln zusammen.
 - Webhook: `src/app/api/webhooks/personalstamm/route.ts`
 - Leserouten: `src/app/api/personalstamm/personen/route.ts` und `src/app/api/personalstamm/pruefen/route.ts`
+- Schreibschutz der Beschäftigtenrouten unter `/api/employees`: `src/lib/personalstamm/schreibschutz.ts`
 - Ansicht: `src/app/(portal)/personen/`, `src/components/personen/zu-pruefen.tsx`
 - Konstanten: `src/lib/constants.ts`, Block „Personalstamm aus DokuBit“

@@ -5079,6 +5079,13 @@ model SonderurlaubAnlass {
         abweisen, mindestens aber <code>SERVICE</code> ausschließen und jede Änderung im
         <code>AuditLog</code> festhalten — ab S1 hängen Zugang und Zuordnung an
         <code>Employee.email</code> und <code>Employee.isActive</code>.
+        <b>Erledigt am 17.10.2026 im S0-Zweig</b> (<code>src/lib/personalstamm/schreibschutz.ts</code>,
+        Entscheidung des Auftraggebers): <code>SERVICE</code> schreibt auf keiner der Routen unter
+        <code>/api/employees</code> mehr, jede Änderung von Hand steht im <code>AuditLog</code>.
+        Gesperrt ist über die Liste hinaus alles, was der Abgleich an einem Vertrag schreibt
+        (auch Einrichtung, Beginn, Ende und Stunden), dazu das Deaktivieren einer Person und das
+        Löschen eines Vertrags aus DokuBit; eine Person mit Quelle <code>DOKUBIT</code> legt nur der
+        Abgleich an.
         <br><b>Tests:</b> <code>anmeldung-zuordnung.test.ts</code> für <code>User</code> (mehr als ein
         Treffer, <code>email_verified = false</code>, schon belegter <code>sub</code>, bedingtes
         Schreiben ohne Wirkung); ein Aufruf mit X-API-Key bleibt angemeldet;

@@ -107,7 +107,7 @@ falschen Person zugeordnet worden. Der Fake verglich exakt und verdeckte das.
 | 1.06 | Sicherheit | CRITICAL | `ILIKE` wie 1.01, auch bei der Prüfung auf fremde Adressen | behoben wie 1.01. Dasselbe Muster im Bestand: `src/app/api/webhooks/contract-end/route.ts:100`, offen |
 | 1.07 | Sicherheit | MINOR | Ist `PERSONALSTAMM_SECRET` gleich `CRON_SECRET`, öffnet auch dieses den Webhook | behoben: 500 „Konfigurationsfehler“, Test |
 | 1.08 | Sicherheit | MINOR | Ansicht lädt über `GET /api/employees` volle Personenzeilen samt privater Adresse, Geburtsdatum, Telefon | behoben: eigene Leseroute `/api/personalstamm/personen` mit `select`, nur die drei HR-Rollen; `GET /api/employees` unverändert |
-| 1.09 | Sicherheit | MINOR | PATCH-Routen für Personen und Anstellungen ohne Sperre und Protokoll (Bestand) | ausgelassen: Bestand, trifft gemeinsam genutzte n8n-Abläufe; im Plan als Vorbedingung von S1 |
+| 1.09 | Sicherheit | MINOR | PATCH-Routen für Personen und Anstellungen ohne Sperre und Protokoll (Bestand) | ausgelassen: Bestand, trifft gemeinsam genutzte n8n-Abläufe; im Plan als Vorbedingung von S1. **Nachgeholt am 17.10.2026** nach Auskunft des Auftraggebers (kein n8n-Ablauf schreibt dorthin): Schreibschutz `src/lib/personalstamm/schreibschutz.ts`, `SERVICE` schreibt nicht mehr, AuditLog je Änderung; Mutationsprobe 6 von 6 erkannt |
 | 1.10 | Oberfläche | MAJOR | Bestandsanstellungen ohne Schlüssel erscheinen als „läuft“ und widersprechen der Status-Pille | behoben: laufende zuerst, beendete gedämpft, Zusatz „Bestand, zählt nicht für den Status“ |
 | 1.11 | Oberfläche | MAJOR | Meldungen unter „Zu prüfen“ lassen sich keiner Zeile zuordnen; die Suche nach einer MANR trifft die LOGA-Nummer | behoben: Schlüssel je Anstellung sichtbar, Suche über die MANR der Verträge. Ausgelassen: Mandantenname in „Zu prüfen“ |
 | 1.12 | Oberfläche | MINOR | Rote Hinweiszeile nur 4,14:1 Kontrast | ausgelassen: Hausmuster; Hausentscheidung offen |
@@ -388,7 +388,7 @@ der Git-Historie enthalten).
 **Außerhalb S0**
 - Vertragsende-Webhook (`src/app/api/webhooks/contract-end/route.ts`): ordnet allein über die MANR
   zu und nutzt den unmaskierten `ILIKE`-Vergleich (Z. 100); eigene Aufgabe vorgeschlagen.
-- Vor S1 die PATCH-Routen der Beschäftigtendaten absichern (1.09).
+- Schreibrouten der Beschäftigtendaten vor S1 absichern (1.09): erledigt am 17.10.2026.
 - `GET /api/employees` liefert volle Datensätze (S0 nutzt die eigene Leseroute).
 - `EVTLLDA`: Bedeutung klärt die Personalabteilung; das Platzhalter-Label „Evtl. letzter
   Arbeitstag“ ist vermutlich falsch.
