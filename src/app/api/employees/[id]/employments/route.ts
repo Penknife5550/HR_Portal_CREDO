@@ -4,14 +4,20 @@
  * GET  /api/employees/[id]/employments - Alle Anstellungen auflisten
  * POST /api/employees/[id]/employments - Neue Anstellung anlegen
  *
- * Auth: Session-Cookie (alle HR-Rollen) ODER X-API-Key (n8n/Service)
+ * Auth: Session-Cookie (alle HR-Rollen) ODER X-API-Key (n8n/Service).
+ * Anlegen nur die HR-Rollen, mit AuditLog. Einen Vertrag aus DokuBit
+ * (Abrechnungskreis + MANR) legt nur der Abgleich an; das Schema nimmt
+ * beides nicht an. Schreibschutz: src/lib/personalstamm/schreibschutz.ts
  */
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiHandler } from "@/lib/api-handler";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { PERSONALSTAMM_ACTIONS, PERSONALSTAMM_PROCESS_TYPE } from "@/lib/constants";
 
+// Lesen: alle HR-Rollen + SERVICE (n8n API-Key)
 const ALLOWED_ROLES = [
   "SUPER_ADMIN",
   "HR_LEITUNG",
@@ -103,11 +109,11 @@ export const GET = apiHandler(
 // =============================================
 export const POST = apiHandler<CreateEmploymentInput>(
   {
-    roles: ALLOWED_ROLES,
+    roles: HR_EDIT_ROLES,
     bodySchema: createEmploymentSchema,
     logLabel: "Employments POST",
   },
-  async ({ params, body }) => {
+  async ({ params, body, session }) => {
     const { id } = params;
 
     // Pruefen ob Mitarbeiter existiert
@@ -130,23 +136,34 @@ export const POST = apiHandler<CreateEmploymentInput>(
       );
     }
 
-    const employment = await prisma.employment.create({
-      data: {
-        employeeId: id,
-        organizationId: body.organizationId,
-        position: body.position || null,
-        department: body.department || null,
-        contractType: body.contractType || null,
-        workingHoursWeek: body.workingHoursWeek ?? null,
-        startDate: body.startDate ? new Date(body.startDate) : null,
-        endDate: body.endDate ? new Date(body.endDate) : null,
-        mandantNumber: body.mandantNumber || null,
-      },
-      include: {
-        organization: {
-          select: { id: true, name: true, mandantNumber: true },
+    const employment = await prisma.$transaction(async (tx) => {
+      const neu = await tx.employment.create({
+        data: {
+          employeeId: id,
+          organizationId: body.organizationId,
+          position: body.position || null,
+          department: body.department || null,
+          contractType: body.contractType || null,
+          workingHoursWeek: body.workingHoursWeek ?? null,
+          startDate: body.startDate ? new Date(body.startDate) : null,
+          endDate: body.endDate ? new Date(body.endDate) : null,
+          mandantNumber: body.mandantNumber || null,
         },
-      },
+        include: {
+          organization: {
+            select: { id: true, name: true, mandantNumber: true },
+          },
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: session?.userId ?? null,
+          processType: PERSONALSTAMM_PROCESS_TYPE,
+          action: PERSONALSTAMM_ACTIONS.ANSTELLUNG_ANGELEGT,
+          details: { employeeId: id, employmentId: neu.id },
+        },
+      });
+      return neu;
     });
 
     return NextResponse.json({ data: employment }, { status: 201 });

@@ -4,20 +4,24 @@
  * PATCH  /api/employees/[id]/employments/[employmentId] - Anstellung aktualisieren
  * DELETE /api/employees/[id]/employments/[employmentId] - Anstellung entfernen
  *
- * Auth: Session-Cookie (alle HR-Rollen) ODER X-API-Key (n8n/Service)
+ * Auth: nur die HR-Rollen (nicht der n8n-Schluessel). Bei einem Vertrag aus
+ * DokuBit (Abrechnungskreis + MANR gesetzt) sperrt der Schreibschutz alles,
+ * was der Abgleich schreibt, und das Loeschen; jede Aenderung kommt ins
+ * AuditLog: src/lib/personalstamm/schreibschutz.ts
  */
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiHandler } from "@/lib/api-handler";
-
-const ALLOWED_ROLES = [
-  "SUPER_ADMIN",
-  "HR_LEITUNG",
-  "HR_SACHBEARBEITER",
-  "SERVICE",
-];
+import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { PERSONALSTAMM_ACTIONS, PERSONALSTAMM_PROCESS_TYPE } from "@/lib/constants";
+import {
+  SCHREIBSCHUTZ_MELDUNGEN,
+  VERWALTETE_VERTRAGSFELDER,
+  gesperrteFelder,
+  vertragVerwaltet,
+} from "@/lib/personalstamm/schreibschutz";
 
 // =============================================
 // Zod Schemas
@@ -83,11 +87,11 @@ async function findEmployment(employeeId: string, employmentId: string) {
 // =============================================
 export const PATCH = apiHandler<UpdateEmploymentInput>(
   {
-    roles: ALLOWED_ROLES,
+    roles: HR_EDIT_ROLES,
     bodySchema: updateEmploymentSchema,
     logLabel: "Employment PATCH",
   },
-  async ({ params, body }) => {
+  async ({ params, body, session }) => {
     const { id, employmentId } = params;
 
     const existing = await findEmployment(id, employmentId);
@@ -96,6 +100,18 @@ export const PATCH = apiHandler<UpdateEmploymentInput>(
         { error: "Anstellung nicht gefunden" },
         { status: 404 }
       );
+    }
+
+    // Ob ein Vertrag aus DokuBit stammt, aendert sich nie: Der Abgleich legt
+    // eigene Zeilen an und setzt den Schluessel nie an einer Bestandszeile.
+    if (vertragVerwaltet(existing)) {
+      const felder = gesperrteFelder(body, VERWALTETE_VERTRAGSFELDER);
+      if (felder.length > 0) {
+        return NextResponse.json(
+          { error: SCHREIBSCHUTZ_MELDUNGEN.vertragFelder(felder), felder },
+          { status: 409 }
+        );
+      }
     }
 
     // Falls organizationId geaendert wird, pruefen ob neue Einrichtung existiert
@@ -127,14 +143,29 @@ export const PATCH = apiHandler<UpdateEmploymentInput>(
     if (body.mandantNumber !== undefined) updateData.mandantNumber = body.mandantNumber;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
 
-    const employment = await prisma.employment.update({
-      where: { id: employmentId },
-      data: updateData,
-      include: {
-        organization: {
-          select: { id: true, name: true, mandantNumber: true },
+    const felder = Object.keys(updateData);
+    const employment = await prisma.$transaction(async (tx) => {
+      const geaendert = await tx.employment.update({
+        where: { id: employmentId },
+        data: updateData,
+        include: {
+          organization: {
+            select: { id: true, name: true, mandantNumber: true },
+          },
         },
-      },
+      });
+      if (felder.length > 0) {
+        await tx.auditLog.create({
+          data: {
+            userId: session?.userId ?? null,
+            processType: PERSONALSTAMM_PROCESS_TYPE,
+            action: PERSONALSTAMM_ACTIONS.ANSTELLUNG_GEAENDERT,
+            // Nur Feldnamen, nie Werte
+            details: { employeeId: id, employmentId, felder },
+          },
+        });
+      }
+      return geaendert;
     });
 
     return NextResponse.json({ data: employment });
@@ -145,8 +176,8 @@ export const PATCH = apiHandler<UpdateEmploymentInput>(
 // DELETE /api/employees/[id]/employments/[employmentId]
 // =============================================
 export const DELETE = apiHandler(
-  { roles: ALLOWED_ROLES, logLabel: "Employment DELETE" },
-  async ({ params }) => {
+  { roles: HR_EDIT_ROLES, logLabel: "Employment DELETE" },
+  async ({ params, session }) => {
     const { id, employmentId } = params;
 
     const existing = await findEmployment(id, employmentId);
@@ -156,9 +187,25 @@ export const DELETE = apiHandler(
         { status: 404 }
       );
     }
+    if (vertragVerwaltet(existing)) {
+      return NextResponse.json(
+        { error: SCHREIBSCHUTZ_MELDUNGEN.vertragLoeschen },
+        { status: 409 }
+      );
+    }
 
-    await prisma.employment.delete({
-      where: { id: employmentId },
+    await prisma.$transaction(async (tx) => {
+      await tx.employment.delete({
+        where: { id: employmentId },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: session?.userId ?? null,
+          processType: PERSONALSTAMM_PROCESS_TYPE,
+          action: PERSONALSTAMM_ACTIONS.ANSTELLUNG_GELOESCHT,
+          details: { employeeId: id, employmentId },
+        },
+      });
     });
 
     return NextResponse.json({ message: "Anstellung gelöscht" });

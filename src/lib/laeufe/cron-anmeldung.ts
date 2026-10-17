@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
  * Zeitkonstanter Vergleich ueber die SHA-256 beider Seiten: gleiche Laenge
  * unabhaengig von der Eingabe, und `timingSafeEqual` wirft nie.
  */
-function gleichZeitkonstant(a: string, b: string): boolean {
+export function gleichZeitkonstant(a: string, b: string): boolean {
   const hash = (wert: string) => crypto.createHash("sha256").update(wert, "utf8").digest();
   return crypto.timingSafeEqual(hash(a), hash(b));
 }

@@ -5,14 +5,26 @@
  * PATCH  /api/employees/[id] - Mitarbeiter-Daten aktualisieren
  * DELETE /api/employees/[id] - Soft Delete (isActive=false)
  *
- * Auth: Session-Cookie (alle HR-Rollen) ODER X-API-Key (n8n/Service)
+ * Auth: Session-Cookie (alle HR-Rollen) ODER X-API-Key (n8n/Service).
+ * Schreiben nur die HR-Rollen. Bei einer Person aus DokuBit sperrt der
+ * Schreibschutz Adresse, Aktiv-Status und Quelle, jede Aenderung kommt ins
+ * AuditLog: src/lib/personalstamm/schreibschutz.ts
  */
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiHandler } from "@/lib/api-handler";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { PERSONALSTAMM_ACTIONS, PERSONALSTAMM_PROCESS_TYPE } from "@/lib/constants";
+import {
+  SCHREIBSCHUTZ_MELDUNGEN,
+  VERWALTETE_PERSONENFELDER,
+  gesperrteFelder,
+  personVerwaltet,
+} from "@/lib/personalstamm/schreibschutz";
 
+// Lesen: alle HR-Rollen + SERVICE (n8n API-Key)
 const ALLOWED_ROLES = [
   "SUPER_ADMIN",
   "HR_LEITUNG",
@@ -116,11 +128,11 @@ export const GET = apiHandler(
 // =============================================
 export const PATCH = apiHandler<UpdateEmployeeInput>(
   {
-    roles: ALLOWED_ROLES,
+    roles: HR_EDIT_ROLES,
     bodySchema: updateEmployeeSchema,
     logLabel: "Employee PATCH",
   },
-  async ({ params, body }) => {
+  async ({ params, body, session }) => {
     const { id } = params;
 
     // Pruefen ob Mitarbeiter existiert
@@ -130,6 +142,16 @@ export const PATCH = apiHandler<UpdateEmployeeInput>(
         { error: "Mitarbeiter nicht gefunden" },
         { status: 404 }
       );
+    }
+
+    if (personVerwaltet(existing)) {
+      const felder = gesperrteFelder(body, VERWALTETE_PERSONENFELDER);
+      if (felder.length > 0) {
+        return NextResponse.json(
+          { error: SCHREIBSCHUTZ_MELDUNGEN.personFelder(felder), felder },
+          { status: 409 }
+        );
+      }
     }
 
     // Personalnummer-Eindeutigkeit pruefen (falls geaendert)
@@ -159,11 +181,42 @@ export const PATCH = apiHandler<UpdateEmployeeInput>(
     if (body.importSource !== undefined) updateData.importSource = body.importSource;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
 
-    const employee = await prisma.employee.update({
-      where: { id },
-      data: updateData,
-    });
+    const felder = Object.keys(updateData);
+    if (felder.length === 0) return NextResponse.json({ data: existing });
 
+    // Bedingt auf die gelesene Quelle: Uebernimmt der Abgleich die Person
+    // inzwischen (Altbestand → DOKUBIT), greift der Schreibschutz.
+    const geschrieben = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.employee.updateMany({
+        where: { id, importSource: existing.importSource },
+        data: updateData,
+      });
+      if (count === 0) return false;
+      await tx.auditLog.create({
+        data: {
+          userId: session?.userId ?? null,
+          processType: PERSONALSTAMM_PROCESS_TYPE,
+          action: PERSONALSTAMM_ACTIONS.PERSON_GEAENDERT,
+          // Nur Feldnamen, nie Werte; die Quelle ist kein Personendatum
+          details: {
+            employeeId: id,
+            felder,
+            ...(body.importSource !== undefined && {
+              quelle: { von: existing.importSource, nach: updateData.importSource ?? null },
+            }),
+          },
+        },
+      });
+      return true;
+    });
+    if (!geschrieben) {
+      return NextResponse.json(
+        { error: SCHREIBSCHUTZ_MELDUNGEN.inzwischenGeaendert },
+        { status: 409 }
+      );
+    }
+
+    const employee = await prisma.employee.findUnique({ where: { id } });
     return NextResponse.json({ data: employee });
   }
 );
@@ -172,8 +225,8 @@ export const PATCH = apiHandler<UpdateEmployeeInput>(
 // DELETE /api/employees/[id] (Soft Delete)
 // =============================================
 export const DELETE = apiHandler(
-  { roles: ALLOWED_ROLES, logLabel: "Employee DELETE" },
-  async ({ params }) => {
+  { roles: HR_EDIT_ROLES, logLabel: "Employee DELETE" },
+  async ({ params, session }) => {
     const { id } = params;
 
     const existing = await prisma.employee.findUnique({ where: { id } });
@@ -183,12 +236,37 @@ export const DELETE = apiHandler(
         { status: 404 }
       );
     }
+    if (personVerwaltet(existing)) {
+      return NextResponse.json(
+        { error: SCHREIBSCHUTZ_MELDUNGEN.personDeaktivieren },
+        { status: 409 }
+      );
+    }
 
-    const employee = await prisma.employee.update({
-      where: { id },
-      data: { isActive: false },
+    const geschrieben = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.employee.updateMany({
+        where: { id, importSource: existing.importSource },
+        data: { isActive: false },
+      });
+      if (count === 0) return false;
+      await tx.auditLog.create({
+        data: {
+          userId: session?.userId ?? null,
+          processType: PERSONALSTAMM_PROCESS_TYPE,
+          action: PERSONALSTAMM_ACTIONS.PERSON_DEAKTIVIERT,
+          details: { employeeId: id },
+        },
+      });
+      return true;
     });
+    if (!geschrieben) {
+      return NextResponse.json(
+        { error: SCHREIBSCHUTZ_MELDUNGEN.inzwischenGeaendert },
+        { status: 409 }
+      );
+    }
 
+    const employee = await prisma.employee.findUnique({ where: { id } });
     return NextResponse.json({ data: employee });
   }
 );

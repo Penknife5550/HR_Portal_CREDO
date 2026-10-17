@@ -1,0 +1,157 @@
+{
+  "name": "CREDO HR-Portal — Personalstamm aus DokuBit (S0)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 2,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "a148f4ae-ec4c-4ac1-8f71-8db0b620f472",
+      "name": "Täglich 02:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  CAST(MANDANTENNUMMER AS varchar(10))      AS mandantNummer,\n  LTRIM(RTRIM(ABRECHNUNGSKREIS))            AS abrechnungskreis,\n  LTRIM(RTRIM(MANR))                        AS personalNr,\n  LTRIM(RTRIM(MAVONAME))                    AS vorname,\n  LTRIM(RTRIM(MANANAME))                    AS nachname,\n  NULLIF(LOWER(LTRIM(RTRIM(MAEMAIL))), '')  AS email,\n  TEILZEITSTUNDEN                           AS teilzeitstunden,\n  CONVERT(char(10), VERTRAGSBEGINN, 23)     AS vertragsbeginn,\n  CONVERT(char(10), VERTRAGSENDE, 23)       AS vertragsende\nFROM [DokuBit].[dbo].[dokubitmitarbeiter]\nWHERE VERTRAGSENDE IS NULL\n   OR CAST(VERTRAGSENDE AS date) >= DATEADD(day, -30, CAST(GETDATE() AS date))\nORDER BY email, mandantNummer, abrechnungskreis, personalNr;"
+      },
+      "id": "acc1266d-1d9e-4947-b094-689da1e9dd41",
+      "name": "DokuBit lesen",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Credential: Microsoft SQL für DokuBit (am besten nur SELECT auf dbo.dokubitmitarbeiter)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stapel fuer POST /api/webhooks/personalstamm bilden:\n// - hoechstens 200 Zeilen je Stapel (Grenze des Webhooks)\n// - alle Zeilen derselben Adresse im selben Stapel (eine Person, ein Aufruf)\n// - Zeilen mit demselben Vertragsschluessel ebenfalls im selben Stapel: Nur so\n//   erkennt das Portal die Dublette (FORMATFEHLER), statt den Vertrag in jeder\n//   Nacht zwischen zwei Personen hin- und herzuhaengen\n// - Zeilen mit demselben Namen ebenfalls im selben Stapel: Sonst laege etwa die\n//   beendete Zeile ohne Adresse in einem anderen Stapel als der laufende\n//   Anschluss derselben Person, und ob sie stillgelegt wird, hinge vom Schnitt ab\n// - feste Spaltenliste: nur diese neun Felder gehen an das Portal\nconst MAX_STAPEL = 200;\n\n// Gruppe -> Gruppe, mit der sie zusammengelegt ist (bis zur Wurzel verfolgen)\nconst zusammen = new Map();\nconst wurzel = (g) => {\n  while (zusammen.get(g) !== g) g = zusammen.get(g);\n  return g;\n};\n// Merkmal (Vertragsschluessel oder Name) -> erste Gruppe damit; jede weitere wird mit ihr zusammengelegt\nconst gruppeJeMerkmal = new Map();\nconst verbinden = (merkmal, gruppe) => {\n  if (gruppeJeMerkmal.has(merkmal)) zusammen.set(wurzel(gruppe), wurzel(gruppeJeMerkmal.get(merkmal)));\n  else gruppeJeMerkmal.set(merkmal, gruppe);\n};\nconst zeilen = [];\nlet ohneAdresse = 0;\nfor (const item of $input.all()) {\n  const z = item.json;\n  const zeile = {\n    mandantNummer: z.mandantNummer,\n    abrechnungskreis: z.abrechnungskreis,\n    personalNr: z.personalNr,\n    vorname: z.vorname,\n    nachname: z.nachname,\n    email: z.email ?? null,\n    teilzeitstunden: z.teilzeitstunden ?? null,\n    vertragsbeginn: z.vertragsbeginn,\n    // Bewusst ohne `?? null`: NULL aus SQL kommt als null (= unbefristet). Fehlt\n    // die Spalte (etwa ein vertippter Alias), fehlt der Schluessel, und das\n    // Portal meldet FORMATFEHLER, statt alle Vertraege fuer unbefristet zu halten.\n    vertragsende: z.vertragsende,\n  };\n  // Zeilen ohne Adresse bilden je eine eigene Gruppe.\n  const gruppe = zeile.email ? String(zeile.email).trim().toLowerCase() : `ohne-adresse-${ohneAdresse++}`;\n  if (!zusammen.has(gruppe)) zusammen.set(gruppe, gruppe);\n  // Vertragsschluessel wie im Portal: Mandant ohne fuehrende Nullen, alles getrimmt.\n  const teile = [\n    String(zeile.mandantNummer ?? '').trim().replace(/^0+/, ''),\n    String(zeile.abrechnungskreis ?? '').trim(),\n    String(zeile.personalNr ?? '').trim(),\n  ];\n  if (teile.every((t) => t !== '')) verbinden(`schluessel:${teile.join('|')}`, gruppe);\n  // Name wie im Portal: getrimmt, klein; ohne Vor- oder Nachnamen wird nicht zusammengelegt.\n  const name = [zeile.vorname, zeile.nachname].map((t) => String(t ?? '').trim().toLowerCase());\n  if (name.every((t) => t !== '')) verbinden(`name:${name.join('|')}`, gruppe);\n  zeilen.push({ gruppe, zeile });\n}\n\nconst gruppen = new Map();\nfor (const { gruppe, zeile } of zeilen) {\n  const g = wurzel(gruppe);\n  if (!gruppen.has(g)) gruppen.set(g, []);\n  gruppen.get(g).push(zeile);\n}\n\nconst stapel = [];\nlet aktuell = [];\nfor (const zeilenDerGruppe of gruppen.values()) {\n  if (zeilenDerGruppe.length > MAX_STAPEL) throw new Error(`Eine Gruppe zusammengehoeriger Zeilen hat mehr als ${MAX_STAPEL} Zeilen`);\n  if (aktuell.length + zeilenDerGruppe.length > MAX_STAPEL) {\n    stapel.push(aktuell);\n    aktuell = [];\n  }\n  aktuell.push(...zeilenDerGruppe);\n}\nif (aktuell.length > 0) stapel.push(aktuell);\n\nreturn stapel.map((eintraege, i) => ({ json: { stapel: i + 1, anzahl: eintraege.length, eintraege } }));\n"
+      },
+      "id": "2b540e60-5f5f-4825-91fb-ccf3798afdee",
+      "name": "Stapel bilden",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "7d3e5b1a-2f4c-4e8b-9a61-5c0d2e8f4b17",
+      "name": "Je Stapel",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        720,
+        300
+      ],
+      "notes": "Ein Stapel nach dem anderen: Der naechste geht erst hinaus, wenn das Portal den vorigen beantwortet hat. Ausgang „loop“ -> An Portal senden -> zurueck hierher; „done“ bleibt frei."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://HR-PORTAL/api/webhooks/personalstamm",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.eintraege) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "4c9597b5-78de-4997-829e-0e256f73851c",
+      "name": "An Portal senden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "notes": "URL: HR-PORTAL durch die Adresse des Portals ersetzen. Credential: Header Auth nur für diesen Ablauf, Name Authorization, Wert Bearer <PERSONALSTAMM_SECRET> (nicht CRON_SECRET)."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Täglich 02:30": {
+      "main": [
+        [
+          {
+            "node": "DokuBit lesen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DokuBit lesen": {
+      "main": [
+        [
+          {
+            "node": "Stapel bilden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stapel bilden": {
+      "main": [
+        [
+          {
+            "node": "Je Stapel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Je Stapel": {
+      "main": [
+        [],
+        [
+          {
+            "node": "An Portal senden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "An Portal senden": {
+      "main": [
+        [
+          {
+            "node": "Je Stapel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Berlin",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  }
+}
