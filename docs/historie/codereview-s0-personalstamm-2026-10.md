@@ -315,7 +315,9 @@ Code tut es heute), und das verbleibende Restrisiko zu R1 (Restrisiko 2).
 **Umgebung.** Lokaler Container `credo-hr-db-dev` (`postgres:16-alpine`, Port 5433), am 17.10.2026
 neu angelegt, Schema per `prisma db push`, Seed eingespielt. Dev-Server wie in `../CLAUDE.md`
 beschrieben, zusätzlich `PERSONALSTAMM_SECRET` (mindestens 24 Zeichen, nicht gleich `CRON_SECRET`).
-Werte stehen nicht in diesem Dokument.
+Werte stehen nicht in diesem Dokument. (Nachtrag 18.10.2026: `../CLAUDE.md` ist eine Datei außerhalb
+des Repos; die Einrichtung ohne sie steht in
+[`docs/entwicklung/lokale-umgebung.md`](../entwicklung/lokale-umgebung.md).)
 
 **Testdaten.** [`s0-testdaten.json`](../module/selfservice/s0-testdaten.json), elf erfundene
 Zeilen, keine echten Beschäftigten: eine Person mit drei Verträgen bei

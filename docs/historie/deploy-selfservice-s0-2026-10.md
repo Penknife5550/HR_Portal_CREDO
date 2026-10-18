@@ -3,6 +3,17 @@
 > **Stand:** Ablaufplan vom 17.10.2026, am 18.10.2026 auf den Code-Stand `0e1d8de` nachgeführt (Fix
 > der Status-Kacheln vor dem Deploy, Abschnitt 0), **noch nicht ausgeführt**. Nach dem Deploy trägt
 > Claude das Protokoll direkt unter diesem Kopf ein (Vorlage in Abschnitt 9).
+> **Nachtrag 18.10.2026 (Sonntag):** kein Zugriff auf den Server, nichts ausgeführt, auch Abschnitt 1
+> nicht. Entschieden: zuerst Abschnitt 1 als eigener Schritt, nur lesend (die drei Ausnahmen aus der
+> Einleitung von Abschnitt 1 bleiben; Befehl A in 1.4 schreibt und läuft in diesem vorgezogenen
+> Schritt nur nach Rücksprache mit Claude). Der Deploy selbst folgt an einem Werktag zwischen 10 und
+> 12 Uhr mit HR, HR wird am Vortag informiert (Abschnitt 0, „Zeitfenster“). Läuft Abschnitt 1 nicht am
+> Tag des Deploys, wird er am Deploy-Tag wiederholt, denn der Serverstand kann sich bis dahin ändern.
+> Stand und nächste Schritte: [Übergabe S0](uebergabe-selfservice-s0-2026-10-17.md), Abschnitt
+> „Stand 18.10.2026 — hier weitermachen“.
+> **Prüfprotokoll dieses Plans:**
+> [`codereview-deploy-selfservice-s0-2026-10.md`](codereview-deploy-selfservice-s0-2026-10.md) (zwei
+> Runden, 34 Befunde, keiner offen).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand (zu prüfen):** laut [Protokoll vom 14.10.2026](deploy-main-2026-10.md) Repo
 > `ea2d41d` („docs(deploy): gemeinsamer Deploy f6d3daf -> main mit Ausstattung & Zugaenge“), Code
@@ -730,7 +741,12 @@ sudo git diff --name-only 0e1d8de HEAD
 `docs/historie/uebergabe-selfservice-s0-2026-10-17.md`, `docs/module/selfservice/README.md` (diese
 drei mit Standnachträgen) und `docs/module/selfservice/s0-personalstamm-n8n.md` (Korrektur der
 Anleitung S0) — oder gar keine Zeile, wenn `HEAD` gleich `0e1d8de` ist; nach einem späteren
-Doku-Commit weitere Zeilen unter `docs/`. Nur notieren.
+Doku-Commit weitere Zeilen unter `docs/`. Nur notieren. Kommen die Nachträge vom 18.10.2026
+(Abgleich für die Arbeit an einem anderen Rechner) im selben Pull Request mit, stehen zusätzlich
+`docs/entwicklung/lokale-umgebung.md`, `docs/historie/codereview-deploy-selfservice-s0-2026-10.md`,
+`docs/historie/codereview-s0-personalstamm-2026-10.md`,
+`docs/module/elternzeit/elternzeit-phase-2-review-fixes.md` und
+`docs/module/elternzeit/elternzeit-phase-2-status.md` in der Liste.
 
 ```bash
 sudo git diff --numstat ea2d41d 0e1d8de -- docker-compose.yml Dockerfile entrypoint.sh package.json package-lock.json .env.production.example .dockerignore next.config.ts prisma/schema.prisma prisma/seed-check.js prisma/seed.ts public/system-dokumente src/middleware.ts src/instrumentation.ts
@@ -2166,7 +2182,9 @@ ruhend“ bzw. „in Betrieb seit …“) überall nachführen, wo heute „nich
 - [`uebergabe-selfservice-s0-2026-10-17.md`](uebergabe-selfservice-s0-2026-10-17.md): Kopf
   („Nicht deployt.“ samt Nachtrag vom 18.10.), Abschnitt 5 (Punkt „Pull Request gemergt und
   deployt“ abhaken), Abschnitt 7 (Zeile S0 der Tabelle) und Abschnitt 8 (Zeilen `main` und
-  `fix/verbeamtung-kacheln-deploy-s0` der Zweig-Tabelle).
+  `fix/verbeamtung-kacheln-deploy-s0` der Zweig-Tabelle). Dazu den Abschnitt „Stand 18.10.2026 —
+  hier weitermachen“ unter dem Kopf auf den Stand nach dem Deploy bringen (Nachtrag vom 18.10.2026)
+  und in 8.6 den Satz zur CLAUDE.md, sobald sie nachgeführt ist.
 - CLAUDE.md **schon mit Etappe 1:** S0 deployt und ruhend; kein Deploy und kein Rückfall auf einen
   Stand ohne das S0-Schema (7.1, auch `ux-umbau` erst nach dem Merge von `main`), neue Stände
   enthalten zudem `0e1d8de` (Ausgangsstand oben); in der Tabelle der

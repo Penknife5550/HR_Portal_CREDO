@@ -299,6 +299,16 @@ src/app/(portal)/dashboard/
 — in unserem Kontext synonym mit `BEAMTER`. Enum bleibt fuer Bestandsdaten.
 Logik-Checks (`BEAMTER || PLANSTELLENINHABER`) bleiben unveraendert.
 
+### KPI-Kacheln (Nachtrag 18.10.2026)
+
+Seit `4cc1358` liefern `GET /api/elternzeit` und `GET /api/mutterschutz` je Status eine Zahl
+(`statusCounts`, `groupBy` ueber `status` mit `baseWhere`): mit den Filtern der Liste (Mandant,
+Einrichtung, Suche u. a.), aber **ohne** den gewaehlten Status. Ein Klick auf eine Kachel filtert
+so nur die Liste, die uebrigen Kacheln behalten ihre Zahlen (laut Notiz der Sitzung vom April
+standen die Kacheln vorher immer auf 0). Code: `src/app/api/elternzeit/route.ts` und `src/app/api/mutterschutz/route.ts`,
+jeweils `statusCountsRaw`. Nach diesem Muster zaehlt seit `0e1d8de` auch die Verbeamtung
+(`docs/historie/deploy-selfservice-s0-2026-10.md`, Abschnitt 0).
+
 ---
 
 ## GoLive-Haertung (April 2026, Commit `4cc1358`)
@@ -318,6 +328,10 @@ damit GoLive-tauglich.
     Token, in der DB steht aber noch Klartext aus alten Vorgaengen).
     Vor dem Update DB-Check auf offene Tokens machen, ggf. neue Links
     nach dem Update versenden.
+  - **Warum SHA-256 ohne Salt und nicht bcrypt** (Nachtrag 18.10.2026): Die
+    Tokens sind zufaellige UUIDs mit 122 Bit; Durchprobieren ist aussichtslos,
+    einen langsamen Passwort-Hash braeuchte es nur bei erratbaren Werten
+    (vgl. `docs/module/onboarding/paket4-feinplanung.md`, Tabelle mit `randomUUID()`).
 
 - **IDOR-Schliessung Mutterschutz:** Alle 4 Bestands-Routes (`[id]` GET/
   PATCH/DELETE, `notizen` GET/POST, `checkliste/[itemId]` PATCH) und
@@ -428,6 +442,10 @@ Test (verhindert Mailflut beim ersten Vorgang).
 stattdessen ein Direct-SQL-INSERT-Snippet (siehe Deployment-Runbook der
 Session) oder die UI-Quick-Add-Buttons nutzen.
 
+> **Richtigstellung 18.10.2026:** Das Deployment-Runbook dieser Sitzung liegt
+> nicht im Repo. Der Weg auf Produktion ist die Schaltflaeche „+ Webhook“ je
+> Ereignis unter Einstellungen → Webhooks.
+
 ---
 
 ## Was bewusst NICHT in Phase 2 ist (→ Phase 3)
@@ -438,6 +456,11 @@ Session) oder die UI-Quick-Add-Buttons nutzen.
 - BR Detmold Tracking-UI (eigener Tab) — bisher nur API
 - Analytics-Dashboard
 - Teilzeit-Antrag als Mini-Workflow
+
+Empfehlung aus der Sitzung vom April 2026 (Nachtrag 18.10.2026): die
+Unterzustaende der Phase 3 (`UNTERBROCHEN`, `RUECKKEHR_GEPLANT`, siehe
+Implementierungsplan) als eigene Workflow-Lib mit eigenen erlaubten
+Folgestatus bauen, nicht in den linearen Hauptablauf einfuegen.
 
 ---
 
@@ -465,6 +488,12 @@ npx next dev -p 3000
 **Mandanten-Config setzen:** Login als SUPER_ADMIN → Mandanten → "Elternzeit-Konfig" pro Einrichtung pflegen (Geschaeftsfuehrung, BR Detmold-Kontakt).
 
 **Cron-Job aktivieren:** n8n-Workflow taeglich gegen `/api/cron/elternzeit-fristen` mit Bearer-Token aus `CRON_SECRET`.
+
+> **Richtigstellung 18.10.2026:** Seit 09/2026 startet der Zeitplaner des Portals den Lauf
+> „Elternzeit-Fristen“ selbst (Einstellungen → Automatische Laeufe, Standard 08:30; neue Laeufe kommen
+> ausgeschaltet an). n8n wird dafuer nicht mehr gebraucht (CLAUDE.md, „Automatische Läufe“). Die Route
+> verlangt ein `CRON_SECRET` mit mindestens 24 Zeichen, der Entwicklungswert oben ist kuerzer (Antwort
+> beim Handaufruf 500). Die lokale Umgebung von heute: `docs/entwicklung/lokale-umgebung.md`.
 
 ---
 

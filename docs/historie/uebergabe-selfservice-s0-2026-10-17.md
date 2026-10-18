@@ -11,6 +11,48 @@
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was gebaut ist, was
 > entschieden und geprüft wurde, was vor dem ersten Produktivlauf fehlt und wie es nach Plan weitergeht.
 
+## Stand 18.10.2026 — hier weitermachen
+
+**Wo die Arbeit steht.**
+
+- S0 ist mit PR #5 in `main` (`a43aa25`, 17.10.2026).
+- **PR #6 ist offen** (Zweig `fix/verbeamtung-kacheln-deploy-s0`, angelegt am 18.10.2026): der Fix
+  der Status-Kacheln der Verbeamtung `0e1d8de`, der Ablaufplan
+  [`deploy-selfservice-s0-2026-10.md`](deploy-selfservice-s0-2026-10.md) mit seinem
+  [Prüfprotokoll](codereview-deploy-selfservice-s0-2026-10.md) und Doku-Nachträge, auch dieser
+  Abschnitt (nur unter `docs/`). **Gemergt wird nur mit „Create a merge commit“**, nie mit Squash oder
+  Rebase, denn der Plan hängt am Hash `0e1d8de` (Ablaufplan Abschnitt 0, „Vor dem Termin zu
+  entscheiden“, Punkt 5, dort auch der Prüfbefehl danach).
+- **Deploy nicht begonnen.** Am 18.10.2026 bestand kein Zugriff auf den Server. Auch Abschnitt 1 des
+  Ablaufplans ist nicht ausgeführt; der Serverstand seit dem 14.10.2026 ist im Repo nicht belegt.
+- **Entschieden am 18.10.2026:** zuerst Abschnitt 1 des Ablaufplans nur lesend, als eigener Schritt.
+  Der Deploy selbst folgt an einem Werktag zwischen 10 und 12 Uhr mit HR; HR wird am Vortag
+  informiert (Nachtrag im Kopf des Ablaufplans).
+
+**Nächste Schritte, in dieser Reihenfolge** (2 und 3 hängen nicht voneinander ab):
+
+1. Auf einem anderen Rechner: Repo holen, den Zweig von PR #6 auschecken (Abschnitt 8.6).
+2. PR #6 auf GitHub prüfen und mit „Create a merge commit“ mergen, danach der Prüfbefehl aus
+   Ablaufplan Abschnitt 0, Punkt 5.
+3. Mit Zugriff auf den Server: Ablaufplan Abschnitt 1 nur lesend, die Ausgaben an Claude.
+4. Die offenen Punkte 3 und 4 unter „Vor dem Termin zu entscheiden“ klären (Lauf „Wartung“, Stand der
+   Punkte vom 14.10.2026).
+5. Termin festlegen und HR am Vortag informieren (Textvorschlag im Ablaufplan, „Zeitfenster“).
+6. Etappe 1 nach dem Ablaufplan (Abschnitte 1 bis 6; Abschnitt 1 am Deploy-Tag wiederholen). Danach
+   trägt Claude das Protokoll ein und führt die Dateien aus „Nach dem Update (Claude)“ nach.
+7. Freigaben F1 bis F11 einholen (Ablaufplan 8.0, Checkliste in Abschnitt 5), erst dann Etappe 2.
+
+Parallel möglich bleibt S1 (Abschnitt 7).
+
+**Offene Entscheidungen.**
+
+- **F11** (Ablaufplan 8.0): Wie lange bewahrt n8n gescheiterte Ausführungen des Stammablaufs auf, die
+  Namen und Adressen aus DokuBit enthalten? Nur dieser Ablauf „Do not save“ oder instanzweit mit
+  Frist. Entscheiden Auftraggeber und DSB, vor Etappe 2.
+- **Lauf „Wartung“** am Tag des Deploys einschalten (empfohlen, Ablaufplan 6.2) oder erst vor
+  Etappe 2 (Ablaufplan Abschnitt 0, Punkt 3).
+- Weitere: Prüfprotokoll des Ablaufplans, Abschnitt „Offen“; hier Abschnitte 5 und 6.
+
 Die Dokumente zu S0:
 
 | Dokument | Inhalt |
@@ -23,6 +65,8 @@ Die Dokumente zu S0:
 | `docs/historie/s0-bauvorgabe-2026-10.md` | Archiv der Bauvorgabe vom 17.10.2026 mit Markierung, was später ersetzt wurde. Nicht mehr maßgeblich |
 | `docs/historie/codereview-s0-personalstamm-2026-10.md` | Prüfprotokoll von S0: Befunde je Runde mit Schwere und Ergebnis, Entscheidungen mit Urheber, Restrisiken |
 | `docs/historie/codereview-selfservice-plan-2026-10.md` | Code-Review des Konzeptplans (F1–F83), auf das Plan und Code verweisen |
+| `docs/historie/deploy-selfservice-s0-2026-10.md` | Ablaufplan des Server-Updates mit S0 (Etappe 1 ruhend, Etappe 2 nach den Freigaben F1–F11); noch nicht ausgeführt |
+| `docs/historie/codereview-deploy-selfservice-s0-2026-10.md` | Prüfprotokoll des Ablaufplans: zwei Runden, 34 Befunde mit Ergebnis, Restrisiken |
 
 ---
 
@@ -187,6 +231,8 @@ Prüfprotokoll [`codereview-s0-personalstamm-2026-10.md`](codereview-s0-personal
 **Gates (17.10.2026, Endstand `24a8d11`):** `npm run pruefen` grün: Typprüfung und Lint ohne Fehler
 (die 5 bekannten Warnungen in fremden Bestandsdateien), **244 Suites, 7.487 Tests**.
 Nach dem Schreibschutz (Abschnitt 2.6): **246 Suites, 7.523 Tests**, dieselben 5 Warnungen.
+Nach dem Kachel-Fix `0e1d8de` (18.10.2026): **247 Suites, 7.526 Tests**, dieselben 5 Warnungen; ebenso
+in einem frischen Klon ohne Datenbank und ohne Umgebungsvariablen.
 
 **Schreibschutz (Abschnitt 2.6).** Mutationsprobe: Vertragssperre, bedingtes Schreiben, Rolle
 SERVICE, gesperrtes `endDate`, Deaktivieren und `POST` mit Quelle `DOKUBIT` einzeln ausgebaut, alle
@@ -256,7 +302,9 @@ Stand der lokalen Datenbank danach: 5 Personen aus DokuBit (4 aktiv), 5 verwalte
       Löschfrist nicht.
 - [ ] **n8n-Importvorlage einmal prüfen:** Die Verdrahtung des Knotens „Loop Over Items“ ist nicht
       gegen eine echte n8n-Instanz getestet (Soll in der Anleitung, Abschnitt 3.2). Einstellungen nach
-      3.3: Zeitzone Europe/Berlin, erfolgreiche Ausführungen nicht speichern.
+      3.3: Zeitzone Europe/Berlin, erfolgreiche Ausführungen nicht speichern. Wie lange gescheiterte
+      Ausführungen bleiben, ist Freigabe F11 im Ablaufplan 8.0 (Stand 18.10.2026: offen,
+      entscheiden Auftraggeber und DSB).
 - [ ] **Erster Lauf von Hand,** dann „Personen“ und Abfrage 5 ansehen, erst danach aktiv schalten.
       Einen Probelauf gibt es nicht; schon der erste Aufruf schreibt.
 
@@ -320,7 +368,8 @@ Für jedes Paket gilt dieselbe Abnahme: `npm run pruefen` grün, bei Schemaände
 
 **Unmittelbar als Nächstes** (Stand 18.10.2026): PR mit dem Kachel-Fix und dem Ablaufplan mergen,
 Etappe 1 nach dem Ablaufplan deployen, die Freigaben für Etappe 2 einholen (Abschnitt 5 und
-Ablaufplan 8.0). Parallel kann S1 beginnen; seine Vorbedingung aus S0 ist erfüllt.
+Ablaufplan 8.0). Parallel kann S1 beginnen; seine Vorbedingung aus S0 ist erfüllt. Der Pull Request
+ist PR #6; Reihenfolge im Einzelnen: Abschnitt „Stand 18.10.2026 — hier weitermachen“ oben.
 
 ## 8 · Wiedereinstieg
 
@@ -330,7 +379,7 @@ Ablaufplan 8.0). Parallel kann S1 beginnen; seine Vorbedingung aus S0 ist erfül
 |---|---|
 | `main` | `a43aa25`, Merge von PR #5 (S0), davor `ac3535a` (PR #4, Konzeptplan) |
 | `feat/selfservice-s0-personalstamm` | in PR #5 gemergt, nur noch Historie |
-| `fix/verbeamtung-kacheln-deploy-s0` | Kachel-Fix `0e1d8de` und Ablaufplan; geht per Pull Request nach `main` |
+| `fix/verbeamtung-kacheln-deploy-s0` | Kachel-Fix `0e1d8de` und Ablaufplan; geht per Pull Request nach `main`. PR #6, angelegt am 18.10.2026, offen; nur mit „Create a merge commit“ mergen (Ablaufplan Abschnitt 0, Punkt 5), danach dessen Prüfbefehl |
 | `feat/selfservice-portal-plan` | in PR #4 gemergt, nur noch Historie |
 | `ux-umbau` | nicht in `main`; Vorbedingung für S3 und S2 |
 
@@ -339,6 +388,11 @@ versehentlich im Ordner `Finance_portal`. Ihre Notizen für Claude liegen seithe
 Projekts HR_Portal_CREDO (`hr-portal-selfservice-stand`, `hr-portal-dokubit-befunde`,
 `hr-portal-git-umgebung`). Nur im richtigen Ordner lädt Claude sie, und nur dort lässt sich ein
 Pull Request an die Sitzung binden.
+
+**Nachtrag 18.10.2026:** Das Gedächtnis gibt es nur auf dem Rechner, auf dem die Sitzung lief
+(Abschnitt 8.6). Maßgeblich ist das Repo; der Inhalt der drei Notizen steht in dieser Übergabe, in
+der Anleitung S0 und im Plan (Abgleich vom 18.10.2026). Der richtige Ordner allein genügt zum Binden
+eines Pull Requests nicht: Am 18.10.2026 scheiterte es, weil `gh` nicht angemeldet war (Abschnitt 8.4).
 
 ### 8.2 Lokale Umgebung
 
@@ -356,6 +410,14 @@ Pull Request an die Sitzung binden.
   Ohne gültiges Geheimnis antwortet der Webhook mit 500 „Konfigurationsfehler“.
 - **Prüfen:** `npm run pruefen` (Typen, Lint, Tests). Nach Schemaänderungen `npx prisma generate`.
 - **Ansicht:** `http://localhost:3000/personen`, angemeldet mit einer der drei HR-Rollen.
+
+**Nachtrag 18.10.2026:** `../CLAUDE.md` ist die Workspace-Datei im Ordner über dem Repo. Sie liegt nur
+auf dem Mac, ist nie committet und fehlt in einem frischen Klon (Abschnitt 8.6). Die Einrichtung ohne
+diese Datei und ohne Werte steht seither in
+[`docs/entwicklung/lokale-umgebung.md`](../entwicklung/lokale-umgebung.md): Container, Variablen samt
+Mindestlängen, Reihenfolge `db push` → `db seed` → `node prisma/seed-check.js`, Testzugang über
+`ADMIN_INITIAL_PASSWORD` oder `scripts/dev-passwort-neu.js`, Vorschau für Claude und Stolpersteine
+(Node 24, HSTS auf localhost).
 
 ### 8.3 Testdaten an den Webhook schicken
 
@@ -392,7 +454,8 @@ auch der zweite Vertrag von „Anna Beispiel“ beendet, und die Zahlen verschie
 Die Folgefälle aus Abschnitt 4 entstehen durch Abwandeln einzelner Zeilen, etwa eine neue Adresse
 (Vertrag wandert), ein neuer Nachname bei allen laufenden Zeilen einer Adresse (Heirat) oder ein
 anderer `vertragsbeginn` unter bekanntem Schlüssel (Zweifelsfall). Wer wieder bei null anfangen will,
-setzt die lokale Datenbank neu auf (Container neu, `db push`, `db seed`).
+setzt die lokale Datenbank neu auf (Container neu, `db push`, `db seed`; Befehle samt
+`node prisma/seed-check.js` in `docs/entwicklung/lokale-umgebung.md`, Abschnitte 4 und 6).
 
 ### 8.4 Wie Pull Requests hier laufen
 
@@ -405,6 +468,14 @@ setzt die lokale Datenbank neu auf (Container neu, `db push`, `db seed`).
 - Gepusht wird nur auf ausdrückliche Freigabe; das Repo ist öffentlich. Deshalb gehören weder Namen
   echter Beschäftigter noch Geheimnisse in Commits, Doku oder Testdaten.
 - Nach dem Merge: `git fetch`, dann `git checkout main` und `git pull --ff-only`.
+- **Nachtrag 18.10.2026:**
+  - „`gh` ist nicht installiert“ beschreibt den Mac. Auf einem anderen Rechner zuerst
+    `gh auth status` prüfen.
+  - Das Binden eines Pull Requests an die Sitzung (Desktop-App) scheiterte am 18.10.2026 ohne
+    angemeldetes `gh`. Der Weg über die Vergleichsseite bleibt.
+  - **Merge-Art immer „Create a merge commit“**, nie „Squash and merge“ oder „Rebase and merge“:
+    Beide schreiben die Commits neu, und Ablaufpläne prüfen feste Hashes. Der Commit-Text bleibt der
+    Standard von GitHub („Merge pull request #… from …“, wie bei PR #4 und #5).
 
 ### 8.5 Falle: „ 2“-Duplikate
 
@@ -419,3 +490,47 @@ Der Repo-Ordner liegt auf dem synchronisierten Schreibtisch. Die Synchronisierun
   `find .git -name '* 2*'`.
 - Vor dem Verschieben mit `cmp` vergleichen und den Auftraggeber fragen. Nicht löschen, sondern in
   eine Sicherung verschieben.
+
+**Nachtrag 18.10.2026.** Auch ein lokaler Dev-Server löst die Duplikate aus: `next dev` schreibt
+`.next` laufend neu, und die Synchronisierung legt dabei Kopien an. Am 18.10.2026 brachen Kopien wie
+`.next/types/… 2.ts` die Typprüfung mit „Duplicate identifier“, denn `tsconfig.json` schließt
+`.next/types/**/*.ts` ein. 50 Dateien wurden byte-gleich in eine Sicherung außerhalb des Repos
+verschoben. Danach lagen in `.next` noch 40 Kopien mit „ 3“ bis „ 7“ im Namen. Die Endung ist also
+nicht immer „ 2“, und der erste Befehl oben lässt `.next` aus.
+
+- Prüfen, alle Ziffern, `.git` und `.next` eingeschlossen:
+  `find . -path ./node_modules -prune -o \( -name '* [0-9]' -o -name '* [0-9].*' \) -print`
+- Abhilfe in `.next`: Dev-Server stoppen, `.next` nach Rückfrage verschieben oder löschen (nur ein
+  Zwischenspeicher), danach `npm run pruefen`. Kopien in `node_modules`: `npm ci`.
+- Auf einem anderen Rechner das Repo außerhalb eines synchronisierten Ordners klonen
+  (`docs/entwicklung/lokale-umgebung.md`, Abschnitt 1). Liegt es doch in einem, dieselben Prüfungen.
+
+### 8.6 Auf einem anderen Rechner weitermachen (Nachtrag 18.10.2026)
+
+**Der Einstieg ist „Lies die Übergabe“:** eine neue Sitzung im Repo-Ordner beginnen mit „Lies
+`docs/historie/uebergabe-selfservice-s0-2026-10-17.md`“. Von selbst findet Claude sie nicht: Die
+CLAUDE.md des Repos nennt S0 und diese Übergabe noch nicht. Sie wird bis zum Deploy nicht geändert,
+denn jede Änderung außerhalb von `docs/` hielte den Ablaufplan in 3.2 an; nachgeführt wird sie mit
+Etappe 1 (Ablaufplan, „Nach dem Update (Claude)“).
+
+**Holen.** Ein frischer Klon steht auf `main`. Solange PR #6 offen ist, liegen Ablaufplan, Kachel-Fix
+und die Nachträge vom 18.10.2026 nur auf seinem Zweig: `git checkout fix/verbeamtung-kacheln-deploy-s0`.
+Weitere Commits auf diesem Zweig nur unter `docs/`, denn 3.2 prüft „nach 0e1d8de nur Doku“. Die
+lokale Umgebung richtet [`docs/entwicklung/lokale-umgebung.md`](../entwicklung/lokale-umgebung.md)
+ein; die Abnahme `npm run pruefen` braucht keine Datenbank.
+
+**Was nicht in Git liegt:**
+
+| Was | Wo | Bedeutung und Ersatz |
+|---|---|---|
+| Gedächtnis von Claude: die drei Notizen aus 8.1, dazu eine zur Elternzeit vom April 2026 | im Benutzerordner von Claude auf dem Mac, je Projektpfad | Wird auf einem anderen Rechner nicht geladen. Der Inhalt steht im Repo (Abgleich vom 18.10.2026): Stand und Entscheidungen hier, Befunde der DokuBit-Abfragen in der Anleitung S0, Abschnitt 2, Git-Eigenheiten in 8.4 und 8.5, Stolpersteine in `lokale-umgebung.md`, Elternzeit im Status Phase 2. Persönliche Angaben bleiben draußen. Überholt sind dort die Regel „Anstellung je Mandant“ (gültig ist eine Anstellung je Vertrag, 2.1), die Zahl 238 (3.1) und der Ort des Startbefehls |
+| Workspace-Datei `../CLAUDE.md` im Ordner über dem Repo | nur auf dem Mac, nie committet | Claude lädt sie dort von selbst. Sie enthält Hausregeln (Sprache, Tech-Stack, CREDO-Design und Styling, API-Muster, Sicherheit, UX, Datenbank, Arbeitsweise, Karpathy-Prinzipien) und das Startrezept mit Entwicklungswerten und Testzugang. Im Repo stehen davon nur einzelne Projektregeln (CLAUDE.md, etwa die Sperrklinke). Ob die Hausregeln ins Repo kommen, entscheidet der Auftraggeber. Bis dahin die Datei privat übertragen, nicht über Git (sie enthält Passwörter), und wieder in den Ordner über dem Repo legen. An die Stelle ihres Startrezepts tritt `lokale-umgebung.md` (ohne Werte) |
+| Lokale Datenbank `credo-hr-db-dev` mit den Testdaten aus Abschnitt 4, `.env` | Docker und Repo-Ordner des Mac | neu aufsetzen (`lokale-umgebung.md`, Abschnitte 4 bis 6), Testdaten nach 8.3. Werte nie übertragen, neu erzeugen |
+| `.claude/launch.json` (Vorschau des Dev-Servers für Claude), `.claude/settings.local.json` | Repo-Ordner, per `.gitignore` ausgeschlossen | `launch.json` neu anlegen (`lokale-umgebung.md`, Abschnitt 8); `settings.local.json` enthält nur Freigaben des Mac und wird nicht übertragen |
+| n8n-Exporte unter `n8n/` | per `.gitignore` ausgeschlossen (`/n8n/`) | Maßgeblich ist die n8n-Instanz. Fünf Exporte erzeugen die Skripte `scripts/generate_n8n_workflows.py` und `scripts/n8n/`; zwei ältere gibt es nur auf dem Mac, bei Bedarf außerhalb von Git übertragen. Drei Exporte vom März 2026 sind aus der Zeit vor der Regel versioniert (Entscheidung beim Auftraggeber) |
+| Lokaler Stash `stash@{0}` vom 15.10.2026 („Artefakte des abgebrochenen Pulls“) | Git-Ordner des Mac | Reste eines abgebrochenen Pulls; nicht anwenden. Ob er gelöscht wird, entscheidet der Auftraggeber am Mac |
+| Rohdaten der Prüfungen (Befundlisten, Logs, Sicherung der verschobenen Duplikate) | temporäre Ablage der Sitzungen | nicht nötig; maßgeblich sind die Prüfprotokolle im Repo |
+
+**Auf dem neuen Rechner zuerst prüfen:** `gh auth status` (8.4), Node-Version (22 empfohlen),
+`git config user.email` (`lokale-umgebung.md`, Abschnitt 1) und ob der Repo-Ordner synchronisiert
+wird (8.5).

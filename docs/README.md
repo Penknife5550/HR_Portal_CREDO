@@ -100,7 +100,13 @@ Branch: `feat/minijob-checkliste-2026`.
 | [module/selfservice/s0-personalstamm-n8n.md](module/selfservice/s0-personalstamm-n8n.md) | **n8n-Stammablauf S0 „Personalstamm aus DokuBit"** — SQL-Abfrage mit fester Spaltenliste, Einrichtung des Ablaufs (Stapel je Adresse, ein Stapel nach dem anderen), Antwort und Grundcodes mit Abhilfe, Rücknahme, Bestandsprüfung der Portal-Datenbank, Checkliste vor dem ersten Produktivlauf. Dazu die Importvorlage [s0-personalstamm-n8n.json](module/selfservice/s0-personalstamm-n8n.json) (n8n 2.x, ohne Credentials) |
 | [module/selfservice/s0-testdaten.json](module/selfservice/s0-testdaten.json) | Elf erfundene DokuBit-Zeilen für den Webhook in der lokalen Umgebung (eine Person mit mehreren Verträgen, beendete Verträge, Formatfehler, unbekannter Mandant, geteiltes Postfach, Unterstrich in der Adresse); Aufruf und erwartete Ergebnisse in der Übergabe, Abschnitt 8.3 |
 
-S0 ist mit PR #5 in `main` (`a43aa25`), noch nicht deployt.
+S0 ist mit PR #5 in `main` (`a43aa25`), noch nicht deployt. Stand vom 18.10.2026 und nächste Schritte: [Übergabe S0](historie/uebergabe-selfservice-s0-2026-10-17.md), Abschnitt „Stand 18.10.2026 — hier weitermachen“; Weitermachen auf einem anderen Rechner: dort Abschnitt 8.6.
+
+## Entwicklung
+
+| Datei | Inhalt |
+|---|---|
+| [entwicklung/lokale-umgebung.md](entwicklung/lokale-umgebung.md) | **Lokale Entwicklungsumgebung einrichten (18.10.2026)** — auf einem neuen Rechner nur mit dem Repo: Voraussetzungen, Klon, Abnahme ohne Datenbank, Datenbank-Container auf Port 5433, Umgebungsvariablen mit Mindestlängen (ohne Werte), Reihenfolge `db push` → `db seed` → `seed-check.js`, Testzugang, Gotenberg, Vorschau für Claude, Stolpersteine |
 
 ## Historie
 
@@ -115,6 +121,7 @@ S0 ist mit PR #5 in `main` (`a43aa25`), noch nicht deployt.
 | [historie/codereview-s0-personalstamm-2026-10.md](historie/codereview-s0-personalstamm-2026-10.md) | **Prüfprotokoll S0, 17.10.2026** — sechs Runden Review und adversariale Gegenprüfung, 77 Befunde (2 kritisch, 23 wesentlich), keiner der kritischen oder wesentlichen offen; Entscheidungen mit Urheber (Auftraggeber oder Claude), Ende-zu-Ende-Probe, Restrisiken |
 | [historie/uebergabe-selfservice-s0-2026-10-17.md](historie/uebergabe-selfservice-s0-2026-10-17.md) | **Übergabe Self-Service S0, 17.10.2026** — Stand, Entscheidungen, Verifikation, Checkliste vor dem ersten Produktivlauf, offene Punkte, nächste Pakete und Wiedereinstieg in einer neuen Sitzung |
 | [historie/deploy-selfservice-s0-2026-10.md](historie/deploy-selfservice-s0-2026-10.md) | **Ablaufplan Server-Update mit Self-Service S0 (noch nicht ausgeführt)** — `main` ab `ea2d41d`: Zugriffskorrekturen vom 16.10., Fix der Status-Kacheln, S0; Etappe 1 rollt S0 ruhend aus, Etappe 2 nimmt es erst nach den Freigaben F1–F11 in Betrieb; Rückfall, Protokollvorlage |
+| [historie/codereview-deploy-selfservice-s0-2026-10.md](historie/codereview-deploy-selfservice-s0-2026-10.md) | **Prüfprotokoll des Ablaufplans, 17./18.10.2026** — zwei Runden (Entwurf mit drei Prüfern, Nachführen auf `0e1d8de` mit zwei Prüfern), 34 Befunde (14 wichtig, 20 klein), keiner offen; verworfene Teilvorschläge mit Grund, Restrisiken |
 
 ---
 

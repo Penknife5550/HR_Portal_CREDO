@@ -13,7 +13,9 @@ Datenschutzbeauftragter und MAV haben ihm am 17.10.2026 zugestimmt. Paket S0 ist
 
 **Hier anfangen:** [Übergabe S0 vom 17.10.2026](../../historie/uebergabe-selfservice-s0-2026-10-17.md).
 Sie nennt Stand, Entscheidungen, Prüfung, die Checkliste vor dem ersten Produktivlauf, die offenen
-Punkte und den Wiedereinstieg.
+Punkte und den Wiedereinstieg. Der Stand vom 18.10.2026 (PR #6 offen, Deploy nicht begonnen) und die
+nächsten Schritte stehen dort direkt unter dem Kopf, das Weitermachen auf einem anderen Rechner in
+Abschnitt 8.6.
 
 ## Stand je Paket
 

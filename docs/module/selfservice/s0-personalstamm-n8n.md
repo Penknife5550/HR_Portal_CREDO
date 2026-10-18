@@ -125,6 +125,25 @@ ORDER BY email, mandantNummer, abrechnungskreis, personalNr;
   Ende: das Fenster für einen Lauf vergrößern (z. B. `-365`). Eine gelöschte Zeile kommt auch so
   nicht; dann den Vertrag in DokuBit wiederherstellen und beenden.
 
+**Befunde der Aggregatabfragen vom 17.10.2026** (Nachtrag 18.10.2026; vom Auftraggeber über n8n
+ausgeführt, nur Zahlen, Tabelle `[DokuBit].[dbo].[dokubitmitarbeiter]`):
+
+- **1.257 Zeilen** mit 1.257 verschiedenen Vertragsschlüsseln (Mandant + Abrechnungskreis + MANR),
+  darin **600 verschiedene MANR** und **1.141 Kombinationen aus Person und Mandant**. Personen stehen
+  bei bis zu **11 Mandanten**; das ist Vertragshistorie, beendete Verträge bleiben als Zeilen stehen.
+- **Immer gefüllt:** `MANR` (varchar 20), `MANDANTENNUMMER` (int), Vor- und Nachname,
+  `VERTRAGSBEGINN`, `ABRECHNUNGSKREIS`.
+- **Teilweise gefüllt** (von 1.257 Zeilen): `MAEMAIL` 1.153, `KONZERNEINTRITT` 1.015,
+  `VERTRAGSENDE` 974, `TEILZEITSTUNDEN` 783 (decimal), `TARIF` 629.
+- **Überall leer:** die sechs Spalten aus der Liste oben (`MASTATUS` …).
+- **Gibt es nicht:** eine Spalte für eine private E-Mail-Adresse und eine für ein Austrittsdatum.
+  Ausgetreten wird deshalb über `VERTRAGSENDE`.
+- **`EVTLLDA`** (datetime, 265 Werte): 219 davon liegen vor dem Vertragsbeginn, die ältesten im Jahr
+  1988. Ein letzter Arbeitstag ist das nicht.
+
+Die Zählungen je Person (343 aktive Personen, 362 laufende Verträge, MANR mit mehreren Namen) stehen
+in der [Übergabe S0](../../historie/uebergabe-selfservice-s0-2026-10-17.md), Abschnitt 3.1.
+
 ## 3. Ablauf in n8n einrichten
 
 Am schnellsten: `s0-personalstamm-n8n.json` importieren (Workflows → Import from File), dann
@@ -273,6 +292,10 @@ Stapel erst, wenn das Portal den vorigen beantwortet hat.
 - **Save manual executions:** Do not save (empfohlen, aus demselben Grund).
 - Fehlgeschlagene Ausführungen speichert n8n weiter. Sie enthalten ebenfalls DokuBit-Daten; die
   instanzweite Bereinigung der Ausführungen sollte deshalb eine kurze Frist haben.
+  Welcher Weg gilt (nur dieser Ablauf „Do not save“ oder instanzweit mit Frist), entscheiden
+  Auftraggeber und DSB vor Etappe 2: Ablaufplan
+  [`deploy-selfservice-s0-2026-10.md`](../../historie/deploy-selfservice-s0-2026-10.md), 8.0, F11
+  (Stand 18.10.2026: offen).
 
 ### 3.4 Erster Lauf und Kontrolle
 
