@@ -3,8 +3,11 @@
 > **Stand:** 17.10.2026, abends · **Zweig:** `feat/selfservice-s0-personalstamm` · **Commit:** `24a8d11`
 > „Self-Service S0: Personalstamm aus DokuBit“, dazu diese Übergabe und der Schreibschutz der
 > Beschäftigtenrouten (Abschnitt 2.6, Nachtrag vom selben Abend).
-> **Nicht deployt.** Der n8n-Ablauf ist nicht eingerichtet. Beim Schreiben war der Zweig noch nicht
-> gepusht; Push und Pull Request folgen mit dieser Übergabe (Abschnitt 8.4).
+> **Nicht deployt.** Der n8n-Ablauf ist nicht eingerichtet. **Nachtrag 18.10.2026:** S0 ist mit
+> PR #5 in `main` (`a43aa25`). Der Deploy-Ablaufplan liegt vor:
+> [`deploy-selfservice-s0-2026-10.md`](deploy-selfservice-s0-2026-10.md), in zwei Etappen (Code
+> ruhend ausrollen, Inbetriebnahme erst nach den Freigaben). Vorher kommt noch ein Fix der
+> Status-Kacheln der Verbeamtung (`0e1d8de`) mit dem Plan in einem eigenen Pull Request.
 > **Zweck:** In einer neuen Sitzung ohne Vorwissen weitermachen können: was gebaut ist, was
 > entschieden und geprüft wurde, was vor dem ersten Produktivlauf fehlt und wie es nach Plan weitergeht.
 
@@ -244,8 +247,9 @@ Stand der lokalen Datenbank danach: 5 Personen aus DokuBit (4 aktiv), 5 verwalte
 - [ ] **Bestand der Portal-Datenbank prüfen** (Anleitung Abschnitt 6, Abfragen 1–4): Herkunft der
       vorhandenen Datensätze, doppelte Adressen. Dubletten vorher bereinigen, nie per DELETE.
 - [ ] **In DokuBit bereinigen:** die 5 Adressen mit fremder Domäne und die 1 Adresse mit zwei Namen.
-- [ ] **Pull Request gemergt und deployt.** Für den Deploy einen Ablaufplan nach dem Muster der
-      bisherigen Deploys anlegen (`docs/historie/deploy-*.md`).
+- [ ] **Pull Request gemergt und deployt.** PR #5 gemergt am 17.10.2026; Ablaufplan
+      [`deploy-selfservice-s0-2026-10.md`](deploy-selfservice-s0-2026-10.md) (Etappe 1 Deploy,
+      Etappe 2 Inbetriebnahme mit den Freigaben F1–F11 in Abschnitt 8.0).
 - [ ] **`PERSONALSTAMM_SECRET` setzen** (mind. 24 Zeichen, nicht gleich `CRON_SECRET`) und das
       n8n-Credential nur im Stammablauf anlegen. Wert nie in Chat, Doku oder Log.
 - [ ] **Lauf „Wartung“** unter Einstellungen → Automatische Läufe eingeschaltet, sonst greift die
@@ -314,8 +318,9 @@ meisten Voraussetzungen.
 Für jedes Paket gilt dieselbe Abnahme: `npm run pruefen` grün, bei Schemaänderungen
 `npx prisma validate` und `npx prisma generate` fehlerfrei, die UI-Sperrklinke steigt nicht.
 
-**Unmittelbar als Nächstes:** Pull Request zu S0 prüfen und mergen, Deploy-Ablaufplan schreiben,
-Checkliste aus Abschnitt 5 abarbeiten. Parallel kann S1 beginnen; seine Vorbedingung aus S0 ist erfüllt.
+**Unmittelbar als Nächstes** (Stand 18.10.2026): PR mit dem Kachel-Fix und dem Ablaufplan mergen,
+Etappe 1 nach dem Ablaufplan deployen, die Freigaben für Etappe 2 einholen (Abschnitt 5 und
+Ablaufplan 8.0). Parallel kann S1 beginnen; seine Vorbedingung aus S0 ist erfüllt.
 
 ## 8 · Wiedereinstieg
 
@@ -323,8 +328,9 @@ Checkliste aus Abschnitt 5 abarbeiten. Parallel kann S1 beginnen; seine Vorbedin
 
 | Zweig | Stand |
 |---|---|
-| `main` | `ac3535a`, Merge von PR #4 (Konzeptplan) |
-| `feat/selfservice-s0-personalstamm` | S0, `24a8d11`, dazu diese Übergabe. Ob gemergt, zeigt `git log --oneline origin/main` |
+| `main` | `a43aa25`, Merge von PR #5 (S0), davor `ac3535a` (PR #4, Konzeptplan) |
+| `feat/selfservice-s0-personalstamm` | in PR #5 gemergt, nur noch Historie |
+| `fix/verbeamtung-kacheln-deploy-s0` | Kachel-Fix `0e1d8de` und Ablaufplan; geht per Pull Request nach `main` |
 | `feat/selfservice-portal-plan` | in PR #4 gemergt, nur noch Historie |
 | `ux-umbau` | nicht in `main`; Vorbedingung für S3 und S2 |
 

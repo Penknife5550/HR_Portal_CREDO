@@ -100,7 +100,7 @@ Branch: `feat/minijob-checkliste-2026`.
 | [module/selfservice/s0-personalstamm-n8n.md](module/selfservice/s0-personalstamm-n8n.md) | **n8n-Stammablauf S0 „Personalstamm aus DokuBit"** — SQL-Abfrage mit fester Spaltenliste, Einrichtung des Ablaufs (Stapel je Adresse, ein Stapel nach dem anderen), Antwort und Grundcodes mit Abhilfe, Rücknahme, Bestandsprüfung der Portal-Datenbank, Checkliste vor dem ersten Produktivlauf. Dazu die Importvorlage [s0-personalstamm-n8n.json](module/selfservice/s0-personalstamm-n8n.json) (n8n 2.x, ohne Credentials) |
 | [module/selfservice/s0-testdaten.json](module/selfservice/s0-testdaten.json) | Elf erfundene DokuBit-Zeilen für den Webhook in der lokalen Umgebung (eine Person mit mehreren Verträgen, beendete Verträge, Formatfehler, unbekannter Mandant, geteiltes Postfach, Unterstrich in der Adresse); Aufruf und erwartete Ergebnisse in der Übergabe, Abschnitt 8.3 |
 
-Branch: `feat/selfservice-s0-personalstamm` (S0, Commit `24a8d11`).
+S0 ist mit PR #5 in `main` (`a43aa25`), noch nicht deployt.
 
 ## Historie
 
@@ -114,6 +114,7 @@ Branch: `feat/selfservice-s0-personalstamm` (S0, Commit `24a8d11`).
 | [historie/s0-bauvorgabe-2026-10.md](historie/s0-bauvorgabe-2026-10.md) | **Bauvorgabe S0 „Personalstamm aus DokuBit“, Archiv (17.10.2026)** — erste Fassung und Nachtrag v3 „Die Adresse ist die Person“ im Wortlaut des Bautags, mit Markierungen, was später ersetzt oder ergänzt wurde. Nicht mehr maßgeblich; es gelten Plan und n8n-Anleitung |
 | [historie/codereview-s0-personalstamm-2026-10.md](historie/codereview-s0-personalstamm-2026-10.md) | **Prüfprotokoll S0, 17.10.2026** — sechs Runden Review und adversariale Gegenprüfung, 77 Befunde (2 kritisch, 23 wesentlich), keiner der kritischen oder wesentlichen offen; Entscheidungen mit Urheber (Auftraggeber oder Claude), Ende-zu-Ende-Probe, Restrisiken |
 | [historie/uebergabe-selfservice-s0-2026-10-17.md](historie/uebergabe-selfservice-s0-2026-10-17.md) | **Übergabe Self-Service S0, 17.10.2026** — Stand, Entscheidungen, Verifikation, Checkliste vor dem ersten Produktivlauf, offene Punkte, nächste Pakete und Wiedereinstieg in einer neuen Sitzung |
+| [historie/deploy-selfservice-s0-2026-10.md](historie/deploy-selfservice-s0-2026-10.md) | **Ablaufplan Server-Update mit Self-Service S0 (noch nicht ausgeführt)** — `main` ab `ea2d41d`: Zugriffskorrekturen vom 16.10., Fix der Status-Kacheln, S0; Etappe 1 rollt S0 ruhend aus, Etappe 2 nimmt es erst nach den Freigaben F1–F11 in Betrieb; Rückfall, Protokollvorlage |
 
 ---
 

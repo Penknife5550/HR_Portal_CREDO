@@ -7,8 +7,9 @@ zentral über Keycloak mit dem Microsoft-365-Konto. Grundlage für alles ist der
 DokuBit, den n8n jede Nacht an das Portal schickt.
 
 **Stand 17.10.2026:** Der Konzeptplan (Fassung 6) ist in `main` (PR #4). Personalabteilung,
-Datenschutzbeauftragter und MAV haben ihm am 17.10.2026 zugestimmt. Paket S0 ist auf dem Zweig
-`feat/selfservice-s0-personalstamm` gebaut, aber nicht deployt.
+Datenschutzbeauftragter und MAV haben ihm am 17.10.2026 zugestimmt. Paket S0 ist mit PR #5 in
+`main`, aber nicht deployt; der Ablaufplan steht in
+[`deploy-selfservice-s0-2026-10.md`](../../historie/deploy-selfservice-s0-2026-10.md).
 
 **Hier anfangen:** [Übergabe S0 vom 17.10.2026](../../historie/uebergabe-selfservice-s0-2026-10-17.md).
 Sie nennt Stand, Entscheidungen, Prüfung, die Checkliste vor dem ersten Produktivlauf, die offenen
@@ -21,7 +22,7 @@ und S3b, danach S2 und S4, zuletzt S5.
 
 | Paket | Inhalt | Stand |
 |---|---|---|
-| S0 | Personalstamm aus DokuBit: Webhook für n8n, Abgleich je Vertrag, Ansicht „Personen“ mit „Zu prüfen“ | **gebaut** (`24a8d11`), nicht deployt; vor dem ersten Produktivlauf E-S25 und E-S27 mit dem DSB klären |
+| S0 | Personalstamm aus DokuBit: Webhook für n8n, Abgleich je Vertrag, Ansicht „Personen“ mit „Zu prüfen“, Schreibschutz der Beschäftigtenrouten | **in `main`** (PR #5, `a43aa25`), nicht deployt; vor dem ersten Produktivlauf E-S25 und E-S27 mit dem DSB klären |
 | S1 | Keycloak und Anmeldung des HR-Teams | geplant; unabhängig von S0, parallel möglich |
 | S2 | Mitarbeiterportal für Beschäftigte | geplant |
 | S3 | Ticketsystem | geplant |
