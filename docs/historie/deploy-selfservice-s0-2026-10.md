@@ -257,7 +257,9 @@ dieser Zeit nichts im Portal; wir geben Bescheid, sobald es wieder läuft.“
 4. **Stand der Punkte „Offen nach dem Deploy“ vom 14.10.** beim Projektverantwortlichen abfragen
    (Abschnitt 10, Punkt 5) — das Repo belegt nur den letzten (Protokoll auf `main`, `5595cf7`) als
    erledigt; davon hängen 1.8 und 6.2 ab.
-5. **Pull Request vor dem Termin mergen — auf GitHub mit „Create a merge commit“**, nicht mit
+5. **Pull Request vor dem Termin mergen — erledigt am 18.10.2026:** PR #6 mit Merge-Commit
+   `82b58ce` gemergt, die Prüfung unten meldete „0e1d8de auf main“. Für jeden weiteren Pull Request
+   bis zum Deploy gilt dasselbe: **auf GitHub mit „Create a merge commit“**, nicht mit
    „Squash and merge“ oder „Rebase and merge“. Beide erzeugen neue Commits: `0e1d8de` fehlte auf
    `main`, und 3.2 hielte auf dem Server an, auch wenn der Code derselbe wäre. Danach auf dem
    Entwicklerrechner (nicht auf dem Server) prüfen:
@@ -658,9 +660,11 @@ sudo git --no-pager log --oneline -12
 
 **Erwartet:** oben mit `(HEAD -> main, origin/main, origin/HEAD)` der Commit, der diese Anleitung
 brachte. Nach einem Merge über GitHub mit „Create a merge commit“ (Hausverfahren, Abschnitt 0, „Vor
-dem Termin zu entscheiden“, Punkt 5) ist das ein Merge-Commit `Merge pull request #… from
-…/fix/verbeamtung-kacheln-deploy-s0`, darunter die Doku-Commits des Pull Requests (wie viele, hängt
-davon ab, was bis zum Merge noch dazukommt), weiter unten `0e1d8de fix(verbeamtung):
+dem Termin zu entscheiden“, Punkt 5) ist das ein Merge-Commit `Merge pull request #… from …`. Stand
+18.10.2026: oben der Merge eines späteren Doku-Pull-Requests mit seinen Doku-Commits (es können
+weitere dazukommen), darunter `82b58ce Merge pull request #6 from
+…/fix/verbeamtung-kacheln-deploy-s0` und dessen Doku-Commits (`176773c`, `a4b1680`, `76a5ae5`),
+weiter unten `0e1d8de fix(verbeamtung):
 Status-Kacheln zählen wieder ohne den gewählten Status` und darunter `a43aa25 Merge pull request #5
 from …/feat/selfservice-s0-personalstamm`; nach einem Fast-Forward-Push ohne den
 GitHub-Knopf (nicht vorgesehen) stehen die Doku-Commits oben, darunter `0e1d8de` und `a43aa25`.
@@ -2190,7 +2194,7 @@ ruhend“ bzw. „in Betrieb seit …“) überall nachführen, wo heute „nich
   (nur Stände mit `a43aa25` und `0e1d8de`, `ux-umbau` erst nach dem Merge von `main`, Rückfall nur
   nach Abschnitt 7) — die Regel bleibt dort und wird nicht mit dem Einstieg umgeschrieben. Nach dem
   Deploy wird der Abschnitt „Laufende Arbeit und Einstieg“ nachgeführt: S0 deployt und ruhend; die
-  Zeile zu PR #6 entfällt, sobald er gemergt ist. Erst mit Etappe 2 kommen dazu: in der Tabelle der
+  Zeile zu PR #6 ist seit seinem Merge am 18.10.2026 gestrichen. Erst mit Etappe 2 kommen dazu: in der Tabelle der
   Umgebungsvariablen `PERSONALSTAMM_SECRET` (optional) und ein Abschnitt zu S0 (Webhook,
   Schreibschutz, Löschfrist, Rücknahme).
 

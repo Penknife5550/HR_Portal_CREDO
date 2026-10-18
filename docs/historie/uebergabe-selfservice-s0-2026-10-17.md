@@ -1,7 +1,7 @@
 # Self-Service S0 „Personalstamm aus DokuBit“ — Übergabe
 
-> **Stand:** 18.10.2026 · `main` `a43aa25` (PR #5) · offen: PR #6, Zweig
-> `fix/verbeamtung-kacheln-deploy-s0`
+> **Stand:** 18.10.2026 · `main` `82b58ce` (PR #6, davor `a43aa25` mit S0, PR #5) · Deploy nicht
+> begonnen
 > **Herkunft:** Übergabe vom 17.10.2026, abends · **Zweig:** `feat/selfservice-s0-personalstamm` ·
 > **Commit:** `24a8d11` „Self-Service S0: Personalstamm aus DokuBit“, dazu diese Übergabe und der
 > Schreibschutz der Beschäftigtenrouten (Abschnitt 2.6, Nachtrag vom selben Abend).
@@ -18,16 +18,13 @@
 **Wo die Arbeit steht.**
 
 - S0 ist mit PR #5 in `main` (`a43aa25`, 17.10.2026).
-- **PR #6 ist offen** (Stand 18.10.2026; Zweig `fix/verbeamtung-kacheln-deploy-s0`, angelegt am
-  18.10.2026): der Fix der Status-Kacheln der Verbeamtung `0e1d8de`, der Ablaufplan
-  [`deploy-selfservice-s0-2026-10.md`](deploy-selfservice-s0-2026-10.md) mit seinem
-  [Prüfprotokoll](codereview-deploy-selfservice-s0-2026-10.md) und Doku-Nachträge, auch dieser
-  Abschnitt (nur unter `docs/` sowie in `CLAUDE.md` und `README.md`). Ob er inzwischen gemergt ist:
-  `git fetch origin && git merge-base --is-ancestor 0e1d8de8cf0d5b714c059140b9f2f09552eb00d1 origin/main && echo "PR #6 gemergt"`.
-  Steht die Zeile da, gilt `main`, nicht mehr der Zweig. **Gemergt wird nur mit „Create a merge
-  commit“**, nie mit Squash oder Rebase, denn der Plan hängt am Hash `0e1d8de` (Ablaufplan
-  Abschnitt 0, „Vor dem Termin zu entscheiden“, Punkt 5). Zeigt GitHub den Pull Request als gemergt,
-  fehlt die Zeile aber, wurde per Squash oder Rebase gemergt: nicht deployen, an Claude.
+- **PR #6 ist gemergt** (18.10.2026, Merge-Commit `82b58ce` über „Create a merge commit“; geprüft:
+  `0e1d8de` liegt auf `main`, danach nur Doku): der Fix der Status-Kacheln der Verbeamtung
+  `0e1d8de`, der Ablaufplan [`deploy-selfservice-s0-2026-10.md`](deploy-selfservice-s0-2026-10.md)
+  mit seinem [Prüfprotokoll](codereview-deploy-selfservice-s0-2026-10.md) und die Doku-Nachträge,
+  auch dieser Abschnitt. Seitdem gilt `main`. Bis Etappe 1 kommen nur noch Änderungen unter `docs/`
+  sowie in `CLAUDE.md` und `README.md` dazu (Ablaufplan 3.2); gemergt wird weiter nur mit „Create a
+  merge commit“.
 - **Deploy nicht begonnen.** Am 18.10.2026 bestand kein Zugriff auf den Server. Auch Abschnitt 1 des
   Ablaufplans ist nicht ausgeführt; der Serverstand seit dem 14.10.2026 ist im Repo nicht belegt.
 - **Entschieden am 18.10.2026:** zuerst Abschnitt 1 des Ablaufplans nur lesend, als eigener Schritt.
@@ -75,10 +72,9 @@
 
 **Nächste Schritte, in dieser Reihenfolge** (2 und 3 hängen nicht voneinander ab):
 
-1. Auf einem anderen Rechner: Repo holen; den Zweig von PR #6 nur auschecken, solange der
-   Prüfbefehl oben nicht „PR #6 gemergt“ meldet, sonst auf `main` bleiben (Abschnitt 8.6).
-2. PR #6 auf GitHub prüfen und mit „Create a merge commit“ mergen, danach der Prüfbefehl oben
-   (entspricht dem aus Ablaufplan Abschnitt 0, Punkt 5). Entfällt, wenn er schon gemergt ist.
+1. Auf einem anderen Rechner: Repo klonen und auf `main` bleiben (Abschnitt 8.6).
+2. PR #6 mergen: erledigt am 18.10.2026 (`82b58ce`, Prüfung aus Ablaufplan Abschnitt 0,
+   Punkt 5 bestanden).
 3. Mit Zugriff auf den Server: Ablaufplan Abschnitt 1 nur lesend (Ausnahmen oben), die Ausgaben an
    Claude.
 4. Die offenen Punkte 3 und 4 unter „Vor dem Termin zu entscheiden“ klären (Lauf „Wartung“, Stand der
@@ -412,10 +408,9 @@ meisten Voraussetzungen.
 Für jedes Paket gilt dieselbe Abnahme: `npm run pruefen` grün, bei Schemaänderungen
 `npx prisma validate` und `npx prisma generate` fehlerfrei, die UI-Sperrklinke steigt nicht.
 
-**Unmittelbar als Nächstes** (Stand 18.10.2026): PR mit dem Kachel-Fix und dem Ablaufplan mergen,
-Etappe 1 nach dem Ablaufplan deployen, die Freigaben für Etappe 2 einholen (Abschnitt 5 und
-Ablaufplan 8.0). Parallel kann S1 beginnen; seine Vorbedingung aus S0 ist erfüllt. Der Pull Request
-ist PR #6; Reihenfolge im Einzelnen: Abschnitt „Stand 18.10.2026 — hier weitermachen“ oben.
+**Unmittelbar als Nächstes** (Stand 18.10.2026): Etappe 1 nach dem Ablaufplan deployen, die Freigaben für Etappe 2 einholen (Abschnitt 5 und
+Ablaufplan 8.0). Parallel kann S1 beginnen; seine Vorbedingung aus S0 ist erfüllt. PR #6 mit Kachel-Fix
+und Ablaufplan ist am 18.10.2026 gemergt; Reihenfolge im Einzelnen: Abschnitt „Stand 18.10.2026 — hier weitermachen“ oben.
 
 ## 8 · Wiedereinstieg
 
@@ -423,9 +418,9 @@ ist PR #6; Reihenfolge im Einzelnen: Abschnitt „Stand 18.10.2026 — hier weit
 
 | Zweig | Stand |
 |---|---|
-| `main` | `a43aa25`, Merge von PR #5 (S0), davor `ac3535a` (PR #4, Konzeptplan) |
+| `main` | `82b58ce`, Merge von PR #6 (Kachel-Fix, Ablaufplan, Doku vom 18.10.2026), davor `a43aa25` (PR #5, S0) und `ac3535a` (PR #4, Konzeptplan) |
 | `feat/selfservice-s0-personalstamm` | in PR #5 gemergt, nur noch Historie |
-| `fix/verbeamtung-kacheln-deploy-s0` | Kachel-Fix `0e1d8de` und Ablaufplan; geht per Pull Request nach `main`. PR #6, angelegt am 18.10.2026, am 18.10.2026 offen (ob gemergt: Prüfbefehl im Abschnitt „Stand 18.10.2026 — hier weitermachen“); nur mit „Create a merge commit“ mergen (Ablaufplan Abschnitt 0, Punkt 5), danach dessen Prüfbefehl. Weitere Commits nur unter `docs/` sowie in `CLAUDE.md` und `README.md` (8.6) |
+| `fix/verbeamtung-kacheln-deploy-s0` | in PR #6 gemergt (18.10.2026, `82b58ce`), nur noch Historie |
 | `feat/selfservice-portal-plan` | in PR #4 gemergt, nur noch Historie |
 | `ux-umbau` | nicht in `main`; Vorbedingung für S3 und S2 |
 
@@ -561,12 +556,9 @@ CLAUDE.md des Repos dorthin: Ihr Einstieg nennt die laufende Arbeit und verweist
 aus der Prüfung „nach 0e1d8de nur Doku“ aus. Den Stand von S0 führt sie mit Etappe 1 nach
 (Ablaufplan, „Nach dem Update (Claude)“).
 
-**Holen.** Ein frischer Klon steht auf `main`. Ob PR #6 schon gemergt ist, zeigt
-`git fetch origin && git merge-base --is-ancestor 0e1d8de8cf0d5b714c059140b9f2f09552eb00d1 origin/main && echo "PR #6 gemergt"`;
-steht die Zeile da, auf `main` bleiben. Solange sie fehlt, liegen Ablaufplan, Kachel-Fix und die
-Nachträge vom 18.10.2026 nur auf seinem Zweig: `git checkout fix/verbeamtung-kacheln-deploy-s0`.
-Weitere Commits auf diesem Zweig nur unter `docs/` sowie in `CLAUDE.md` und `README.md`, denn 3.2
-prüft „nach 0e1d8de nur Doku“ und nimmt nur diese aus. Die
+**Holen.** Ein frischer Klon steht auf `main`; seit dem Merge von PR #6 am 18.10.2026 liegt dort
+alles, ein anderer Zweig ist nicht nötig. Weitere Commits bis Etappe 1 nur unter `docs/` sowie in
+`CLAUDE.md` und `README.md`, denn 3.2 prüft „nach 0e1d8de nur Doku“ und nimmt nur diese aus. Die
 lokale Umgebung richtet [`docs/entwicklung/lokale-umgebung.md`](../entwicklung/lokale-umgebung.md)
 ein; die Abnahme `npm run pruefen` braucht keine Datenbank.
 

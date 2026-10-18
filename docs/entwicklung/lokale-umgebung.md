@@ -1,7 +1,7 @@
 # Lokale Entwicklungsumgebung einrichten
 
-> **Stand:** 18.10.2026 · geprüft auf dem Code-Stand `0e1d8de` (Zweig
-> `fix/verbeamtung-kacheln-deploy-s0`, PR #6)
+> **Stand:** 18.10.2026 · geprüft auf dem Code-Stand `0e1d8de` (seit PR #6 am 18.10.2026 in
+> `main`)
 > **Zweck:** Auf einem neuen Rechner nur mit dem Repo arbeitsfähig werden. Bisher stand das Rezept in
 > einer Datei außerhalb des Repos (`../CLAUDE.md`, „Dev-Umgebung starten“) und in Bruchstücken in
 > mehreren Modul-Dokumenten. Diese Anleitung bündelt es und enthält **keine Werte**: Jedes Geheimnis
@@ -36,18 +36,7 @@ git clone https://github.com/Penknife5550/HR_Portal_CREDO.git
 cd HR_Portal_CREDO
 ```
 
-Ob PR #6 schon gemergt ist:
-
-```bash
-git fetch origin && git merge-base --is-ancestor 0e1d8de8cf0d5b714c059140b9f2f09552eb00d1 origin/main && echo "PR #6 gemergt"
-```
-
-Steht `PR #6 gemergt` da, auf `main` bleiben. Fehlt die Zeile, liegen Ablaufplan, Kachel-Fix und die
-Nachträge vom 18.10.2026 nur auf seinem Zweig (Stand 18.10.2026: PR #6 offen):
-
-```bash
-git checkout fix/verbeamtung-kacheln-deploy-s0
-```
+Seit dem 18.10.2026 liegt alles auf `main` (PR #6 gemergt); ein anderer Zweig ist nicht nötig.
 
 Danach Abhängigkeiten und Prisma Client (es gibt kein `postinstall`):
 

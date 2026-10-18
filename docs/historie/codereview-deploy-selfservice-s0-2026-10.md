@@ -1,6 +1,6 @@
 # Prüfprotokoll Ablaufplan „Server-Update mit Self-Service S0“ — Oktober 2026
 
-> **Stand:** 18.10.2026 · Zweig `fix/verbeamtung-kacheln-deploy-s0` (PR #6, offen) · Gegenstand:
+> **Stand:** 18.10.2026 · Zweig `fix/verbeamtung-kacheln-deploy-s0` (PR #6, gemergt am 18.10.2026 als `82b58ce`) · Gegenstand:
 > [`deploy-selfservice-s0-2026-10.md`](deploy-selfservice-s0-2026-10.md)
 > **Grundlage:** `main` = `a43aa25` (S0, PR #5), Code-Stand des Deploys `0e1d8de` (Fix der
 > Status-Kacheln der Verbeamtung)
