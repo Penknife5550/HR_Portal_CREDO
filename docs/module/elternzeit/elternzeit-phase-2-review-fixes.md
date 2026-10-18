@@ -787,6 +787,8 @@ Drei Stellen nutzen `Record<string, unknown>` als Workaround, sollten `Prisma.El
 
 Aufteilen in `ElternzeitHeader`, `ElternzeitActions`, `BriefeTab`, `FristenTab`, `ChecklisteTab`, `NotizenTab`, `AbschnitteTab`.
 
+> Nachtrag 18.10.2026: Die Datei hat heute rund 1.400 Zeilen. Weiter Backlog, kein GoLive-Blocker.
+
 ### R6 — Magic Numbers in Konstanten
 
 `src/lib/constants.ts` ergaenzen:

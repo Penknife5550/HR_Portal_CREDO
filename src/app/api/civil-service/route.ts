@@ -76,34 +76,37 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    // Filter zusammenbauen (inkl. Org-Einschraenkung)
-    const where: Record<string, unknown> = {
+    // Filter zusammenbauen (inkl. Org-Einschraenkung), ohne den Status: Den
+    // bekommt nur die Liste, nicht die Status-Zaehler (unten).
+    const baseWhere: Record<string, unknown> = {
       ...(await orgFilter(session)),
     };
-    if (status) where.status = status;
-    if (organizationId) where.organizationId = organizationId;
+    if (organizationId) baseWhere.organizationId = organizationId;
     if (from) {
-      where.createdAt = {
-        ...(where.createdAt as object || {}),
+      baseWhere.createdAt = {
+        ...(baseWhere.createdAt as object || {}),
         gte: new Date(from),
       };
     }
     if (to) {
       const toDate = new Date(to);
       toDate.setHours(23, 59, 59, 999);
-      where.createdAt = {
-        ...(where.createdAt as object || {}),
+      baseWhere.createdAt = {
+        ...(baseWhere.createdAt as object || {}),
         lte: toDate,
       };
     }
     if (search) {
-      where.OR = [
+      baseWhere.OR = [
         { displayId: { contains: search, mode: "insensitive" } },
         { employeeEmail: { contains: search, mode: "insensitive" } },
         { employeeFirstName: { contains: search, mode: "insensitive" } },
         { employeeLastName: { contains: search, mode: "insensitive" } },
       ];
     }
+
+    const where: Record<string, unknown> = { ...baseWhere };
+    if (status) where.status = status;
 
     const [processes, total, statusCounts] = await Promise.all([
       prisma.civilServiceProcess.findMany({
@@ -132,14 +135,15 @@ export async function GET(request: NextRequest) {
         skip,
       }),
       prisma.civilServiceProcess.count({ where }),
-      // MIT `where`: Die Status-Zaehler zaehlten bis zum 16.10.2026 ueber ALLE
-      // Traeger, waehrend die Liste darunter gefiltert war — die Kacheln
-      // nannten also Zahlen aus Einrichtungen, die der Abfrage nicht
-      // zustanden. Derselbe Filter wie oben, sonst widersprechen sich Liste
-      // und Zaehler.
+      // MIT dem Filter der Liste: Die Status-Zaehler zaehlten bis zum
+      // 16.10.2026 ueber ALLE Traeger, waehrend die Liste darunter gefiltert
+      // war — die Kacheln nannten also Zahlen aus Einrichtungen, die der
+      // Abfrage nicht zustanden. Aber OHNE den Status (`baseWhere`, wie in der
+      // Elternzeit): Die Kacheln sind der Statusfilter; mit ihm fielen nach
+      // einem Klick alle anderen Kacheln auf 0.
       prisma.civilServiceProcess.groupBy({
         by: ["status"],
-        where,
+        where: baseWhere,
         _count: { status: true },
       }),
     ]);

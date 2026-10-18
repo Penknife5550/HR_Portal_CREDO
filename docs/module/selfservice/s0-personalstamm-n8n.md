@@ -1,6 +1,7 @@
 # Personalstamm aus DokuBit — n8n-Stammablauf (Self-Service S0)
 
-**Stand:** 17.10.2026 · **Zweig:** `feat/selfservice-s0-personalstamm`
+**Stand:** 17.10.2026 · **Zweig:** `feat/selfservice-s0-personalstamm`, gemergt mit PR #5
+(`a43aa25`) am 17.10.2026; Nachträge 18.10.2026
 **Plan:** [`selfservice-portal-plan.html`](./selfservice-portal-plan.html), Abschnitt 5.1
 **Vorlage zum Import:** [`s0-personalstamm-n8n.json`](./s0-personalstamm-n8n.json) (n8n 2.x, ohne Credentials)
 
@@ -124,6 +125,25 @@ ORDER BY email, mandantNummer, abrechnungskreis, personalNr;
   greift erst, wenn gar kein Vertrag der Person mehr geliefert wird. Abhilfe beim nachträglichen
   Ende: das Fenster für einen Lauf vergrößern (z. B. `-365`). Eine gelöschte Zeile kommt auch so
   nicht; dann den Vertrag in DokuBit wiederherstellen und beenden.
+
+**Befunde der Aggregatabfragen vom 17.10.2026** (Nachtrag 18.10.2026; vom Auftraggeber über n8n
+ausgeführt, nur Zahlen, Tabelle `[DokuBit].[dbo].[dokubitmitarbeiter]`):
+
+- **1.257 Zeilen** mit 1.257 verschiedenen Vertragsschlüsseln (Mandant + Abrechnungskreis + MANR),
+  darin **600 verschiedene MANR** und **1.141 Kombinationen aus Person und Mandant**. Personen stehen
+  bei bis zu **11 Mandanten**; das ist Vertragshistorie, beendete Verträge bleiben als Zeilen stehen.
+- **Immer gefüllt:** `MANR` (varchar 20), `MANDANTENNUMMER` (int), Vor- und Nachname,
+  `VERTRAGSBEGINN`, `ABRECHNUNGSKREIS`.
+- **Teilweise gefüllt** (von 1.257 Zeilen): `MAEMAIL` 1.153, `KONZERNEINTRITT` 1.015,
+  `VERTRAGSENDE` 974, `TEILZEITSTUNDEN` 783 (decimal), `TARIF` 629.
+- **Überall leer:** die sechs Spalten aus der Liste oben (`MASTATUS` …).
+- **Gibt es nicht:** eine Spalte für eine private E-Mail-Adresse und eine für ein Austrittsdatum.
+  Ausgetreten wird deshalb über `VERTRAGSENDE`.
+- **`EVTLLDA`** (datetime, 265 Werte): 219 davon liegen vor dem Vertragsbeginn, die ältesten im Jahr
+  1988. Ein letzter Arbeitstag ist das nicht.
+
+Die Zählungen je Person (343 aktive Personen, 362 laufende Verträge, MANR mit mehreren Namen) stehen
+in der [Übergabe S0](../../historie/uebergabe-selfservice-s0-2026-10-17.md), Abschnitt 3.1.
 
 ## 3. Ablauf in n8n einrichten
 
@@ -273,6 +293,10 @@ Stapel erst, wenn das Portal den vorigen beantwortet hat.
 - **Save manual executions:** Do not save (empfohlen, aus demselben Grund).
 - Fehlgeschlagene Ausführungen speichert n8n weiter. Sie enthalten ebenfalls DokuBit-Daten; die
   instanzweite Bereinigung der Ausführungen sollte deshalb eine kurze Frist haben.
+  Welcher Weg gilt (nur dieser Ablauf „Do not save“ oder instanzweit mit Frist), entscheiden
+  Auftraggeber und DSB vor Etappe 2: Ablaufplan
+  [`deploy-selfservice-s0-2026-10.md`](../../historie/deploy-selfservice-s0-2026-10.md), 8.0, F11
+  (Stand 18.10.2026: offen).
 
 ### 3.4 Erster Lauf und Kontrolle
 
@@ -314,7 +338,7 @@ Behoben wird immer an der Quelle, meist in DokuBit. Der nächste Lauf räumt die
 | `MANDANT_UNBEKANNT` | Mandantennummer im Portal unbekannt | Mandant im Portal anlegen oder Nummer prüfen |
 | `INTERNER_FEHLER` | Ausnahme bei dieser Zeile. Scheitert schon das Lesen vor der Verarbeitung, tragen alle Zeilen des Stapels diesen Code. Mit Schlüssel `person`: Der Aktiv-Status einer Person ließ sich am Ende des Stapels nicht schreiben | Log des Portals ansehen; der nächste Lauf versucht es erneut |
 | `MAIL_FEHLT` | Vertrag ohne dienstliche Adresse. Ein neuer laufender wird nicht angelegt; ein bekannter bleibt bei seiner Person, sein Vertragsende kommt an (Regel unter der Tabelle), der Name bleibt | `MAEMAIL` in DokuBit nachtragen |
-| `EMAIL_MEHRDEUTIG` | Die Adresse gehört im Portal mehreren Personen. Angelegt oder zugeordnet wird nichts; ein bekannter Vertrag bleibt bei seiner Person (Regel unter der Tabelle) | Dublette im Portal bereinigen; welche es sind, zeigt Abschnitt 6, Abfrage 4. Die Ansicht „Personen“ bearbeitet nichts: bei der überzähligen Person die Adresse über `PATCH /api/employees/[id]` (Feld `email`) korrigieren oder leeren. Bei einer Person aus DokuBit sperrt das Portal die Adresse (409, Abschnitt 1); überzählig ist dann die andere. **Nie löschen:** Ein DELETE entfernt per Cascade auch die Anstellungen und alles, was an der Person hängt |
+| `EMAIL_MEHRDEUTIG` | Die Adresse gehört im Portal mehreren Personen. Angelegt oder zugeordnet wird nichts; ein bekannter Vertrag bleibt bei seiner Person (Regel unter der Tabelle) | Dublette im Portal bereinigen; welche es sind, zeigt Abschnitt 6, Abfrage 4. Die Ansicht „Personen“ bearbeitet nichts: bei der überzähligen Person die Adresse über `PATCH /api/employees/[id]` (Feld `email`) korrigieren oder leeren. Bei einer Person aus DokuBit sperrt das Portal die Adresse (409, Abschnitt 1); überzählig ist dann die andere. **Nicht deaktivieren, nie per SQL löschen:** `DELETE /api/employees/[id]` setzt nur `isActive = false`; die Adresse bleibt und damit die Dublette. Ein `DELETE` in der Datenbank entfernt per Cascade auch die Anstellungen und alles, was an der Person hängt |
 | `EMAIL_ANDERER_NAME` | Adresse und Name passen nicht zu derselben Person: Dieselbe Adresse steht im Stapel bei mehreren Namen; oder sie gehört im Portal einer Person mit anderem Namen, deren Namen der Abgleich nicht ändern darf (nicht alle ihre laufenden Verträge nennen den neuen Namen, Vor- und Nachname sind beide neu, sie hat keinen laufenden Vertrag mehr und für einen Anschluss fehlt der Nachweis nach der Regel unter der Tabelle, oder sie stammt aus dem Bestand ohne Herkunft). Angelegt oder zugeordnet wird nichts; ein bekannter Vertrag bleibt bei seiner Person (Regel unter der Tabelle). Die Person mit dieser Adresse bleibt nur aktiv, wenn die gemeldete Zeile ihren eigenen Namen trägt | In DokuBit prüfen: geteiltes Postfach, eine Adresse oder ein Vertragsschlüssel für einen anderen Menschen wiederverwendet, oder ein neuer Name erst bei einem Teil der Verträge. Adresse oder Name korrigieren; einen neuen Namen bei allen Verträgen der Person, die n8n liefert, auch bei den in den letzten 30 Tagen beendeten. **Anschluss nach einer Heirat ohne Nachweis** (Regel unter der Tabelle): den neuen Namen in DokuBit auch am alten Vertrag eintragen, und dort die Adresse stehen lassen oder wieder eintragen; der nächste Lauf ordnet den Anschluss zu und reaktiviert die Person. Ein `PATCH` des Namens hilft nicht, solange n8n die alte Zeile mit dem alten Namen unter der Adresse liefert. Nur wenn das in DokuBit nicht geht (Zeile gelöscht, neuer Vorname, Ende vor mehr als 30 Tagen, Anschluss auf demselben Vertragsschlüssel) und es wirklich dieselbe Person ist: den Namen im Portal über `PATCH /api/employees/[id]` (Felder `firstName`, `lastName`) nachziehen. Das wirkt, sobald alle Zeilen der Adresse im Stapel diesen Namen tragen; dann ordnet der nächste Lauf den Anschluss zu und reaktiviert die Person |
 | `MANUELLER_DATENSATZ` | Die Adresse gehört im Portal einer von Hand geführten Person (`importSource` `MANUELL`, auch nachträglich umgestellt; eine Person aus DokuBit lässt sich nicht zurückstellen). Ihr wird kein Vertrag zugeordnet, weder ein neuer noch ein bekannter einer anderen Person; ein bekannter Vertrag bleibt, wo er ist (Regel unter der Tabelle). Adresse, Name und Aktiv-Status der Person bleiben | HR entscheidet. Soll der Abgleich die Person führen, `importSource` auf `DOKUBIT` setzen |
 | `FREMDE_QUELLE` | Person aus einer anderen Quelle, z. B. LOGA; sonst wie `MANUELLER_DATENSATZ` | wie `MANUELLER_DATENSATZ` |

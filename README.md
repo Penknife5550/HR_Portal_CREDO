@@ -2,6 +2,8 @@
 
 Digitales Einstellungsmanagement-Portal fuer die CREDO Schultraegergruppe. Das System bildet den gesamten Onboarding-Prozess neuer Mitarbeiter ab -- vom Personalfragebogen ueber die Einstellungsmodalitaeten durch den Vorgesetzten bis zur finalen Pruefung durch die HR-Abteilung.
 
+Weitere Dokumentation: Uebersicht aller Plaene, Anleitungen und Protokolle in [`docs/README.md`](docs/README.md); lokale Entwicklungsumgebung auf einem neuen Rechner (ohne Werte) in [`docs/entwicklung/lokale-umgebung.md`](docs/entwicklung/lokale-umgebung.md).
+
 ---
 
 ## Inhaltsverzeichnis
@@ -84,7 +86,7 @@ credo-hr-portal/
 │   ├── components/            # Wiederverwendbare UI-Komponenten
 │   ├── lib/                   # Utilities (DB, Encryption, Mailer, Webhooks)
 │   └── middleware.ts          # Security Headers + JWT-Validierung
-├── docker-compose.prod.yml    # Produktions-Setup (PostgreSQL + App)
+├── docker-compose.yml         # Produktions-Setup (PostgreSQL + App + Gotenberg)
 ├── Dockerfile                 # Multi-Stage Build
 ├── entrypoint.sh              # DB-Migration + Seed + Start
 └── .env.example               # Vorlage fuer Umgebungsvariablen
@@ -96,30 +98,33 @@ credo-hr-portal/
 
 ### Voraussetzungen
 
-- Node.js >= 18
+- Node.js 22 (wie im Image, `node:22-alpine` im `Dockerfile`)
 - PostgreSQL 16 (lokal oder Docker)
 - npm
 
 ### Installation
 
+Massgeblich und ausfuehrlich (Datenbank-Container auf Port 5433, Werte der `.env`, Anmelden, Stolpersteine): [`docs/entwicklung/lokale-umgebung.md`](docs/entwicklung/lokale-umgebung.md). Kurzfassung:
+
 ```bash
 # Repository klonen
-git clone <repository-url>
-cd credo-hr-portal
+git clone https://github.com/Penknife5550/HR_Portal_CREDO.git
+cd HR_Portal_CREDO
 
-# Abhaengigkeiten installieren
-npm install
+# Abhaengigkeiten genau nach package-lock.json installieren
+npm ci
 
-# Umgebungsvariablen konfigurieren
-cp .env.example .env
-# .env anpassen: DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY setzen
+# .env im Repo-Ordner anlegen, alle Werte selbst erzeugen (lokale-umgebung.md, Abschnitt 5).
+# .env.example taugt nur als Muster: Port 5432 statt 5433, und N8N_API_KEY nicht uebernehmen
+# (der Platzhalter schaltete den n8n-Schluessel frei).
 
-# Prisma Client generieren und Datenbank-Schema anlegen
+# Prisma Client generieren und Datenbank-Schema anlegen (nie prisma migrate dev)
 npx prisma generate
 npx prisma db push
 
-# Seed ausfuehren (Admin-User und Mandanten anlegen)
+# Seed (Admin-User und Mandanten), danach System-Vorlagen und einmalige Datenmigrationen
 npm run db:seed
+node prisma/seed-check.js
 
 # Entwicklungsserver starten
 npm run dev
@@ -136,16 +141,20 @@ Das Portal ist dann unter `http://localhost:3000` erreichbar.
 | `npm run db:push`   | Datenbank-Schema synchronisieren            |
 | `npm run db:seed`   | Seed ausfuehren (Admin + Mandanten)         |
 | `npm run db:studio` | Prisma Studio oeffnen (Datenbank-Browser)   |
-| `npm run db:migrate`| Prisma Migration erstellen                  |
 | `npm run lint`      | ESLint ausfuehren                           |
+| `npm run pruefen`   | Typen, Lint und Tests — vor jedem Push      |
+
+`npm run db:migrate` nicht verwenden: Das Schema wird ohne Migrationen per `db push` abgeglichen, und `prisma migrate dev` boete an, eine so gepflegte Datenbank zurueckzusetzen (`prisma/migrations/` ist ein ungenutzter Rest).
 
 ---
 
 ## Deployment (Produktion)
 
+> **Massgeblich fuer Betrieb und Deploy ist [`CLAUDE.md`](CLAUDE.md), Abschnitt „Docker / Deployment“** (Pflichtvariablen, Sicherung vor dem Schema-Abgleich, feste Anker fuer Deploy und Rueckfall), dazu der Ablaufplan des jeweiligen Server-Updates unter [`docs/historie/`](docs/README.md). Dieser Abschnitt ist eine Kurzfassung; am 18.10.2026 an Datei- und Containernamen angeglichen.
+
 ### 1. Umgebungsvariablen erstellen
 
-Erstelle eine Datei `.env.production` im Projektverzeichnis:
+Erstelle eine Datei `.env` im Projektverzeichnis (Muster: `.env.production.example`):
 
 ```bash
 # Datenbank
@@ -157,8 +166,14 @@ JWT_SECRET=ein_langes_zufaelliges_geheimnis_min_32_zeichen
 # Verschluesselung – Generieren mit: openssl rand -hex 32
 ENCRYPTION_KEY=64_zeichen_hex_string
 
-# Admin-Passwort beim ersten Start
-ADMIN_INITIAL_PASSWORD=Credo2026!HR
+# Eigener Schluessel fuer BEM-Gesundheitsdaten – openssl rand -hex 32, NICHT derselbe Wert
+BEM_ENCRYPTION_KEY=64_zeichen_hex_string
+
+# Absicherung der Cron-Routen fuer den Handaufruf – openssl rand -base64 24 (mindestens 24 Zeichen)
+CRON_SECRET=mindestens_24_zeichen
+
+# Admin-Passwort beim ersten Start (optional; ohne Wert erzeugt der Seed ein Zufallspasswort)
+ADMIN_INITIAL_PASSWORD=
 
 # App-URL (Domain mit HTTPS)
 APP_URL=https://hr.fes-credo.de
@@ -175,10 +190,12 @@ N8N_API_KEY=
 | Variable                  | Pflicht | Beschreibung                                                                 |
 |---------------------------|---------|------------------------------------------------------------------------------|
 | `DATABASE_URL`            | Ja      | PostgreSQL-Verbindungsstring. Wird in Docker automatisch zusammengesetzt.    |
-| `DB_PASSWORD`             | Ja      | Passwort fuer den PostgreSQL-Benutzer `credo`.                               |
+| `DB_PASSWORD`             | Ja      | Passwort fuer den PostgreSQL-Benutzer `hrportal` (`docker-compose.yml`).     |
 | `JWT_SECRET`              | Ja      | Geheimnis fuer JWT-Token-Signierung. Mindestens 32 Zeichen. Darf nicht `dev_secret` enthalten. |
 | `ENCRYPTION_KEY`          | Ja      | 64 Hex-Zeichen fuer AES-256-GCM-Verschluesselung sensibler Felder. Generieren: `openssl rand -hex 32` |
-| `ADMIN_INITIAL_PASSWORD`  | Nein    | Passwort des initialen Admin-Accounts. Standard: `Credo2026!HR`              |
+| `BEM_ENCRYPTION_KEY`      | Ja      | 64 Hex-Zeichen, eigener Schluessel fuer BEM-Gesundheitsdaten (nicht derselbe Wert wie `ENCRYPTION_KEY`). Ohne ihn bricht der Entrypoint ab. |
+| `CRON_SECRET`             | Ja      | Absicherung der Cron-Routen fuer den Handaufruf; die taeglichen Laeufe startet der Zeitplaner des Portals. Mindestens 24 Zeichen, sonst antworten mehrere Routen mit 500. |
+| `ADMIN_INITIAL_PASSWORD`  | Nein    | Passwort des initialen Admin-Accounts. Ohne Wert erzeugt der Seed ein Zufallspasswort und gibt es einmal aus. |
 | `APP_URL`                 | Ja      | Oeffentliche URL des Portals. Wird fuer Magic Links in E-Mails verwendet.   |
 | `MAGIC_LINK_EXPIRY_HOURS` | Nein   | Gueltigkeit der Magic Links in Stunden (Standard: 720 = 30 Tage).           |
 | `N8N_API_KEY`             | Nein    | Optionaler API-Key fuer n8n-Service-Aufrufe.                                 |
@@ -187,13 +204,13 @@ N8N_API_KEY=
 ### 3. Docker Compose starten
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+sudo docker compose up -d --build
 ```
 
-Das Entrypoint-Skript fuehrt automatisch aus:
-1. Pflicht-Umgebungsvariablen pruefen (JWT_SECRET, ENCRYPTION_KEY, DATABASE_URL)
-2. Datenbank-Schema synchronisieren (`prisma db push`)
-3. Seed ausfuehren falls noch kein Admin-User existiert
+Das Entrypoint-Skript fuehrt automatisch aus (Einzelheiten: `CLAUDE.md`, „Entrypoint“):
+1. Pflicht-Umgebungsvariablen pruefen (JWT_SECRET, ENCRYPTION_KEY, BEM_ENCRYPTION_KEY, DATABASE_URL)
+2. Schema vergleichen; nur bei einem Unterschied: Sicherung per `pg_dump` nach `/backups` (schlaegt sie fehl, bricht der Start ab), dann `prisma db push --accept-data-loss`
+3. Seed-Check: System-Vorlagen, einmalige Datenmigrationen, Seed nur, solange noch kein Benutzer existiert
 4. Next.js-Server starten
 
 ### 4. Netzwerk-Voraussetzungen
@@ -214,12 +231,12 @@ Nach dem ersten Start wird automatisch ein Admin-Account angelegt:
 | Feld      | Wert                                                       |
 |-----------|------------------------------------------------------------|
 | E-Mail    | `dimitri@credo-gruppe.de`                                  |
-| Passwort  | Wert von `ADMIN_INITIAL_PASSWORD` (Standard: `Credo2026!HR`) |
+| Passwort  | Wert von `ADMIN_INITIAL_PASSWORD`; ohne Wert ein Zufallspasswort, das der Seed einmal ausgibt |
 | Rolle     | `SUPER_ADMIN`                                              |
 
 Login-URL: `https://<APP_URL>/login`
 
-Es wird dringend empfohlen, das Passwort nach dem ersten Login zu aendern.
+Es wird dringend empfohlen, das Passwort nach dem ersten Login zu aendern. Lokal hilft, wenn das ausgegebene Passwort verloren ist, `node scripts/dev-passwort-neu.js <e-mail>` (nur gegen eine lokale Datenbank; Einzelheiten in [`docs/entwicklung/lokale-umgebung.md`](docs/entwicklung/lokale-umgebung.md), Abschnitt 7).
 
 ---
 
@@ -340,7 +357,7 @@ nach „Text auf Standard zuruecksetzen".
 | `POST /api/offboarding/[id]/department-links` | HR (Admin, HR-Leitung, Sachbearbeitung) | Body leer/`{}` = Abteilungen informieren; `{ "aktion": "erneut-senden" \| "erinnern" \| "link-erneuern", "departmentKey": "IT" }`. Antwort 201 (mindestens eine Mail versendet), 409 (nichts zu versenden, Grund je Abteilung), 502 (alle Versuche am Mailserver gescheitert); Body `{ data: { aktion, versendet[], uebersprungen[] }, meldung, hinweis }` |
 | `GET /api/offboarding-tasks/[token]` | Abteilung, ohne Anmeldung | Nur die eigenen Aufgaben (ohne interne Notiz, ohne Fortschritt anderer Abteilungen); 404 ungueltig, 410 abgelaufen oder Vorgang abgebrochen |
 | `PATCH /api/offboarding-tasks/[token]/[itemId]` | Abteilung, ohne Anmeldung | `{ "isCompleted": true, "comment": "…" }` (Kommentar max. 1000 Zeichen, `""` loescht); 409 bei abgeschlossenem Vorgang, 429 je IP bzw. je Link |
-| `POST /api/cron/offboarding-reminders` | n8n, `Authorization: Bearer <CRON_SECRET>` | Taegliche Erinnerungen. Antwort `{ success, timestamp, remindersProcessed, errors, details[], uebersprungen[] }`; `details` fuehrt jeden Versuch mit `status` (SENT/WEBHOOK/SKIPPED/FAILED), `uebersprungen` die Links mit geaenderter oder fehlender Adresse |
+| `POST /api/cron/offboarding-reminders` | Zeitplaner des Portals; Handaufruf mit `Authorization: Bearer <CRON_SECRET>` | Taegliche Erinnerungen. Antwort `{ success, timestamp, remindersProcessed, errors, details[], uebersprungen[] }`; `details` fuehrt jeden Versuch mit `status` (SENT/WEBHOOK/SKIPPED/FAILED), `uebersprungen` die Links mit geaenderter oder fehlender Adresse |
 
 **Onboarding**
 
@@ -350,7 +367,7 @@ nach „Text auf Standard zuruecksetzen".
 | `GET /api/onboarding/[id]/abteilungen` | Portal-Rollen | Uebersicht fuer Karte, Stepper und Dialog (`{ abteilungen, fuehrungskraft }`). Schreibt nichts und entschluesselt nichts |
 | `GET /api/onboarding-tasks/[token]` | Abteilung, ohne Anmeldung | Nur die eigenen Aufgaben mit dem Hinweis aus der Vorlage, dazu Name, Vorgangsnummer, Einrichtung, Vertragsbeginn und die Zusatzangaben, die dieser Schluessel sehen darf (`zusatz`); 404 ungueltig (auch bei einem Offboarding-Token), 410 abgelaufen oder Vorgang nicht mehr aktiv |
 | `PATCH /api/onboarding-tasks/[token]/[itemId]` | Abteilung, ohne Anmeldung | `{ "isCompleted": true, "comment": "…" }` (Kommentar max. 1000 Zeichen, `""` loescht); 409 bei abgeschlossenem Vorgang, 429 je IP bzw. je Link |
-| `POST /api/cron/reminders` | n8n, `Authorization: Bearer <CRON_SECRET>` | Der **bestehende** taegliche Lauf; Abschnitt 3 erinnert die informierten Abteilungen. Die Antwort traegt zusaetzlich `departmentReminders` (`{ remindersProcessed, errors, details[], uebersprungen[] }`), `total` bleibt Mitarbeiter + Vorgesetzte. Ein eigener Cron ist nicht noetig |
+| `POST /api/cron/reminders` | Zeitplaner des Portals; Handaufruf mit `Authorization: Bearer <CRON_SECRET>` | Der **bestehende** taegliche Lauf; Abschnitt 3 erinnert die informierten Abteilungen. Die Antwort traegt zusaetzlich `departmentReminders` (`{ remindersProcessed, errors, details[], uebersprungen[] }`), `total` bleibt Mitarbeiter + Vorgesetzte. Ein eigener Cron ist nicht noetig |
 
 Die Adressen der Abteilungen stehen unter **Einstellungen** > **Abteilungen** (`/api/settings/departments`), die Adresse der Fuehrungskraft am Vorgang (`supervisorEmail`, `supervisorName`) — im Onboarding immer die Adresse, die auch den Modalitaeten-Link bekommen hat.
 
@@ -553,13 +570,13 @@ Modalitaeten zeigt allein `supervisorSubmittedAt`; die Reporting-API
 **Loesung:**
 ```bash
 # Container-Logs pruefen
-docker logs credo-hr-app
+sudo docker logs hr-portal-app
 
 # Healthcheck-Status pruefen
-docker inspect --format='{{.State.Health.Status}}' credo-hr-app
+sudo docker inspect --format='{{.State.Health.Status}}' hr-portal-app
 
 # Container neustarten
-docker compose -f docker-compose.prod.yml --env-file .env.production restart app
+sudo docker compose restart app
 ```
 
 Der Container hat eine `start_period` von 30 Sekunden. Warten Sie nach dem Start mindestens 30-60 Sekunden.
@@ -568,15 +585,15 @@ Der Container hat eine `start_period` von 30 Sekunden. Warten Sie nach dem Start
 
 **Ursache:** `prisma db push` im Entrypoint konnte die Tabellen nicht anlegen.
 
-**Loesung:**
+**Loesung** (auf dem Server nur nach Ruecksprache und mit eigener Sicherung vorher; der Seed selbst nie von Hand, `CLAUDE.md`, „Docker / Deployment“):
 ```bash
 # In den Container einsteigen
-docker exec -it credo-hr-app sh
+sudo docker exec -it hr-portal-app sh
 
 # Schema manuell synchronisieren
-npx prisma db push
+npx prisma db push --skip-generate
 
-# Seed manuell ausfuehren
+# Seed-Check wie im Entrypoint (System-Vorlagen, Datenmigrationen; Seed nur ohne Benutzer)
 node prisma/seed-check.js
 ```
 
@@ -586,11 +603,8 @@ node prisma/seed-check.js
 
 **Loesung:**
 ```bash
-# Entwicklung: Schema direkt pushen (ohne Migration)
+# Entwicklung: Schema direkt pushen (ohne Migration; nie prisma migrate dev oder npm run db:migrate)
 npx prisma db push
-
-# Oder: Migration erstellen und ausfuehren
-npx prisma migrate dev --name beschreibung_der_aenderung
 ```
 
 In Produktion wird `prisma db push` beim Container-Start automatisch ausgefuehrt.
@@ -599,7 +613,7 @@ In Produktion wird `prisma db push` beim Container-Start automatisch ausgefuehrt
 
 **Ursache:** Der Entrypoint prueft, dass `JWT_SECRET` gesetzt ist und nicht den Wert `dev_secret` enthaelt.
 
-**Loesung:** In `.env.production` ein sicheres, zufaelliges Secret setzen (mindestens 32 Zeichen).
+**Loesung:** In `.env` ein sicheres, zufaelliges Secret setzen (mindestens 32 Zeichen).
 
 ### FATAL: ENCRYPTION_KEY fehlt oder ist zu kurz
 
@@ -609,7 +623,7 @@ In Produktion wird `prisma db push` beim Container-Start automatisch ausgefuehrt
 ```bash
 # Schluessel generieren
 openssl rand -hex 32
-# Ergebnis in .env.production als ENCRYPTION_KEY eintragen
+# Ergebnis in .env als ENCRYPTION_KEY eintragen
 ```
 
 ### Webhooks werden nicht ausgeloest
@@ -620,14 +634,14 @@ openssl rand -hex 32
 1. Im Admin-Portal unter **Einstellungen** > **Webhooks** pruefen
 2. Sicherstellen, dass der Webhook aktiv ist und die URL erreichbar
 3. Test-Button nutzen, um die Verbindung zu pruefen
-4. Container-Logs auf Fehlermeldungen pruefen: `docker logs credo-hr-app | grep Webhooks`
+4. Container-Logs auf Fehlermeldungen pruefen: `sudo docker logs hr-portal-app | grep Webhooks`
 
 ### E-Mails kommen nicht an
 
 **Loesung:**
 1. Pruefen, ob mindestens ein Webhook oder SMTP konfiguriert und aktiv ist
 2. SMTP-Verbindungstest unter **Einstellungen** > **SMTP** ausfuehren
-3. Container-Logs pruefen: `docker logs credo-hr-app | grep Mailer`
+3. Container-Logs pruefen: `sudo docker logs hr-portal-app | grep Mailer`
 
 ---
 
