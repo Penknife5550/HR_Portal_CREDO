@@ -1,6 +1,7 @@
 # Personalstamm aus DokuBit — n8n-Stammablauf (Self-Service S0)
 
-**Stand:** 17.10.2026 · **Zweig:** `feat/selfservice-s0-personalstamm`
+**Stand:** 17.10.2026 · **Zweig:** `feat/selfservice-s0-personalstamm`, gemergt mit PR #5
+(`a43aa25`) am 17.10.2026; Nachträge 18.10.2026
 **Plan:** [`selfservice-portal-plan.html`](./selfservice-portal-plan.html), Abschnitt 5.1
 **Vorlage zum Import:** [`s0-personalstamm-n8n.json`](./s0-personalstamm-n8n.json) (n8n 2.x, ohne Credentials)
 

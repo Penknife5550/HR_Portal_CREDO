@@ -13,7 +13,7 @@
 > „Stand 18.10.2026 — hier weitermachen“.
 > **Prüfprotokoll dieses Plans:**
 > [`codereview-deploy-selfservice-s0-2026-10.md`](codereview-deploy-selfservice-s0-2026-10.md) (zwei
-> Runden, 34 Befunde, keiner offen).
+> Runden, 34 Befunde, keiner offen; Nachtrag vom 18.10.2026 zur Ausnahme in 3.2).
 > **Server:** `fes-vm-ubuntudocker`, `/vol/container/HR_Portal_CREDO`, `https://hr.fes-credo.de`
 > **Ausgangsstand (zu prüfen):** laut [Protokoll vom 14.10.2026](deploy-main-2026-10.md) Repo
 > `ea2d41d` („docs(deploy): gemeinsamer Deploy f6d3daf -> main mit Ausstattung & Zugaenge“), Code
@@ -27,9 +27,10 @@
 > `0e1d8de` („fix(verbeamtung): Status-Kacheln zählen wieder ohne den gewählten Status“, 18.10.2026)
 > direkt auf `a43aa25` („Merge pull request #5 from …/feat/selfservice-s0-personalstamm“ mit S0,
 > gemergt am 17.10.2026 um 22:48 Uhr deutscher Zeit, lokal aus `origin/main` festgestellt) und
-> darüber nur Doku (diese Anleitung, eine Korrektur der Anleitung S0 und Standnachträge in
-> `docs/README.md`, im Einstieg Self-Service und in der Übergabe S0; Liste in 3.2) samt dem
-> Merge-Commit des Pull Requests. **Gemergt wird auf GitHub mit „Create a
+> darüber nur Doku (unter anderem diese Anleitung, eine Korrektur der Anleitung S0 und
+> Standnachträge in `docs/README.md`, im Einstieg Self-Service und in der Übergabe S0, dazu
+> `CLAUDE.md` mit Einstieg und Hausregeln vom 18.10.2026 und `README.md` ohne das frühere
+> Standardpasswort; was als Doku zählt, regelt 3.2) samt dem Merge-Commit des Pull Requests. **Gemergt wird auf GitHub mit „Create a
 > merge commit“**, nie mit „Squash and merge“ oder „Rebase and merge“: Beide schreiben die Commits
 > neu, `0e1d8de` stünde dann nicht auf `main`, und 3.2 hielte am Deploy-Tag an (Abschnitt 0, „Vor dem
 > Termin zu entscheiden“, Punkt 5).
@@ -652,20 +653,21 @@ oder eine Frage nach Zugangsdaten → **STOPP, Ausgabe an Claude.** Das Portal l
 ### 3.2 Was angekommen ist
 
 ```bash
-sudo git log --oneline -3
+sudo git --no-pager log --oneline -12
 ```
 
 **Erwartet:** oben mit `(HEAD -> main, origin/main, origin/HEAD)` der Commit, der diese Anleitung
 brachte. Nach einem Merge über GitHub mit „Create a merge commit“ (Hausverfahren, Abschnitt 0, „Vor
 dem Termin zu entscheiden“, Punkt 5) ist das ein Merge-Commit `Merge pull request #… from
-…/fix/verbeamtung-kacheln-deploy-s0`, darunter der Doku-Commit und dann `0e1d8de
-fix(verbeamtung): Status-Kacheln zählen wieder ohne den gewählten Status`; nach einem
-Fast-Forward-Push ohne den GitHub-Knopf (nicht vorgesehen) steht der Doku-Commit oben, `0e1d8de`
-darunter und `a43aa25 Merge pull request #5 from …/feat/selfservice-s0-personalstamm` als dritte
-Zeile. Kam diese Anleitung nicht über `main`, steht
-`0e1d8de` selbst oben und `a43aa25` direkt darunter. Nur zum Ansehen, keine dieser Formen ist ein
-STOPP — ob S0 (`a43aa25`) und der Code-Stand `0e1d8de` enthalten sind und darüber nur Doku liegt,
-prüfen die nächsten Befehle gegen diese festen Stände.
+…/fix/verbeamtung-kacheln-deploy-s0`, darunter die Doku-Commits des Pull Requests (wie viele, hängt
+davon ab, was bis zum Merge noch dazukommt), weiter unten `0e1d8de fix(verbeamtung):
+Status-Kacheln zählen wieder ohne den gewählten Status` und darunter `a43aa25 Merge pull request #5
+from …/feat/selfservice-s0-personalstamm`; nach einem Fast-Forward-Push ohne den
+GitHub-Knopf (nicht vorgesehen) stehen die Doku-Commits oben, darunter `0e1d8de` und `a43aa25`.
+Kam diese Anleitung nicht über `main`, steht `0e1d8de` selbst oben und `a43aa25` direkt darunter.
+Fehlen `0e1d8de` oder `a43aa25` in den zwölf Zeilen, mit `-30` statt `-12` mehr Zeilen ansehen. Nur
+zum Ansehen, keine dieser Formen ist ein STOPP — ob S0 (`a43aa25`) und der Code-Stand `0e1d8de`
+enthalten sind und darüber nur Doku liegt, prüfen die nächsten Befehle gegen diese festen Stände.
 
 ```bash
 sudo git merge-base --is-ancestor a43aa25 HEAD && echo "a43aa25 enthalten"
@@ -723,30 +725,26 @@ sudo git diff --quiet 00af8d6 a43aa25 && echo "Merge gleich S0-Zweig"
 
 **Erwartet:** `Merge gleich S0-Zweig`. Fehlt die Zeile → **STOPP, Ausgabe an Claude.**
 
-Nach `0e1d8de` darf nur noch Doku kommen:
+Nach `0e1d8de` darf nur noch Doku kommen — Dateien unter `docs/` sowie `CLAUDE.md` und `README.md`
+im Projektordner (`.dockerignore` schließt `*.md` im Projektordner aus, `CLAUDE.md` und `README.md`
+kommen also nie ins Image):
 
 ```bash
-sudo git diff --quiet 0e1d8de HEAD -- . ':!docs' && echo "nach 0e1d8de nur Doku"
+sudo git diff --quiet 0e1d8de HEAD -- . ':!docs' ':!CLAUDE.md' ':!README.md' && echo "nach 0e1d8de nur Doku"
 ```
 
-**Erwartet:** `nach 0e1d8de nur Doku`. Fehlt die Zeile (auch `CLAUDE.md` zählt) → **STOPP, Ausgabe
-an Claude.**
+**Erwartet:** `nach 0e1d8de nur Doku`. Fehlt die Zeile → **STOPP, Ausgabe an Claude.**
 
 ```bash
 sudo git diff --name-only 0e1d8de HEAD
 ```
 
-**Erwartet:** die fünf Dateien des Doku-Commits — `docs/README.md`,
-`docs/historie/deploy-selfservice-s0-2026-10.md` (diese Anleitung),
-`docs/historie/uebergabe-selfservice-s0-2026-10-17.md`, `docs/module/selfservice/README.md` (diese
-drei mit Standnachträgen) und `docs/module/selfservice/s0-personalstamm-n8n.md` (Korrektur der
-Anleitung S0) — oder gar keine Zeile, wenn `HEAD` gleich `0e1d8de` ist; nach einem späteren
-Doku-Commit weitere Zeilen unter `docs/`. Nur notieren. Kommen die Nachträge vom 18.10.2026
-(Abgleich für die Arbeit an einem anderen Rechner) im selben Pull Request mit, stehen zusätzlich
-`docs/entwicklung/lokale-umgebung.md`, `docs/historie/codereview-deploy-selfservice-s0-2026-10.md`,
-`docs/historie/codereview-s0-personalstamm-2026-10.md`,
-`docs/module/elternzeit/elternzeit-phase-2-review-fixes.md` und
-`docs/module/elternzeit/elternzeit-phase-2-status.md` in der Liste.
+**Erwartet:** nur Zeilen, die mit `docs/` beginnen, dazu höchstens `CLAUDE.md` und `README.md` —
+wie viele, hängt davon ab, welche Doku-Commits bis zum Merge noch dazukommen (unter anderem diese
+Anleitung `docs/historie/deploy-selfservice-s0-2026-10.md`, die Übergabe S0, die Korrektur der
+Anleitung S0 und die Nachträge vom 18.10.2026 für die Arbeit an einem anderen Rechner). Gar keine
+Zeile, wenn `HEAD` gleich `0e1d8de` ist. Nur notieren; eine Zeile außerhalb davon hätte schon der
+Befehl davor gemeldet.
 
 ```bash
 sudo git diff --numstat ea2d41d 0e1d8de -- docker-compose.yml Dockerfile entrypoint.sh package.json package-lock.json .env.production.example .dockerignore next.config.ts prisma/schema.prisma prisma/seed-check.js prisma/seed.ts public/system-dokumente src/middleware.ts src/instrumentation.ts
@@ -1743,13 +1741,13 @@ nach der `docker-compose.yml` im Projektordner. Hat seit Etappe 1 jemand gebaut,
 Entrypoint. Deshalb vorher:
 
 ```bash
-sudo git diff --quiet 0e1d8de HEAD -- . ':!docs' ':!CLAUDE.md' && echo "Code-Stand 0e1d8de"
+sudo git diff --quiet 0e1d8de HEAD -- . ':!docs' ':!CLAUDE.md' ':!README.md' && echo "Code-Stand 0e1d8de"
 ```
 
-**Erwartet:** `Code-Stand 0e1d8de` (seit Etappe 1 höchstens Doku dazu, auch `CLAUDE.md`: Abschnitt
-9 führt sie schon mit Etappe 1 nach; sie liegt nicht im Image — `.dockerignore` schließt `*.md`
-aus — und liest zur Laufzeit niemand. Anders als in 3.2, wo der Doku-Commit `CLAUDE.md` nicht
-anfasst und deshalb jede Änderung dort auffallen soll). Kam nach Etappe 1 ein
+**Erwartet:** `Code-Stand 0e1d8de` (seit Etappe 1 höchstens Doku dazu — dieselbe Ausnahme wie in
+3.2: Dateien unter `docs/`, `CLAUDE.md` und `README.md`; Abschnitt 9 führt die `CLAUDE.md` schon
+mit Etappe 1 nach, beide liegen nicht im Image — `.dockerignore` schließt `*.md` im Projektordner
+aus — und liest zur Laufzeit niemand). Kam nach Etappe 1 ein
 weiterer Deploy, setzt Claude hier dessen Code-Stand ein. Fehlt die Zeile → **STOPP, Ausgabe an
 Claude.**
 
@@ -2042,7 +2040,8 @@ ein Einspielen der Sicherung aus 8.4 (7.4) verwürfe sonst, was HR inzwischen ge
 **Stufe 1:** den Ablauf in n8n ausschalten. Mehr ist nicht nötig.
 
 **Stufe 2:** zusätzlich das Geheimnis entfernen, damit auch ein vergessener Ablauf nichts mehr
-schreibt. Vorher die vier Prüfungen aus 8.1 zu Code-Stand, Override-Datei, Image und
+schreibt. Vorher die vier Prüfungen aus 8.1 zu Code-Stand (derselbe Befehl, also mit derselben
+Ausnahme `':!docs' ':!CLAUDE.md' ':!README.md'` wie in 3.2), Override-Datei, Image und
 Schema-Vergleich wiederholen — das Neuanlegen unten nimmt sonst womöglich ein anderes Image, dessen
 Entrypoint nach dem ersten Lauf Daten löschen könnte (7.1). Erwartet ist dabei die Image-ID aus dem
 letzten Deploy-Protokoll. Weicht etwas ab → **STOPP, nichts neu anlegen, Ausgabe an Claude**;
@@ -2184,12 +2183,16 @@ ruhend“ bzw. „in Betrieb seit …“) überall nachführen, wo heute „nich
   deployt“ abhaken), Abschnitt 7 (Zeile S0 der Tabelle) und Abschnitt 8 (Zeilen `main` und
   `fix/verbeamtung-kacheln-deploy-s0` der Zweig-Tabelle). Dazu den Abschnitt „Stand 18.10.2026 —
   hier weitermachen“ unter dem Kopf auf den Stand nach dem Deploy bringen (Nachtrag vom 18.10.2026)
-  und in 8.6 den Satz zur CLAUDE.md, sobald sie nachgeführt ist.
-- CLAUDE.md **schon mit Etappe 1:** S0 deployt und ruhend; kein Deploy und kein Rückfall auf einen
-  Stand ohne das S0-Schema (7.1, auch `ux-umbau` erst nach dem Merge von `main`), neue Stände
-  enthalten zudem `0e1d8de` (Ausgangsstand oben); in der Tabelle der
-  Umgebungsvariablen `PERSONALSTAMM_SECRET` (optional, erst mit Etappe 2). Nach Etappe 2 zusätzlich
-  ein Abschnitt zu S0 (Webhook, Schreibschutz, Löschfrist, Rücknahme).
+  und in 8.6 nur den Satz „Den Stand von S0 führt sie mit Etappe 1 nach“ anpassen (der Rest des
+  Absatzes zur CLAUDE.md gilt weiter).
+- CLAUDE.md **schon mit Etappe 1:** Sie hat seit dem 18.10.2026 einen Einstieg, die Hausregeln und
+  im Abschnitt „Docker / Deployment“ die dauerhafte Regel „Feste Anker für Deploy und Rückfall“
+  (nur Stände mit `a43aa25` und `0e1d8de`, `ux-umbau` erst nach dem Merge von `main`, Rückfall nur
+  nach Abschnitt 7) — die Regel bleibt dort und wird nicht mit dem Einstieg umgeschrieben. Nach dem
+  Deploy wird der Abschnitt „Laufende Arbeit und Einstieg“ nachgeführt: S0 deployt und ruhend; die
+  Zeile zu PR #6 entfällt, sobald er gemergt ist. Erst mit Etappe 2 kommen dazu: in der Tabelle der
+  Umgebungsvariablen `PERSONALSTAMM_SECRET` (optional) und ein Abschnitt zu S0 (Webhook,
+  Schreibschutz, Löschfrist, Rücknahme).
 
 ---
 
@@ -2223,4 +2226,38 @@ Vorläufige Liste — beim Eintragen des Protokolls auf den tatsächlichen Stand
    der Status-Kacheln still zurück; sein Ablaufplan prüft `git merge-base --is-ancestor a43aa25 HEAD`
    (S0-Schema), dasselbe mit `0e1d8de8cf0d5b714c059140b9f2f09552eb00d1` (Code-Stand dieses Deploys)
    und eine Vorschau ohne `DROP` (7.1).
-10. **Claude:** Protokoll eintragen und die Dateien aus „Nach dem Update (Claude)“ nachführen.
+10. **Claude:** Protokoll eintragen und die Dateien aus „Nach dem Update (Claude)“ nachführen — in
+    der CLAUDE.md den Abschnitt „Laufende Arbeit und Einstieg“ (Einstieg, Hausregeln und die festen
+    Anker unter „Docker / Deployment“ stehen dort seit dem 18.10.2026 und bleiben).
+11. **Versionierte n8n-Exporte aus Git nehmen, erst nach Etappe 1** (Entscheidung vom 18.10.2026):
+    `git ls-files n8n` zeigt drei Dateien (`n8n/CREDO_HR_Portal_Offboarding_Workflow.json`,
+    `n8n/CREDO_Offboarding_Reminder_Workflow.json`, `n8n/CREDO_Reminder_Cron_Workflow.json`). Am
+    Entwicklerrechner genau diese drei mit `git rm --cached` herausnehmen und über einen Pull Request
+    auf `main` bringen. Danach greift der Eintrag `/n8n/` in `.gitignore`; die Dateien bleiben im
+    Arbeitsbaum dieses Rechners, in der Historie stehen sie weiter. Zwei Folgen: Jeder andere Klon
+    (der zweite Rechner, der Projektordner auf dem Server) löscht die drei Dateien beim nächsten
+    `git pull` aus seinem Arbeitsbaum — wer sie dort braucht (`scripts/build-offboarding-flow.js`
+    liest `CREDO_HR_Portal_Offboarding_Workflow.json`), sichert sie vorher. Und die Löschung liegt
+    außerhalb von `docs/`: Wird auf dem Server vor Etappe 2 gezogen (nicht vorgesehen), meldet 8.1
+    keine Zeile `Code-Stand 0e1d8de` mehr — STOPP wie dort beschrieben; Claude prüft dann, ob nur die
+    drei Exporte dazukamen, und führt 8.1 nach.
+12. **Früheres Standardpasswort aus der `README.md`** (Entscheidung vom 18.10.2026): Die `README.md`
+    nannte bis zum 18.10.2026 ein Standardpasswort für das erste Admin-Konto. Der Wert stand
+    öffentlich im Repo und bleibt in der Historie. Der Auftraggeber prüft selbst, ob ein Konto in
+    Produktion dieses Passwort trägt, und ändert es dann. Den Wert nie in das Protokoll, eine Ausgabe
+    an Claude oder eine Datei schreiben. **Erweitert nach der Gegenprüfung vom 18.10.2026:** Ebenso
+    öffentlich in der Historie stehen das Passwort des Testzugangs aus der Workspace-Datei (bis zum
+    18.10.2026 in zwei Dokumenten unter `docs/`) und ein noch älteres Seed-Standardpasswort (in den
+    Skripten aus Punkt 13 und im Kommentar von `prisma/seed.ts`). Dieselbe Prüfung für beide, auf
+    jedem Server und jeder Testinstanz; dazu, dass dort keiner der früheren Entwicklungswerte
+    (Datenbankpasswort, `JWT_SECRET`, `ENCRYPTION_KEY`, `CRON_SECRET`) gesetzt ist. Das Ergebnis nur
+    als „geprüft, nichts gefunden“ bzw. „geändert“ festhalten, nie mit Werten.
+13. **Altlasten außerhalb von `docs/`, erst nach Etappe 1** (gefunden bei der Gegenprüfung vom
+    18.10.2026; Entscheidung beim Auftraggeber): `check-server.ps1`, `test-api.ps1`, `test-create.ps1`,
+    `test-health.ps1` und `test-runner.mjs` im Projektordner (Stand 24.03.2026, gegen `localhost`)
+    melden sich mit der Admin-Adresse und dem älteren Seed-Standardpasswort aus Punkt 12 an;
+    `src/__tests__/lib/encryption.test.ts` nimmt als Testschlüssel genau den früheren
+    Entwicklungs-`ENCRYPTION_KEY`. Vorschlag: die Skripte bereinigen oder entfernen und im Test einen
+    eigenen Schlüssel nehmen, über einen Pull Request auf `main`. Wie Punkt 11 liegt das außerhalb
+    von `docs/`, `CLAUDE.md` und `README.md`: vorher hielte 3.2 an, und vor Etappe 2 auf dem Server
+    gezogen meldete 8.1 keine Zeile `Code-Stand 0e1d8de` mehr — dann wie dort, Claude führt 8.1 nach.

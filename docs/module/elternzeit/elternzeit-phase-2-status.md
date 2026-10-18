@@ -471,10 +471,8 @@ Folgestatus bauen, nicht in den linearen Hauptablauf einfuegen.
 ```bash
 cd HR_Portal_CREDO
 docker start credo-hr-db-dev
-export DATABASE_URL="postgresql://credo:credo_dev_2026@localhost:5433/hr_portal?schema=public"
-export JWT_SECRET="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4"
-export ENCRYPTION_KEY="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
-export CRON_SECRET="cron-dev-secret-2026"
+# Umgebungsvariablen aus der .env im Repo-Ordner (Werte selbst erzeugt, nie ins Repo; Mindestlaengen
+# und Erzeugung): docs/entwicklung/lokale-umgebung.md, Abschnitt 5
 
 npm run db:push
 npm run db:generate
@@ -492,8 +490,9 @@ npx next dev -p 3000
 > **Richtigstellung 18.10.2026:** Seit 09/2026 startet der Zeitplaner des Portals den Lauf
 > „Elternzeit-Fristen“ selbst (Einstellungen → Automatische Laeufe, Standard 08:30; neue Laeufe kommen
 > ausgeschaltet an). n8n wird dafuer nicht mehr gebraucht (CLAUDE.md, „Automatische Läufe“). Die Route
-> verlangt ein `CRON_SECRET` mit mindestens 24 Zeichen, der Entwicklungswert oben ist kuerzer (Antwort
-> beim Handaufruf 500). Die lokale Umgebung von heute: `docs/entwicklung/lokale-umgebung.md`.
+> verlangt ein `CRON_SECRET` mit mindestens 24 Zeichen (sonst Antwort 500 beim Handaufruf); der bis
+> zum 18.10.2026 oben abgedruckte Entwicklungswert war kuerzer. Die lokale Umgebung von heute:
+> `docs/entwicklung/lokale-umgebung.md`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Stand:** 17.10.2026 · Zweig `feat/selfservice-s0-personalstamm`, Commit `24a8d11`
 > „Self-Service S0: Personalstamm aus DokuBit“ (beim Schreiben noch nicht gepusht; Push und
-> Pull Request folgen)
+> Pull Request folgen); gemergt mit PR #5 (`a43aa25`) am 17.10.2026; Nachträge 18.10.2026
 > **Grundlage:** Konzeptplan Fassung 6, gemergt mit PR #4 (`main` = `ac3535a`); Zustimmung von
 > Personalabteilung, DSB und MAV am 17.10.2026
 > **Regeln im Detail:** [`s0-personalstamm-n8n.md`](../module/selfservice/s0-personalstamm-n8n.md)

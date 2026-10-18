@@ -23,6 +23,9 @@ er an diesen Stellen so aussieht.
 | 2 | Nachführen auf den Code-Stand `0e1d8de` (18.10.2026) | 2: feste Stände (Hashes), Inhalt | 11: 4 / 7 | alle bestätigt und umgesetzt, nichts verworfen |
 | | **Summe** | | **34: 14 / 20** | kein Befund offen |
 
+Dazu der Abschnitt „Nachtrag 18.10.2026“ nach Runde 2 (Ausnahme in 3.2, Gegenprüfung der
+Doku-Nachträge, Probe).
+
 W = wichtig, k = klein. Einen kritischen Befund gab es in keiner Runde. Mehrere Prüfer fanden
 dieselbe Lücke unabhängig; solche Befunde stehen einzeln in der Tabelle und haben dasselbe Ergebnis.
 Kürzel in diesem Dokument: Runde.Nummer, also `1.01` bis `2.11`.
@@ -138,6 +141,41 @@ ausführbaren Befehle lieferten, was der Plan erwartet.
 | 2.09 | Inhalt | klein | wie 2.03 | umgesetzt: Kopf und 3.2 nennen alle fünf Dateien; Abschnitt 9 berücksichtigt die schon eingetragene Historienzeile |
 | 2.10 | Inhalt | klein | Die Kacheln zählen nach dem Deploy im gewählten Filter statt über alle Vorgänge; der Plan sagte, für HR ändere sich nur der Menüpunkt | umgesetzt in Abschnitt 0 und der Tabelle. Den Text an HR in 5.5 hat die Überarbeitung nicht geändert, das entscheidet der Auftraggeber |
 | 2.11 | Inhalt | klein | wie 2.05; `ux-umbau` enthält `b474d8a`, aber nicht `0e1d8de` | umgesetzt: Abschnitt 9 „Ausgangsstand“, 10.9 und Abschnitt 0 verlangen beide Anker; `main` erst nach dem Merge von PR #6 in `ux-umbau` |
+
+---
+
+## Nachtrag 18.10.2026 — Ausnahme in 3.2 und Gegenprüfung der Doku-Nachträge
+
+**Entscheidung des Auftraggebers.** `CLAUDE.md` und `README.md` zählen in 3.2 als Doku, wie schon in
+8.1 und 8.8: `git diff --quiet 0e1d8de HEAD -- . ':!docs' ':!CLAUDE.md' ':!README.md'`. Grund:
+`.dockerignore` schließt `*.md` im Projektordner aus, beide kommen nie ins Image. Die Dateiliste in
+Kopf und 3.2 ist durch eine Regel ersetzt (nur `docs/`, dazu höchstens `CLAUDE.md` und `README.md`).
+Damit sind überholt: in 2.01 der Satz „3.2 bleibt streng“ und das Ergebnis von 2.09 („Kopf und 3.2
+nennen alle fünf Dateien“).
+
+**Gegenprüfung.** Zwei Prüfer lasen die Doku-Nachträge vom 18.10.2026 (Einstieg und Hausregeln in
+`CLAUDE.md`, `README.md`, `lokale-umgebung.md`, Übergabe S0, dieser Plan). Für den Plan umgesetzt:
+
+- Die dauerhafte Regel zu Deploy und Rückfall steht jetzt in `CLAUDE.md`, Abschnitt „Docker /
+  Deployment“, „Feste Anker für Deploy und Rückfall“, und nicht nur im Einstieg, der sich mit jeder
+  Übergabe ändert. Abschnitt 9 („Nach dem Update (Claude)“) und Abschnitt 10, Punkt 10 sagen das.
+  1.08 („die Regel kommt schon mit Etappe 1 in CLAUDE.md“) ist damit früher erfüllt als geplant.
+- Kopf: statt „Liste in 3.2“ jetzt „was als Doku zählt, regelt 3.2“; Abschnitt 9: in 8.6 der
+  Übergabe nur noch den einen Satz zum Stand nachführen.
+- Abschnitt 10, Punkt 12 erweitert (Passwort des Testzugangs aus der Workspace-Datei, ein älteres
+  Seed-Standardpasswort, frühere Entwicklungswerte auf Servern und Testinstanzen); Punkt 13 neu
+  (alte Testskripte im Projektordner und der Testschlüssel in `encryption.test.ts`, erst nach
+  Etappe 1).
+
+**Probe.** 3.1, 3.2 und der Code-Anker aus 8.1 und 8.8 liefen am 18.10.2026 in einem Wegwerf-Klon:
+Arbeitsbaum als Commit auf `a4b1680`, Merge wie über GitHub (`--no-ff`) auf `main` = `a43aa25`,
+Server-Klon auf `ea2d41d` mit einer Datei unter `backups/`. Alles wie erwartet: Fast-Forward ab
+`ea2d41d`; in `log -12` `0e1d8de` in Zeile 5 und `a43aa25` in Zeile 6; beide Anker enthalten (voller
+Hash von `a43aa25` stimmt); 20 Commits, 6 Merges, Liste von `0e1d8de` bis `5595cf7`; „Merge gleich
+S0-Zweig“; „nach 0e1d8de nur Doku“; `--name-only` nur `CLAUDE.md`, `README.md` und Zeilen unter
+`docs/`; genau die drei `numstat`-Zeilen; „package.json und package-lock unveraendert“; `git status`
+nur `?? backups/…`; „Code-Stand 0e1d8de“. Gegenprobe: Nach einer Änderung an `src/middleware.ts`
+fehlt die Zeile „nur Doku“.
 
 ---
 

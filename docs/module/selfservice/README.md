@@ -6,10 +6,11 @@ sehen. Mails an das HR-Postfach kommen als zweiter Eingang in dasselbe Ticketsys
 zentral über Keycloak mit dem Microsoft-365-Konto. Grundlage für alles ist der Personalstamm aus
 DokuBit, den n8n jede Nacht an das Portal schickt.
 
-**Stand 17.10.2026:** Der Konzeptplan (Fassung 6) ist in `main` (PR #4). Personalabteilung,
+**Stand 18.10.2026:** Der Konzeptplan (Fassung 6) ist in `main` (PR #4). Personalabteilung,
 Datenschutzbeauftragter und MAV haben ihm am 17.10.2026 zugestimmt. Paket S0 ist mit PR #5 in
-`main`, aber nicht deployt; der Ablaufplan steht in
-[`deploy-selfservice-s0-2026-10.md`](../../historie/deploy-selfservice-s0-2026-10.md).
+`main` (17.10.2026), aber nicht deployt; der Ablaufplan steht in
+[`deploy-selfservice-s0-2026-10.md`](../../historie/deploy-selfservice-s0-2026-10.md) und kommt mit
+PR #6 nach `main`.
 
 **Hier anfangen:** [Übergabe S0 vom 17.10.2026](../../historie/uebergabe-selfservice-s0-2026-10-17.md).
 Sie nennt Stand, Entscheidungen, Prüfung, die Checkliste vor dem ersten Produktivlauf, die offenen
@@ -51,6 +52,8 @@ und S3b, danach S2 und S4, zuletzt S5.
 | [../../historie/codereview-s0-personalstamm-2026-10.md](../../historie/codereview-s0-personalstamm-2026-10.md) | Prüfprotokoll S0: sechs Runden Review und Gegenprüfung mit 77 Befunden und ihrem Ergebnis, die Entscheidungen mit Urheber, Ende-zu-Ende-Probe und Restrisiken |
 | [../../historie/s0-bauvorgabe-2026-10.md](../../historie/s0-bauvorgabe-2026-10.md) | Archiv der Bauvorgabe, nach der S0 gebaut wurde, mit Markierungen, was später ersetzt oder ergänzt wurde. Nicht mehr maßgeblich; es gelten Plan und Anleitung |
 | [../../historie/codereview-selfservice-plan-2026-10.md](../../historie/codereview-selfservice-plan-2026-10.md) | Prüfprotokoll des Konzeptplans: Code-Review mit Gegenprüfung, Befunde F1–F83 und ihre Umsetzung in Fassung 6 |
+| [../../historie/deploy-selfservice-s0-2026-10.md](../../historie/deploy-selfservice-s0-2026-10.md) | Ablaufplan des Server-Updates mit S0: Etappe 1 rollt den Code ruhend aus, Etappe 2 nimmt S0 erst nach den Freigaben F1–F11 in Betrieb; Rückfall, Protokollvorlage. Noch nicht ausgeführt |
+| [../../historie/codereview-deploy-selfservice-s0-2026-10.md](../../historie/codereview-deploy-selfservice-s0-2026-10.md) | Prüfprotokoll des Ablaufplans: zwei Runden, 34 Befunde mit Ergebnis, Restrisiken |
 
 ## Im Code
 

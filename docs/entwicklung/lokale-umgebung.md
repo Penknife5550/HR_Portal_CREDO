@@ -16,8 +16,8 @@ n8n-Exporte, lokaler Stash), steht in der
 ## 1. Voraussetzungen
 
 - **Git**, **Docker** (Docker Desktop), **Node.js 22 LTS** wie im Image (`node:22-alpine` im
-  `Dockerfile`; das README nennt noch „>= 18“). Auf dem Mac lief bisher Node 24.12 mit npm 11.6;
-  dazu der Stolperstein in Abschnitt 9.
+  `Dockerfile`; das README nennt seit dem 18.10.2026 ebenfalls 22). Auf dem Mac lief bisher
+  Node 24.12 mit npm 11.6; dazu der Stolperstein in Abschnitt 9.
 - **openssl** für die Geheimnisse. Unter Windows bringt Git Bash es mit. Die Befehle dieser Anleitung
   sind bash; unter PowerShell 5.1 ist `curl` ein anderes Programm (`curl.exe` nehmen).
 - **Nicht in einen synchronisierten Ordner klonen** (iCloud-Schreibtisch, OneDrive). Die
@@ -25,8 +25,9 @@ n8n-Exporte, lokaler Stash), steht in der
   damit `git fetch` und die Typprüfung (Übergabe S0, Abschnitt 8.5).
 - **Git-Kennung setzen**, einmal je Rechner, gleich auf allen Rechnern:
   `git config --global user.name "…"` und `git config --global user.email "…"`. Ohne sie trägt Git
-  eine aus dem Rechnernamen erzeugte Adresse ein (so bei 41 Commits bis 18.10.2026). Das Repo ist
-  öffentlich, die Adresse steht in jedem Commit.
+  eine aus dem Rechnernamen erzeugte Adresse ein (so bei 42 Commits bis `a4b1680`). Auf dem Mac sind
+  `user.name` und `user.email` seit dem 18.10.2026 gesetzt. Das Repo ist öffentlich, die Adresse
+  steht in jedem Commit.
 
 ## 2. Repo holen
 
@@ -35,8 +36,14 @@ git clone https://github.com/Penknife5550/HR_Portal_CREDO.git
 cd HR_Portal_CREDO
 ```
 
-Solange PR #6 offen ist, liegen Ablaufplan, Kachel-Fix und die Nachträge vom 18.10.2026 nur auf
-seinem Zweig:
+Ob PR #6 schon gemergt ist:
+
+```bash
+git fetch origin && git merge-base --is-ancestor 0e1d8de8cf0d5b714c059140b9f2f09552eb00d1 origin/main && echo "PR #6 gemergt"
+```
+
+Steht `PR #6 gemergt` da, auf `main` bleiben. Fehlt die Zeile, liegen Ablaufplan, Kachel-Fix und die
+Nachträge vom 18.10.2026 nur auf seinem Zweig (Stand 18.10.2026: PR #6 offen):
 
 ```bash
 git checkout fix/verbeamtung-kacheln-deploy-s0
@@ -103,8 +110,13 @@ Platzhalter (er schaltete lokal den n8n-Schlüssel mit diesem Wert frei).
 Entwicklungsumgebung verschickt so nie von selbst Mails) und `N8N_API_KEY` (nur zum Probieren des
 n8n-Schlüssels, dann mit einem eigenen Zufallswert).
 
-Die in `docs/module/elternzeit/elternzeit-phase-2-status.md` („Aktivierung“) abgedruckten
-Entwicklungswerte gelten nur für die damalige Datenbank; ihr `CRON_SECRET` ist kürzer als 24 Zeichen.
+In drei Dokumenten standen bis zum 18.10.2026 Entwicklungswerte der damaligen Datenbank, in zweien
+auch ein Testzugang: `docs/module/elternzeit/elternzeit-phase-1-status.md`,
+`docs/module/elternzeit/elternzeit-phase-2-status.md` („Aktivierung“) und
+`docs/module/verbeamtung/VERBEAMTUNG_BEURTEILUNGEN_STATUS.md`. Seither verweisen sie auf diesen
+Abschnitt und auf Abschnitt 7. In der Git-Historie bleiben die Werte lesbar, und der damalige
+`ENCRYPTION_KEY` ist zugleich der Testschlüssel in `src/__tests__/lib/encryption.test.ts`: alte Werte
+nie wiederverwenden, jeder Rechner erzeugt neue.
 
 ## 6. Schema, Grunddaten, System-Vorlagen
 
@@ -146,8 +158,9 @@ node scripts/dev-passwort-neu.js <e-mail>
 ```
 
 Das Skript arbeitet nur gegen eine lokale Datenbank und gibt ein neues Zufallspasswort aus. **Kein
-Passwort ins Repo.** Das im README genannte Standardpasswort gilt nicht mehr: Der Seed erzeugt ohne
-`ADMIN_INITIAL_PASSWORD` ein zufälliges.
+Passwort ins Repo.** Ein Standardpasswort gibt es nicht: Der Seed erzeugt ohne
+`ADMIN_INITIAL_PASSWORD` ein zufälliges (das README nannte bis zum 18.10.2026 eines, das nicht mehr
+galt).
 
 ## 8. Starten
 

@@ -1,8 +1,10 @@
 # Self-Service S0 „Personalstamm aus DokuBit“ — Übergabe
 
-> **Stand:** 17.10.2026, abends · **Zweig:** `feat/selfservice-s0-personalstamm` · **Commit:** `24a8d11`
-> „Self-Service S0: Personalstamm aus DokuBit“, dazu diese Übergabe und der Schreibschutz der
-> Beschäftigtenrouten (Abschnitt 2.6, Nachtrag vom selben Abend).
+> **Stand:** 18.10.2026 · `main` `a43aa25` (PR #5) · offen: PR #6, Zweig
+> `fix/verbeamtung-kacheln-deploy-s0`
+> **Herkunft:** Übergabe vom 17.10.2026, abends · **Zweig:** `feat/selfservice-s0-personalstamm` ·
+> **Commit:** `24a8d11` „Self-Service S0: Personalstamm aus DokuBit“, dazu diese Übergabe und der
+> Schreibschutz der Beschäftigtenrouten (Abschnitt 2.6, Nachtrag vom selben Abend).
 > **Nicht deployt.** Der n8n-Ablauf ist nicht eingerichtet. **Nachtrag 18.10.2026:** S0 ist mit
 > PR #5 in `main` (`a43aa25`). Der Deploy-Ablaufplan liegt vor:
 > [`deploy-selfservice-s0-2026-10.md`](deploy-selfservice-s0-2026-10.md), in zwei Etappen (Code
@@ -16,25 +18,69 @@
 **Wo die Arbeit steht.**
 
 - S0 ist mit PR #5 in `main` (`a43aa25`, 17.10.2026).
-- **PR #6 ist offen** (Zweig `fix/verbeamtung-kacheln-deploy-s0`, angelegt am 18.10.2026): der Fix
-  der Status-Kacheln der Verbeamtung `0e1d8de`, der Ablaufplan
+- **PR #6 ist offen** (Stand 18.10.2026; Zweig `fix/verbeamtung-kacheln-deploy-s0`, angelegt am
+  18.10.2026): der Fix der Status-Kacheln der Verbeamtung `0e1d8de`, der Ablaufplan
   [`deploy-selfservice-s0-2026-10.md`](deploy-selfservice-s0-2026-10.md) mit seinem
   [Prüfprotokoll](codereview-deploy-selfservice-s0-2026-10.md) und Doku-Nachträge, auch dieser
-  Abschnitt (nur unter `docs/`). **Gemergt wird nur mit „Create a merge commit“**, nie mit Squash oder
-  Rebase, denn der Plan hängt am Hash `0e1d8de` (Ablaufplan Abschnitt 0, „Vor dem Termin zu
-  entscheiden“, Punkt 5, dort auch der Prüfbefehl danach).
+  Abschnitt (nur unter `docs/` sowie in `CLAUDE.md` und `README.md`). Ob er inzwischen gemergt ist:
+  `git fetch origin && git merge-base --is-ancestor 0e1d8de8cf0d5b714c059140b9f2f09552eb00d1 origin/main && echo "PR #6 gemergt"`.
+  Steht die Zeile da, gilt `main`, nicht mehr der Zweig. **Gemergt wird nur mit „Create a merge
+  commit“**, nie mit Squash oder Rebase, denn der Plan hängt am Hash `0e1d8de` (Ablaufplan
+  Abschnitt 0, „Vor dem Termin zu entscheiden“, Punkt 5). Zeigt GitHub den Pull Request als gemergt,
+  fehlt die Zeile aber, wurde per Squash oder Rebase gemergt: nicht deployen, an Claude.
 - **Deploy nicht begonnen.** Am 18.10.2026 bestand kein Zugriff auf den Server. Auch Abschnitt 1 des
   Ablaufplans ist nicht ausgeführt; der Serverstand seit dem 14.10.2026 ist im Repo nicht belegt.
 - **Entschieden am 18.10.2026:** zuerst Abschnitt 1 des Ablaufplans nur lesend, als eigener Schritt.
-  Der Deploy selbst folgt an einem Werktag zwischen 10 und 12 Uhr mit HR; HR wird am Vortag
-  informiert (Nachtrag im Kopf des Ablaufplans).
+  „Nur lesend“ mit den drei Ausnahmen aus der Einleitung von Abschnitt 1: 1.0 legt den Arbeitsordner
+  `~/deploy-selfservice-s0` an (außerhalb des Repos), die beiden Schreibtests in 1.4 legen je eine
+  leere Datei an und löschen sie sofort, und Befehl A in 1.4 (`chown` des Ordners `backups`, nur bei
+  Bedarf) läuft in diesem vorgezogenen Schritt nur nach Rücksprache mit Claude. Der Deploy selbst
+  folgt an einem Werktag zwischen 10 und 12 Uhr mit HR; HR wird am Vortag informiert (Nachtrag im
+  Kopf des Ablaufplans).
+
+**Weitere Entscheidungen des Auftraggebers vom 18.10.2026:**
+
+- **CLAUDE.md des Repos:** Sie hat seither einen Einstieg mit der laufenden Arbeit und Verweisen
+  (auch hierher), die falsche Rollenliste ist berichtigt, und die Hausregeln der Workspace-Datei
+  `../CLAUDE.md` stehen dort **ohne Werte** (keine Passwörter, keine Entwicklungsgeheimnisse, kein
+  Testzugang). Wo sie der gelebten Praxis des Repos widersprachen, gilt die Regel des Repos; die
+  Widersprüche sind dort genannt. Nach der Gegenprüfung steht dort auch die dauerhafte Regel zu
+  Deploy und Rückfall (Abschnitt „Docker / Deployment“, „Feste Anker für Deploy und Rückfall“: nur
+  Stände mit `a43aa25` und `0e1d8de`), getrennt vom Einstieg, der sich mit jeder Übergabe ändert.
+  Erlaubt vor dem Deploy, weil `.dockerignore` `*.md` ausschließt:
+  `CLAUDE.md` und `README.md` kommen nie ins Image. Ablaufplan 3.2 prüft „nach 0e1d8de nur Doku“
+  deshalb mit `':!docs' ':!CLAUDE.md' ':!README.md'`.
+- **Git-Kennung auf dem Mac gesetzt** (`user.name`, `user.email`). Die 42 Commits bis `a4b1680`
+  tragen noch die aus dem Rechnernamen erzeugte Adresse (`lokale-umgebung.md`, Abschnitt 1).
+- **Elternzeit-Status Phase 2, „Aktivierung“:** die abgedruckten Entwicklungswerte durch einen
+  Verweis auf `lokale-umgebung.md`, Abschnitt 5 ersetzt. Bei der Gegenprüfung fanden sich dieselben
+  Werte samt Testzugang in zwei weiteren Dokumenten (`elternzeit-phase-1-status.md`,
+  `VERBEAMTUNG_BEURTEILUNGEN_STATUS.md`); dort ebenso ersetzt (Doku, nicht im Image). In der
+  Git-Historie bleiben sie lesbar; wer sie lokal noch nutzt, erzeugt neue.
+- **Weitere Altlasten außerhalb von `docs/`** (gefunden bei der Gegenprüfung, nicht entschieden):
+  vier PowerShell-Skripte und `test-runner.mjs` im Projektordner melden sich mit der Admin-Adresse
+  und einem früheren Seed-Standardpasswort an, und `src/__tests__/lib/encryption.test.ts` nutzt den
+  früheren Entwicklungs-`ENCRYPTION_KEY` als Testschlüssel. Ändern erst nach Etappe 1 (sonst hielte
+  3.2 an); als Punkt 13 in Abschnitt 10 des Ablaufplans festgehalten, die Produktionsprüfung in
+  Punkt 12 erweitert. Entscheidung beim Auftraggeber.
+- **README.md:** das Standardpasswort des Admin-Kontos gestrichen (ohne `ADMIN_INITIAL_PASSWORD`
+  erzeugt der Seed ein Zufallspasswort und gibt es einmal aus), Node 22 wie im `Dockerfile`, Verweise
+  auf `docs/README.md` und `lokale-umgebung.md`. Auch dieses Passwort bleibt in der Historie lesbar;
+  ob ein Konto es noch trägt, ist nicht geprüft — wenn ja, ändern.
+- **n8n-Exporte:** Die drei versionierten Exporte (`git ls-files n8n`) kommen erst **nach Etappe 1**
+  per `git rm --cached` aus Git; vorher hielte die Änderung außerhalb von `docs/`, `CLAUDE.md` und
+  `README.md` den Ablaufplan in 3.2 an. Als Punkt im Ablaufplan festgehalten. Lokal bleiben die
+  Dateien liegen; in anderen Klonen, auch auf dem Server, entfernt der nächste Pull sie aus dem
+  Arbeitsordner.
 
 **Nächste Schritte, in dieser Reihenfolge** (2 und 3 hängen nicht voneinander ab):
 
-1. Auf einem anderen Rechner: Repo holen, den Zweig von PR #6 auschecken (Abschnitt 8.6).
-2. PR #6 auf GitHub prüfen und mit „Create a merge commit“ mergen, danach der Prüfbefehl aus
-   Ablaufplan Abschnitt 0, Punkt 5.
-3. Mit Zugriff auf den Server: Ablaufplan Abschnitt 1 nur lesend, die Ausgaben an Claude.
+1. Auf einem anderen Rechner: Repo holen; den Zweig von PR #6 nur auschecken, solange der
+   Prüfbefehl oben nicht „PR #6 gemergt“ meldet, sonst auf `main` bleiben (Abschnitt 8.6).
+2. PR #6 auf GitHub prüfen und mit „Create a merge commit“ mergen, danach der Prüfbefehl oben
+   (entspricht dem aus Ablaufplan Abschnitt 0, Punkt 5). Entfällt, wenn er schon gemergt ist.
+3. Mit Zugriff auf den Server: Ablaufplan Abschnitt 1 nur lesend (Ausnahmen oben), die Ausgaben an
+   Claude.
 4. Die offenen Punkte 3 und 4 unter „Vor dem Termin zu entscheiden“ klären (Lauf „Wartung“, Stand der
    Punkte vom 14.10.2026).
 5. Termin festlegen und HR am Vortag informieren (Textvorschlag im Ablaufplan, „Zeitfenster“).
@@ -379,7 +425,7 @@ ist PR #6; Reihenfolge im Einzelnen: Abschnitt „Stand 18.10.2026 — hier weit
 |---|---|
 | `main` | `a43aa25`, Merge von PR #5 (S0), davor `ac3535a` (PR #4, Konzeptplan) |
 | `feat/selfservice-s0-personalstamm` | in PR #5 gemergt, nur noch Historie |
-| `fix/verbeamtung-kacheln-deploy-s0` | Kachel-Fix `0e1d8de` und Ablaufplan; geht per Pull Request nach `main`. PR #6, angelegt am 18.10.2026, offen; nur mit „Create a merge commit“ mergen (Ablaufplan Abschnitt 0, Punkt 5), danach dessen Prüfbefehl |
+| `fix/verbeamtung-kacheln-deploy-s0` | Kachel-Fix `0e1d8de` und Ablaufplan; geht per Pull Request nach `main`. PR #6, angelegt am 18.10.2026, am 18.10.2026 offen (ob gemergt: Prüfbefehl im Abschnitt „Stand 18.10.2026 — hier weitermachen“); nur mit „Create a merge commit“ mergen (Ablaufplan Abschnitt 0, Punkt 5), danach dessen Prüfbefehl. Weitere Commits nur unter `docs/` sowie in `CLAUDE.md` und `README.md` (8.6) |
 | `feat/selfservice-portal-plan` | in PR #4 gemergt, nur noch Historie |
 | `ux-umbau` | nicht in `main`; Vorbedingung für S3 und S2 |
 
@@ -508,14 +554,19 @@ nicht immer „ 2“, und der erste Befehl oben lässt `.next` aus.
 ### 8.6 Auf einem anderen Rechner weitermachen (Nachtrag 18.10.2026)
 
 **Der Einstieg ist „Lies die Übergabe“:** eine neue Sitzung im Repo-Ordner beginnen mit „Lies
-`docs/historie/uebergabe-selfservice-s0-2026-10-17.md`“. Von selbst findet Claude sie nicht: Die
-CLAUDE.md des Repos nennt S0 und diese Übergabe noch nicht. Sie wird bis zum Deploy nicht geändert,
-denn jede Änderung außerhalb von `docs/` hielte den Ablaufplan in 3.2 an; nachgeführt wird sie mit
-Etappe 1 (Ablaufplan, „Nach dem Update (Claude)“).
+`docs/historie/uebergabe-selfservice-s0-2026-10-17.md`“. Seit dem 18.10.2026 führt auch die
+CLAUDE.md des Repos dorthin: Ihr Einstieg nennt die laufende Arbeit und verweist auf diese Übergabe
+(Entscheidung des Auftraggebers vom 18.10.2026). Ändern darf man sie schon vor dem Deploy, weil
+`.dockerignore` `*.md` ausschließt; 3.2 des Ablaufplans nimmt `CLAUDE.md` und `README.md` deshalb
+aus der Prüfung „nach 0e1d8de nur Doku“ aus. Den Stand von S0 führt sie mit Etappe 1 nach
+(Ablaufplan, „Nach dem Update (Claude)“).
 
-**Holen.** Ein frischer Klon steht auf `main`. Solange PR #6 offen ist, liegen Ablaufplan, Kachel-Fix
-und die Nachträge vom 18.10.2026 nur auf seinem Zweig: `git checkout fix/verbeamtung-kacheln-deploy-s0`.
-Weitere Commits auf diesem Zweig nur unter `docs/`, denn 3.2 prüft „nach 0e1d8de nur Doku“. Die
+**Holen.** Ein frischer Klon steht auf `main`. Ob PR #6 schon gemergt ist, zeigt
+`git fetch origin && git merge-base --is-ancestor 0e1d8de8cf0d5b714c059140b9f2f09552eb00d1 origin/main && echo "PR #6 gemergt"`;
+steht die Zeile da, auf `main` bleiben. Solange sie fehlt, liegen Ablaufplan, Kachel-Fix und die
+Nachträge vom 18.10.2026 nur auf seinem Zweig: `git checkout fix/verbeamtung-kacheln-deploy-s0`.
+Weitere Commits auf diesem Zweig nur unter `docs/` sowie in `CLAUDE.md` und `README.md`, denn 3.2
+prüft „nach 0e1d8de nur Doku“ und nimmt nur diese aus. Die
 lokale Umgebung richtet [`docs/entwicklung/lokale-umgebung.md`](../entwicklung/lokale-umgebung.md)
 ein; die Abnahme `npm run pruefen` braucht keine Datenbank.
 
@@ -524,13 +575,13 @@ ein; die Abnahme `npm run pruefen` braucht keine Datenbank.
 | Was | Wo | Bedeutung und Ersatz |
 |---|---|---|
 | Gedächtnis von Claude: die drei Notizen aus 8.1, dazu eine zur Elternzeit vom April 2026 | im Benutzerordner von Claude auf dem Mac, je Projektpfad | Wird auf einem anderen Rechner nicht geladen. Der Inhalt steht im Repo (Abgleich vom 18.10.2026): Stand und Entscheidungen hier, Befunde der DokuBit-Abfragen in der Anleitung S0, Abschnitt 2, Git-Eigenheiten in 8.4 und 8.5, Stolpersteine in `lokale-umgebung.md`, Elternzeit im Status Phase 2. Persönliche Angaben bleiben draußen. Überholt sind dort die Regel „Anstellung je Mandant“ (gültig ist eine Anstellung je Vertrag, 2.1), die Zahl 238 (3.1) und der Ort des Startbefehls |
-| Workspace-Datei `../CLAUDE.md` im Ordner über dem Repo | nur auf dem Mac, nie committet | Claude lädt sie dort von selbst. Sie enthält Hausregeln (Sprache, Tech-Stack, CREDO-Design und Styling, API-Muster, Sicherheit, UX, Datenbank, Arbeitsweise, Karpathy-Prinzipien) und das Startrezept mit Entwicklungswerten und Testzugang. Im Repo stehen davon nur einzelne Projektregeln (CLAUDE.md, etwa die Sperrklinke). Ob die Hausregeln ins Repo kommen, entscheidet der Auftraggeber. Bis dahin die Datei privat übertragen, nicht über Git (sie enthält Passwörter), und wieder in den Ordner über dem Repo legen. An die Stelle ihres Startrezepts tritt `lokale-umgebung.md` (ohne Werte) |
+| Workspace-Datei `../CLAUDE.md` im Ordner über dem Repo | nur auf dem Mac, nie committet | Claude lädt sie dort von selbst. Ihre Hausregeln (Sprache, Tech-Stack, CREDO-Design und Styling, API-Muster, Sicherheit, UX, Datenbank, Arbeitsweise, Karpathy-Prinzipien) stehen seit dem 18.10.2026 ohne Werte in der CLAUDE.md des Repos (Entscheidung des Auftraggebers; Widersprüche zur Praxis des Repos sind dort zugunsten der Repo-Regel aufgelöst und genannt). Privat bleibt die Datei nur noch für das Startrezept mit Entwicklungswerten und Testzugang: nie über Git übertragen (sie enthält Passwörter); für dieses Repo auf einem anderen Rechner nicht nötig. Dieselben Werte standen bis zum 18.10.2026 in drei Dokumenten unter `docs/` und bleiben in der Git-Historie lesbar (`lokale-umgebung.md`, Abschnitt 5) — deshalb auf jedem Rechner neue erzeugen, die alten nie wiederverwenden. An die Stelle ihres Startrezepts tritt `lokale-umgebung.md` (ohne Werte); die Werte erzeugt man dort neu |
 | Lokale Datenbank `credo-hr-db-dev` mit den Testdaten aus Abschnitt 4, `.env` | Docker und Repo-Ordner des Mac | neu aufsetzen (`lokale-umgebung.md`, Abschnitte 4 bis 6), Testdaten nach 8.3. Werte nie übertragen, neu erzeugen |
 | `.claude/launch.json` (Vorschau des Dev-Servers für Claude), `.claude/settings.local.json` | Repo-Ordner, per `.gitignore` ausgeschlossen | `launch.json` neu anlegen (`lokale-umgebung.md`, Abschnitt 8); `settings.local.json` enthält nur Freigaben des Mac und wird nicht übertragen |
-| n8n-Exporte unter `n8n/` | per `.gitignore` ausgeschlossen (`/n8n/`) | Maßgeblich ist die n8n-Instanz. Fünf Exporte erzeugen die Skripte `scripts/generate_n8n_workflows.py` und `scripts/n8n/`; zwei ältere gibt es nur auf dem Mac, bei Bedarf außerhalb von Git übertragen. Drei Exporte vom März 2026 sind aus der Zeit vor der Regel versioniert (Entscheidung beim Auftraggeber) |
+| n8n-Exporte unter `n8n/` | per `.gitignore` ausgeschlossen (`/n8n/`) | Maßgeblich ist die n8n-Instanz. Fünf Exporte erzeugen die Skripte `scripts/generate_n8n_workflows.py` und `scripts/n8n/`; zwei ältere gibt es nur auf dem Mac, bei Bedarf außerhalb von Git übertragen. Drei Exporte vom März 2026 sind aus der Zeit vor der Regel versioniert (`git ls-files n8n`); entschieden am 18.10.2026: nach Etappe 1 per `git rm --cached` aus Git nehmen, vorher nicht (Ablaufplan 3.2). Der nächste Pull entfernt sie dann aus anderen Klonen |
 | Lokaler Stash `stash@{0}` vom 15.10.2026 („Artefakte des abgebrochenen Pulls“) | Git-Ordner des Mac | Reste eines abgebrochenen Pulls; nicht anwenden. Ob er gelöscht wird, entscheidet der Auftraggeber am Mac |
 | Rohdaten der Prüfungen (Befundlisten, Logs, Sicherung der verschobenen Duplikate) | temporäre Ablage der Sitzungen | nicht nötig; maßgeblich sind die Prüfprotokolle im Repo |
 
 **Auf dem neuen Rechner zuerst prüfen:** `gh auth status` (8.4), Node-Version (22 empfohlen),
-`git config user.email` (`lokale-umgebung.md`, Abschnitt 1) und ob der Repo-Ordner synchronisiert
-wird (8.5).
+`git config user.email` (`lokale-umgebung.md`, Abschnitt 1; auf dem Mac seit dem 18.10.2026
+gesetzt) und ob der Repo-Ordner synchronisiert wird (8.5).
