@@ -9,12 +9,12 @@ DokuBit, den n8n jede Nacht an das Portal schickt.
 **Stand 18.10.2026:** Der Konzeptplan (Fassung 6) ist in `main` (PR #4). Personalabteilung,
 Datenschutzbeauftragter und MAV haben ihm am 17.10.2026 zugestimmt. Paket S0 ist mit PR #5 in
 `main` (17.10.2026), aber nicht deployt; der Ablaufplan steht in
-[`deploy-selfservice-s0-2026-10.md`](../../historie/deploy-selfservice-s0-2026-10.md) und kommt mit
-PR #6 nach `main`.
+[`deploy-selfservice-s0-2026-10.md`](../../historie/deploy-selfservice-s0-2026-10.md) und ist seit
+PR #6 (18.10.2026) in `main`.
 
 **Hier anfangen:** [Übergabe S0 vom 17.10.2026](../../historie/uebergabe-selfservice-s0-2026-10-17.md).
 Sie nennt Stand, Entscheidungen, Prüfung, die Checkliste vor dem ersten Produktivlauf, die offenen
-Punkte und den Wiedereinstieg. Der Stand vom 18.10.2026 (PR #6 offen, Deploy nicht begonnen) und die
+Punkte und den Wiedereinstieg. Der Stand vom 18.10.2026 (PR #6 gemergt, Deploy nicht begonnen) und die
 nächsten Schritte stehen dort direkt unter dem Kopf, das Weitermachen auf einem anderen Rechner in
 Abschnitt 8.6.
 
