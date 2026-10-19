@@ -15,9 +15,16 @@ Kachel-Fix `0e1d8de`); Prüfung, Build, Pilot-Abnahme (213) und Kopf-Abnahme (26
 (Protokoll Abschnitt 7, „19.10.2026“). **Ziel der Woche** (Projektverantwortlicher): fertig bis
 zum Pull Request samt eigenem Ablaufplan für den Deploy. **Reihenfolge: erst Etappe 1 von S0,
 dann dieser Deploy** — vorher nicht nach `main` mergen, sonst hält der S0-Ablaufplan in 3.2 an.
-Nächste Schritte: Ablaufplan für den Deploy von U0 + U1 + Pilot + Mailtext schreiben
-(Ausgangsstand = Server nach Etappe 1, Anker `a43aa25` und `0e1d8de`, Schema-Delta +1 Tabelle
-`email_log_texte`), gegenprüfen, pushen und den Pull Request öffnen (erst nach Freigabe).
+**Ablaufplan geschrieben und geprüft (19.10.2026):**
+[`docs/historie/deploy-ux-umbau-2026-10.md`](../../historie/deploy-ux-umbau-2026-10.md) mit
+Generalprobe beider Images und Prüfprotokoll
+[`codereview-deploy-ux-umbau-2026-10.md`](../../historie/codereview-deploy-ux-umbau-2026-10.md)
+(Generalprobe, zwei Prüfrunden mit 35 und 22 Befunden, alle umgesetzt); die Ankündigung [pilot-ankuendigung.md](pilot-ankuendigung.md) ist auf
+den Stand gebracht. Der Plan ist noch nicht ausführbar: Er braucht die Werte aus dem Protokoll von
+Etappe 1 (Platzhalter ‹E1: …›). **Nächste Schritte:** pushen und den Pull Request öffnen (nach
+Freigabe, gemergt erst nach Etappe 1); nach Etappe 1 `main` in `ux-umbau` mergen, die Platzhalter
+füllen und die festen Stände nachrechnen (Plan, Abschnitt 0, Punkt 1); vor dem Termin die
+Entscheidungen in Abschnitt 0 des Plans (offen nur noch Punkte 2 und 5; 3, 7 und 8 am 19.10.2026 entschieden).
 
 ### 0.0a Stand 15.10.2026
 
