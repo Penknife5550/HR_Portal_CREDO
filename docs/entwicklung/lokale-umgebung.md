@@ -209,5 +209,21 @@ jeweiligen Rechners und wird nicht übertragen.
   OneDrive scheiterte der Build mit `EINVAL … readlink`). Abhilfe: Dev-Server stoppen, `.next`
   löschen (nur Zwischenspeicher), neu bauen.
 - **Zeilenenden unter Windows:** `.gitattributes` legt nur Shell-Skripte und `Dockerfile` auf LF
-  fest. Ob die Tests mit einer CRLF-Arbeitskopie grün bleiben, ist nicht geprüft; Abnahme ist
-  Abschnitt 3.
+  fest. Mit `core.autocrlf=true` (Vorgabe von Git für Windows) steht der Arbeitsbaum in CRLF; am
+  19.10.2026 auf dem Zweig `ux-umbau` geprüft: `npm run pruefen` ist so grün (271 Suiten), nachdem
+  `personalstamm-n8n-stapel.test.ts` die Anleitung vor dem Vergleich normalisiert. Ins Repository
+  kommt trotzdem nur LF (`git grep --cached -I -l -P '\r$'` muss leer sein).
+- **`openssl` unter Git Bash endet auf CRLF.** Wer Werte mit `$(openssl rand …)` in die `.env`
+  schreibt, schreibt ein unsichtbares `\r` mit. Die Shell schneidet es beim Einlesen
+  (`set -a; . ./.env`) ab, Next.js und Prisma lesen es mit — dann passt etwa das Passwort des
+  Seeds oder das Geheimnis des Webhooks nicht, obwohl beide Seiten „gleich“ aussehen. Abhilfe:
+  `$(openssl rand -hex 32 | tr -d '\r\n')`; eine schon geschriebene `.env` mit `sed -i 's/\r//g' .env`
+  bereinigen (steckt das `\r` auch im Passwort des Datenbank-Containers, dort mit `ALTER USER`
+  angleichen).
+- **`seed-check.js` liest die `.env` nicht selbst:** mit `node` direkt aufgerufen fehlt
+  `DATABASE_URL`. Vorher `set -a; . ./.env; set +a`.
+- **Abnahme-Skripte** (`scripts/ux-abnahme*.js`) brauchen `puppeteer-core`, das nicht in
+  `package.json` steht: `npm install --no-save puppeteer-core@24` (Paketdateien bleiben
+  unverändert), dazu Chrome unter `C:/Program Files/Google/Chrome/Application/chrome.exe` und ein
+  Testkonto auf `@beispiel.invalid` (mit Rolle SUPER_ADMIN anlegen, Passwort über
+  `scripts/dev-passwort-neu.js`).

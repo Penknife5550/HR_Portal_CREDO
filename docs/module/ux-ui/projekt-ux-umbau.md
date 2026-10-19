@@ -4,11 +4,22 @@
 Abweichungen vom Plan und ein Protokoll je Arbeitstag. Sie wird mit **jedem** Commit auf
 `ux-umbau` fortgeschrieben.
 
-Letzte Änderung: 15.10.2026 (Prototyp-Tag gelaufen, DSB einverstanden, `main` gemergt – **0.0 zuerst lesen**; davor am selben Tag: Mailtext im Protokoll mit zwei Durchsichten, Handbuch, DSB-Papier, siehe Abschnitt 7)
+Letzte Änderung: 19.10.2026 (`main` mit Self-Service S0 und Kachel-Fix gemergt, Abnahme grün – **0.0 zuerst lesen**; Protokoll Abschnitt 7)
 
-## 0. Übergabe (Stand 15.10.2026)
+## 0. Übergabe (Stand 19.10.2026)
 
-### 0.0 Hier anfangen (15.10.2026)
+### 0.0 Hier anfangen (19.10.2026)
+
+**Stand 19.10.2026:** `main` bis `5fc31bd` ist gemergt (`8f4f064`, mit Self-Service S0 und dem
+Kachel-Fix `0e1d8de`); Prüfung, Build, Pilot-Abnahme (213) und Kopf-Abnahme (26) sind grün
+(Protokoll Abschnitt 7, „19.10.2026“). **Ziel der Woche** (Projektverantwortlicher): fertig bis
+zum Pull Request samt eigenem Ablaufplan für den Deploy. **Reihenfolge: erst Etappe 1 von S0,
+dann dieser Deploy** — vorher nicht nach `main` mergen, sonst hält der S0-Ablaufplan in 3.2 an.
+Nächste Schritte: Ablaufplan für den Deploy von U0 + U1 + Pilot + Mailtext schreiben
+(Ausgangsstand = Server nach Etappe 1, Anker `a43aa25` und `0e1d8de`, Schema-Delta +1 Tabelle
+`email_log_texte`), gegenprüfen, pushen und den Pull Request öffnen (erst nach Freigabe).
+
+### 0.0a Stand 15.10.2026
 
 Die Abschnitte 0.1 bis 0.7 stammen vom 08./12.10.2026 und sind in Teilen überholt; was neuer
 ist, steht hier.
@@ -1942,6 +1953,44 @@ erscheinen: Ein Kommentar behauptete ungeprüft „die Verbeamtung hat keine Nic
 (entfernt), und `civil-service-detail.test.ts` sicherte vormittags `200` für Nicht-HR zu, also
 das Gegenteil der späteren Entscheidung (umgeschrieben; der Dateikopf erzählt beide Schritte).
 
+### 19.10.2026 – Merge von `main` (Self-Service S0, Kachel-Fix), Abnahme auf dem Windows-Rechner
+
+**Ziel des Projektverantwortlichen:** den Pilot diese Woche fertig machen bis zum Pull Request
+samt Ablaufplan; gemergt und deployt wird erst NACH Etappe 1 von S0 (Ablaufplan
+`docs/historie/deploy-selfservice-s0-2026-10.md`, Reihenfolge „erst S0, dann UX“). Bis Etappe 1
+darf auf `main` nur Doku landen (dort 3.2).
+
+**Neuer Klon.** Gearbeitet wird in `C:\Users\driesen.FES\Projekte\HR_Portal_CREDO` (außerhalb von
+OneDrive). Der Ordner `HR_Portal_CREDO-main` in OneDrive ist nur ein ZIP-Stand ohne `.git`.
+
+**Merge `8f4f064`** (`main` bis `5fc31bd`): drei Konflikte — `CLAUDE.md` (beide Zeilen der
+Befehle), `docs/README.md` (der Zweig hatte die Datei mit CRLF eingecheckt, deshalb Konflikt über
+die ganze Datei; aufgelöst als Fassung von `main` plus Abschnitt UX-Umbau und Zeile zu den
+Zugriffs-Korrekturen) und `src/components/portal-header.tsx` (bleibt gelöscht). Nachgezogen:
+„Personen“ in `NAVIGATION` (nur HR-Rollen, zwischen Vorgänge und BEM — Reihenfolge nach E3), die
+S0-Seite ohne `PortalHeader`, Titel als `h1`, Weiterleitung über `vorgangslistePfad()`. Ein Test
+von S0 (`personalstamm-n8n-stapel.test.ts`) suchte „```js\n“ und scheiterte an der
+CRLF-Arbeitskopie unter Windows — er normalisiert jetzt. `npm run pruefen` 271 Suiten / 8619
+Tests, `npm run build` grün. Beide Anker (`a43aa25`, `0e1d8de`) sind enthalten.
+
+**Abnahme** gegen eine eigene lokale Datenbank `credo-hr-db-ux` (Port 5436, Werte neu erzeugt;
+die vorhandene `credo-hr-db-dev` blieb unberührt): Seite „Personen“ mit den Testdaten aus
+Übergabe S0 8.3 (5 angelegt, 2 übersprungen, 2 Zweifelsfälle, 2 Fehler — wie dokumentiert),
+genau ein Kopf, „Personen“ aktiv. Befund dabei: nach dem `h1` folgte `h3` — „Zu prüfen“ ist
+jetzt `h2`, die Gruppentitel in `zu-pruefen.tsx` `h3` (Klassen unverändert). Pilot:
+`scripts/ux-abnahme-pilot.js` **213 Prüfungen in Ordnung**, Kopf: `scripts/ux-abnahme-u1.js`
+**26 in Ordnung** (Erwartung der Punkte um „Personen“ ergänzt; die vier Bilder `u1-kopf-*.png`
+sind neu und zeigen den Punkt). Ein Lauf von `ux-abnahme-u1.js` brach einmal mit „Cannot read
+properties of null (reading 'scrollWidth')“ ab (Zeile 195 fragt den Kopf ab, bevor er da ist) —
+Zeitproblem des Skripts, beim nächsten Lauf grün.
+
+**Zwei Fallen auf Windows** (auch in `docs/entwicklung/lokale-umgebung.md`, Abschnitt 9):
+`openssl rand` unter Git Bash endet auf CRLF — Werte, die man mit `$(openssl …)` in die `.env`
+schreibt, tragen ein unsichtbares `\r`; die Shell schneidet es beim Einlesen ab, Next.js und
+Prisma nicht (Folge hier: Seed-Passwort und Webhook-Geheimnis passten nicht). Und
+`puppeteer-core` steht nicht in `package.json`: für die Abnahme-Skripte mit
+`npm install --no-save puppeteer-core@24`.
+
 ## 8. Branches und Commits
 
 | Branch | Commit | Inhalt |
@@ -2007,6 +2056,7 @@ das Gegenteil der späteren Entscheidung (umgeschrieben; der Dateikopf erzählt 
 
 | `main` | `c8b9c6e`, `1cffbba`, `b474d8a`, `98d0697` | Drei Zugriffs-Korrekturen plus die n8n-Berichtigung (nicht Umbau, siehe Abschnitt 7) |
 | `ux-umbau` | `68df3f9`, `4f2901b`, `1b58cf1`, `6897b28` | Die Merges von `main` dazu |
+| `ux-umbau` | `8f4f064` | Merge von `main` bis `5fc31bd` (Self-Service S0 `a43aa25`, Kachel-Fix `0e1d8de`, Doku vom 17./18.10.): drei Konflikte, „Personen“ in der Navigation, S0-Seite ohne alten Kopf |
 
 Kennungen werden jeweils im nächsten Commit nachgetragen (ein Commit kann seine eigene nicht
 enthalten); `git log --oneline main..ux-umbau` zeigt den aktuellen Stand.

@@ -242,9 +242,9 @@ export function PersonenContent({ user }: { user: User }) {
 
         {/* Zu prüfen */}
         <section className="mb-6 rounded-lg border border-border bg-card p-4" aria-labelledby="zu-pruefen">
-          <h3 id="zu-pruefen" className="mb-2 text-sm font-semibold text-foreground">
+          <h2 id="zu-pruefen" className="mb-2 text-sm font-semibold text-foreground">
             Zu prüfen
-          </h3>
+          </h2>
           {pruefung ? (
             <ZuPruefen pruefung={pruefung} />
           ) : pruefungFehler ? (

@@ -95,9 +95,9 @@ async function anmeldenUeberFormular(seite) {
   try {
     // ---------- 1. Je Rolle
     const SOLL = {
-      SUPER_ADMIN: { punkte: ["Vorgänge", "BEM", "Vorlagen", "Verwaltung"], rolle: "Administration", logo: "/vorgaenge", ort: "/vorgaenge/onboarding" },
-      HR_LEITUNG: { punkte: ["Vorgänge", "BEM", "Vorlagen", "Verwaltung"], rolle: "HR-Leitung", logo: "/vorgaenge", ort: "/vorgaenge/onboarding" },
-      HR_SACHBEARBEITER: { punkte: ["Vorgänge", "BEM", "Vorlagen"], rolle: "HR-Sachbearbeitung", logo: "/vorgaenge", ort: "/vorgaenge/onboarding" },
+      SUPER_ADMIN: { punkte: ["Vorgänge", "Personen", "BEM", "Vorlagen", "Verwaltung"], rolle: "Administration", logo: "/vorgaenge", ort: "/vorgaenge/onboarding" },
+      HR_LEITUNG: { punkte: ["Vorgänge", "Personen", "BEM", "Vorlagen", "Verwaltung"], rolle: "HR-Leitung", logo: "/vorgaenge", ort: "/vorgaenge/onboarding" },
+      HR_SACHBEARBEITER: { punkte: ["Vorgänge", "Personen", "BEM", "Vorlagen"], rolle: "HR-Sachbearbeitung", logo: "/vorgaenge", ort: "/vorgaenge/onboarding" },
       EINRICHTUNGSLEITUNG: { punkte: ["Vorgänge", "BEM"], rolle: "Einrichtungsleitung", logo: "/vorgaenge", ort: "/vorgaenge/onboarding" },
       VORGESETZTER: { punkte: ["Vorgänge", "BEM"], rolle: "Führungskraft", logo: "/vorgaenge", ort: "/vorgaenge/onboarding" },
       BEM_BEAUFTRAGTER: { punkte: ["BEM"], rolle: "BEM-Beauftragte:r", logo: "/bem", ort: "/bem" },
