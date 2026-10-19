@@ -4,15 +4,20 @@
  * GET  /api/employees - Alle Mitarbeiter auflisten (mit Anstellungen)
  * POST /api/employees - Neuen Mitarbeiter anlegen
  *
- * Auth: Session-Cookie (alle HR-Rollen) ODER X-API-Key (n8n/Service)
+ * Auth: Session-Cookie (alle HR-Rollen) ODER X-API-Key (n8n/Service).
+ * Schreiben nur die HR-Rollen; Schreibschutz und Protokoll:
+ * src/lib/personalstamm/schreibschutz.ts
  */
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiHandler } from "@/lib/api-handler";
+import { HR_EDIT_ROLES } from "@/lib/permissions";
+import { PERSONALSTAMM_ACTIONS, PERSONALSTAMM_PROCESS_TYPE, PERSONALSTAMM_QUELLE } from "@/lib/constants";
+import { SCHREIBSCHUTZ_MELDUNGEN } from "@/lib/personalstamm/schreibschutz";
 
-// Alle HR-Rollen + SERVICE (n8n API-Key)
+// Lesen: alle HR-Rollen + SERVICE (n8n API-Key)
 const ALLOWED_ROLES = [
   "SUPER_ADMIN",
   "HR_LEITUNG",
@@ -131,11 +136,18 @@ export const GET = apiHandler(
 // =============================================
 export const POST = apiHandler<CreateEmployeeInput>(
   {
-    roles: ALLOWED_ROLES,
+    roles: HR_EDIT_ROLES,
     bodySchema: createEmployeeSchema,
     logLabel: "Employees POST",
   },
-  async ({ body }) => {
+  async ({ body, session }) => {
+    if (body.importSource === PERSONALSTAMM_QUELLE) {
+      return NextResponse.json(
+        { error: SCHREIBSCHUTZ_MELDUNGEN.personAnlegen },
+        { status: 400 }
+      );
+    }
+
     // Personalnummer-Eindeutigkeit pruefen
     if (body.personalNumber) {
       const existing = await prisma.employee.findUnique({
@@ -149,18 +161,30 @@ export const POST = apiHandler<CreateEmployeeInput>(
       }
     }
 
-    const employee = await prisma.employee.create({
-      data: {
-        personalNumber: body.personalNumber || null,
-        firstName: body.firstName,
-        lastName: body.lastName,
-        email: body.email || null,
-        privateEmail: body.privateEmail || null,
-        dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
-        phone: body.phone || null,
-        importSource: body.importSource || null,
-        importedAt: body.importSource ? new Date() : null,
-      },
+    const employee = await prisma.$transaction(async (tx) => {
+      const neu = await tx.employee.create({
+        data: {
+          personalNumber: body.personalNumber || null,
+          firstName: body.firstName,
+          lastName: body.lastName,
+          email: body.email || null,
+          privateEmail: body.privateEmail || null,
+          dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : null,
+          phone: body.phone || null,
+          importSource: body.importSource || null,
+          importedAt: body.importSource ? new Date() : null,
+        },
+      });
+      // Ohne Namen und Adressen, wie die Eintraege des Abgleichs
+      await tx.auditLog.create({
+        data: {
+          userId: session?.userId ?? null,
+          processType: PERSONALSTAMM_PROCESS_TYPE,
+          action: PERSONALSTAMM_ACTIONS.PERSON_ANGELEGT,
+          details: { employeeId: neu.id, quelle: neu.importSource },
+        },
+      });
+      return neu;
     });
 
     return NextResponse.json({ data: employee }, { status: 201 });

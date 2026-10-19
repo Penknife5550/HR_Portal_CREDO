@@ -207,6 +207,7 @@ describe("PortalKopf: Handy-Menue", () => {
     const verweise = within(liste).getAllByRole("link").map((l) => l.textContent);
     expect(verweise).toEqual([
       "Vorgänge",
+      "Personen",
       "BEM",
       "Formulare",
       "Brief-Vorlagen",

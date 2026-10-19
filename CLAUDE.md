@@ -4,6 +4,18 @@
 
 Digitales HR-Portal der CREDO Schultraegergruppe (16 Mandanten). Verwaltet Onboarding, Offboarding, Verbeamtung (PSI), Exit-Interviews und Zeugnisse. Sprache der UI ist Deutsch.
 
+## Laufende Arbeit und Einstieg
+
+Stand 18.10.2026 — mit jeder Übergabe nachführen.
+
+- **Self-Service (Mitarbeiterportal), Paket S0 „Personalstamm aus DokuBit“:** mit PR #5 in `main`, noch nicht deployt. Einstieg: `docs/historie/uebergabe-selfservice-s0-2026-10-17.md`, Abschnitt „Stand … — hier weitermachen“ (nächste Schritte in Reihenfolge, offene Entscheidungen).
+- **Deploy-Ablaufplan:** `docs/historie/deploy-selfservice-s0-2026-10.md` (Etappe 1 ruhend, Etappe 2 erst nach den Freigaben F1–F11). Er hängt am Code-Stand `0e1d8de` (Kachel-Fix der Verbeamtung, mit PR #6 am 18.10.2026 in `main`, Merge `82b58ce`). Bis Etappe 1 kommt danach nur noch Doku: `docs/`, dazu `CLAUDE.md` und `README.md` (beide nie im Image, `.dockerignore` schließt `*.md` aus). Abschnitt 3.2 des Plans prüft das auf dem Server. Was danach dauerhaft für jeden Deploy gilt: Abschnitt „Docker / Deployment“, „Feste Anker für Deploy und Rückfall“.
+- **UX-Umbau:** Zweig `ux-umbau` (letzter Commit 16.10.2026), nicht in `main`, Vorbedingung für S2 und S3 (Übergabe S0, Abschnitt 7). Einstieg nur auf dem Zweig: `docs/module/ux-ui/projekt-ux-umbau.md`. Die „Bausteine“ und „Muster des UX-Umbaus“, auf die diese Datei verweist, gibt es auf `main` noch nicht. Vor seinem Deploy `main` hineinmergen („Feste Anker für Deploy und Rückfall“).
+- **Übersicht aller Dokumente:** `docs/README.md`.
+- **Neuer Rechner:** `docs/entwicklung/lokale-umgebung.md` (ohne Werte; Geheimnisse und Passwörter erzeugt man auf dem Rechner selbst). Was es außerhalb von Git gibt: Übergabe S0, Abschnitt 8.6.
+
+**Git ist die Quelle der Wahrheit.** Der Auftraggeber arbeitet an zwei Rechnern. Das Gedächtnis von Claude gibt es nur auf dem jeweiligen Rechner, ebenso die Workspace-Datei `../CLAUDE.md`. Deshalb am Ende jedes Arbeitsblocks Stand, Entscheidungen und nächste Schritte in die Übergabe schreiben und nach Freigabe committen und pushen. Gemergt wird auf GitHub immer mit „Create a merge commit“, nie mit Squash oder Rebase: Ablaufpläne prüfen feste Hashes (Übergabe S0, Abschnitt 8.4).
+
 ## Tech Stack
 
 - **Framework:** Next.js 15 (App Router, Standalone Output)
@@ -26,7 +38,7 @@ npm run build        # Produktion-Build
 npm run lint         # ESLint
 npm run test         # Jest-Tests
 npm run pruefen      # Typen + Lint + Tests — vor JEDEM Push (es gibt weder CI noch Git-Hooks); Jest laesst `.claude/` aus (`testPathIgnorePatterns`), sonst laufen die Arbeitskopien offener Sitzungen mit und der Lauf ist immer rot
-npm run db:push      # Schema synchronisieren (kein Migrations-Ordner)
+npm run db:push      # Schema synchronisieren (ohne Migrationen; nie db:migrate, Hausregeln, Abweichung 1)
 npm run db:seed      # Seed (tsx prisma/seed.ts) — legt nur an, was fehlt, aendert nie Bestehendes
 npm run db:studio    # Prisma Studio
 npm run db:generate  # Prisma Client generieren
@@ -70,6 +82,16 @@ sudo docker exec hr-portal-app curl -s http://localhost:3000/api/health
 ```
 
 **Seed: auf dem Server nicht noetig — und nie von Hand ausfuehren.** Der Entrypoint ruft `prisma/seed-check.js`, und der startet den Seed (`prisma/seed.js`, beim Build mit esbuild aus `prisma/seed.ts` gebuendelt — im Container gibt es kein `tsx`) von selbst, solange die Datenbank noch keinen Benutzer hat. Der Seed legt **nur an, was fehlt**, und aendert oder loescht nie Bestehendes (seit 10/2026, Waechter `src/__tests__/lib/seed-schutz.test.ts`). Folgenlos ist ein Handaufruf auf einer gefuellten Datenbank trotzdem nicht: Er bringt keine neuen Vorlagenstaende, legt aber wieder an, was unter seinem Schluessel fehlt — auch was HR bewusst geloescht oder umbenannt hat (eine geloeschte Offboarding-Checkliste gaebe das Offboarding danach wieder jedem neuen Austritt mit, eine umbenannte globale Beurteilungsvorlage stuende unter altem Namen ein zweites Mal da). Zwei Faelle schliesst der Seed selbst aus: Ein Konto legt er nur in einer Datenbank ohne Benutzer an (sonst kaeme nach geaenderter Admin-Adresse ein zweites SUPER_ADMIN-Konto), eine Standard-Beurteilungsvorlage nur, solange es keine globale Standardvorlage gibt. Mandantennamen und Vorlagen pflegt HR in der Oberflaeche; Aenderungen am Bestand gehoeren als einmalige Datenmigration nach `prisma/seed-check.js` (Abschnitt „Einmalige Datenmigrationen“). Frueher ueberschrieb jeder Seed-Lauf gepflegte Mandantennamen, Fragebogen- und Checklisten-Vorlagen und loeschte Exit-Interview-, Zeugnis- und Beurteilungsvorlagen samt Formulierungen — aeltere Anleitungen, die `node prisma/seed.js` auf dem Server nennen, sind ueberholt.
+
+### Feste Anker für Deploy und Rückfall (seit 10/2026)
+
+Ab dem Server-Update mit Self-Service S0 (Etappe 1 des Ablaufplans `docs/historie/deploy-selfservice-s0-2026-10.md`) gilt **dauerhaft** — der Entrypoint gleicht das Schema mit `db push --accept-data-loss` ab und löscht, was ein Stand nicht kennt:
+
+- **Ausgerollt wird nur ein Stand, der `a43aa25` (S0-Schema) und `0e1d8de` (Code-Stand des Updates) enthält**, auch kein neuerer Zweig ohne sie. Prüfen mit `git merge-base --is-ancestor a43aa25 HEAD` und demselben Befehl mit `0e1d8de8cf0d5b714c059140b9f2f09552eb00d1`, vor dem Start eine Vorschau wie in Ablaufplan 3.4 ohne `DROP`. Ein Stand ohne `a43aa25` löschte an `employments` die Spalten `abrechnungskreis` und `"personalNumber"` samt Index `employments_dokubit_vertrag_key` — nach dem ersten Lauf von S0 mit allen Vertragsschlüsseln (Ablaufplan 7.1); einer ohne `0e1d8de` nähme den Fix der Status-Kacheln still zurück.
+- **`ux-umbau` erst nach dem Merge von `main`** (mit PR #6) ausrollen (Ablaufplan Abschnitt 10, Punkt 9).
+- **Rückfall nur nach Ablaufplan Abschnitt 7 und nur mit Claude:** das alte Image `hr-portal-app:0974b7f` nur, solange S0 nie geschrieben hat (7.3), nie ein älteres (7.1).
+
+Kommt ein weiterer Deploy, nennt sein Ablaufplan diese Anker und gegebenenfalls einen neuen Code-Stand; die Regel selbst bleibt hier stehen, der Abschnitt „Laufende Arbeit und Einstieg“ ändert sich mit jeder Übergabe.
 
 ### Entrypoint (`entrypoint.sh`)
 
@@ -231,13 +253,149 @@ src/
 - **Keine Umlaute** in Variablen-/Funktionsnamen (nur in UI-Strings)
 - **ESLint:** Die Regel `@typescript-eslint/no-explicit-any` existiert NICHT in der aktuellen ESLint-Config. Keine `eslint-disable`-Kommentare dafuer verwenden.
 - **Links:** Innerhalb der App immer `<Link>` von `next/link` statt `<a>` verwenden
-- **Prisma:** Kein Migrations-Ordner — Schema wird mit `prisma db push` synchronisiert
+- **Prisma:** Keine Migrationen — Schema wird mit `prisma db push` synchronisiert (`prisma/migrations/` ist ein ungenutzter Rest, `npm run db:migrate` nie verwenden: Hausregeln, Abweichung 1)
 - **Vorgangsnummern** (`{Praefix}-{Jahr}-{Kuerzel}-{Nr}`): Jahr und Zaehlbereich IMMER aus `vorgangsjahrInBerlin` (`src/lib/vorgangsjahr.ts`), nie `new Date().getFullYear()`/`new Date(jahr, 0, 1)` — der Container laeuft in UTC, in der ersten Stunde des Jahres bekaeme ein Vorgang sonst die Jahreszahl des alten. Gilt fuer Onboarding, Offboarding, Verbeamtung, Vertragsende, BEM, Mutterschutz und Elternzeit.
 - **Datum und Uhrzeit im Server-Code nur in deutscher Zeit** (`formatDatumDE`, `formatZeitpunktDE` — mit `{ sekunden: true }` fuer Belege — aus `src/lib/format.ts`; Kalendertage aus `src/lib/kalendertag.ts`). Der Container laeuft in UTC: `toLocale…String` ohne `timeZone` schrieb Uhrzeiten 1–2 Stunden zu frueh und datierte Briefe zwischen 0 und 2 Uhr auf gestern. Der Waechter `src/__tests__/lib/zeitzone-waechter.test.ts` verlangt in `src/lib`, `src/app/api` und `src/app/verify` bei jedem `toLocale…String`-Aufruf ein `timeZone` (Zahlen stehen dort in `ZAHLEN`). **Jest rechnet in UTC** (`process.env.TZ` in `jest.config.ts`), wie der Container — sonst bestuenden Zeitzonen-Tests auf dem Entwicklerrechner auch mit falschem Code.
 - **Sperrklinke gegen Altmuster der Oberflaeche** (`src/__tests__/lib/ui-sperrklinke.test.ts`, Stand in `ui-sperrklinke.stand.json`): `confirm(`, `alert(`, `prompt(`, `toLocaleDateString`/`toLocaleTimeString`, fest eingetragene Farben (Hex oder Farbfunktion in einer Klasse, Hex im `style`-Objekt, Tailwind-Palettenklassen wie `bg-green-100`), `fixed inset-0` und Inline-`<svg` duerfen JE DATEI nur weniger werden (gezaehlt ohne Kommentare). Mehr als im Stand: den Ersatz nehmen (`unterlagen/dialog-rahmen.tsx` bzw. die Bausteine des UX-Umbaus, `formatDatumDE`, Farb-Token, `lucide-react`), nicht den Stand anheben. Weniger: `SPERRKLINKE_STAND=schreiben npx jest ui-sperrklinke` und die Summe `gesamt` im Test nachziehen.
 - **API-Handler:** Zentrale Wrapper in `src/lib/api-handler.ts` (mit Auth + Error-Handling)
 - **Validierung:** Zod-Schemas in `src/lib/validations/`
-- **Berechtigungen:** Rollen-System in `src/lib/permissions.ts` (SUPER_ADMIN, ADMIN, HR_STAFF, VIEWER)
+- **Berechtigungen:** Rollen-System in `src/lib/permissions.ts`. Die Rollen stehen im Enum `UserRole` (`prisma/schema.prisma`): SUPER_ADMIN, HR_LEITUNG, HR_SACHBEARBEITER, EINRICHTUNGSLEITUNG, VORGESETZTER und BEM_BEAUFTRAGTER (extern, sieht nur BEM, bewusst nicht in `PORTAL_ROLES`). Dazu kommt die Pseudorolle SERVICE: Schickt ein Aufruf im Header `x-api-key` den Wert von `N8N_API_KEY`, meldet `getSession` (`src/lib/auth.ts`) den n8n-Schlüssel als SERVICE an, noch vor der Cookie-Sitzung — kein Enum-Wert, kein Benutzerkonto. **Ausgeschlossen ist SERVICE nur durch eine Rollenliste, die ihn nicht nennt** (`PORTAL_ROLES`, `HR_EDIT_ROLES`, `ADMIN_ROLES`, `authHandler`/`adminHandler` …); ausdrücklich zugelassen ist er in `CHECKLIST_ROLES`, `REPORT_SESSION_ROLES` (Reporting-API, `src/lib/api-key.ts`) und einigen Routen der Verbeamtung und der Beschäftigten. Die Middleware prüft nur das Sitzungs-Cookie und sperrt ihn nirgends: Eine Route, die nur die Anmeldung prüft (`if (!session)`, `apiHandler` ohne `roles`), lässt ihn durch — Altbestand etwa `GET /api/vorlagen`, `GET /api/offboarding/analytics` und `GET|POST /api/onboarding/[id]/notes` (dort ohne Rollen- und Mandantenprüfung: Der n8n-Schlüssel liest die Notizen jeder Einstellung; Fix offen, eigener Auftrag). **Neue Routen deshalb immer mit Rollenliste.** Rollengruppen für neuen Code nur aus `permissions.ts` (im Bestand stehen feste Listen auch in `authHandler`/`adminHandler` und `REPORT_SESSION_ROLES`), `ORG_RESTRICTED_ROLES` (EINRICHTUNGSLEITUNG, VORGESETZTER) aus `src/lib/mandanten-gate.ts`. ADMIN, HR_STAFF und VIEWER gibt es nicht.
+
+## Hausregeln
+
+Herkunft: die Workspace-Datei `../CLAUDE.md` im Ordner über dem Repo (nur auf dem Mac, nie in Git), übernommen am 18.10.2026 **ohne Werte**, ergänzt um Regeln, die im Repo schon galten (Merge-Commit, Commit-Präfix, Rollengruppen), und um Vorgaben des Auftraggebers (öffentliches Repo, Commit und Push nur nach Freigabe; Stand 18.10.2026). Passwörter, Entwicklungsgeheimnisse und Testzugang **gehören nicht ins Repo**; an ihre Stelle tritt `docs/entwicklung/lokale-umgebung.md`. **Altlasten:** Die Werte der Workspace-Datei standen bis zum 18.10.2026 in drei Dokumenten unter `docs/` (seither Platzhalter) und bleiben in der Git-Historie lesbar; außerhalb von `docs/` stehen noch bekannte Werte in alten Testskripten im Projektordner und in einem Test — Liste und Bereinigung erst nach Etappe 1: Ablaufplan S0, Abschnitt 10, Punkt 13. Wo die Workspace-Datei der gelebten Praxis des Repos widerspricht, gilt das Repo (Liste am Ende). Was oben oder in einem Modulabschnitt schon steht, ist nur verwiesen.
+
+### Sprache und Kommunikation
+
+- Deutsch in der Kommunikation, in allen UI-Texten und in Fehlermeldungen für Benutzer.
+- Code-Kommentare Deutsch oder Englisch, je Datei einheitlich.
+- Commit-Messages auf Deutsch, im Bestand meist mit Präfix (`feat(ausstattung): …`, `fix(verbeamtung): …`, `docs(deploy): …`).
+- Keine Gendersprache. Bei der Übernahme am 18.10.2026 ausgelegt als: kein Sternchen, kein Doppelpunkt, kein Unterstrich, kein Binnen-I. Neutrale Wörter (Person, Führungskraft, Personalabteilung) gehen immer. **Offen** (Auftraggeber fragen): ob Schrägstrich- und Paarformen („Mitarbeiter/in“, „die/den“) für neue Texte zulässig sind oder das generische Maskulinum gilt; im Bestand und in dieser Datei stehen sie („Bekannt im Bestand“).
+
+### Tech-Stack
+
+Wie im Abschnitt „Tech Stack“ — **nicht eigenmächtig ändern**. Dazu gehören auch TypeScript `strict`, Prisma 6.9, Tailwind CSS 4 mit dem Theme in `src/app/globals.css` (es gibt keine `tailwind.config`), Radix-UI-Primitives, Icons aus `lucide-react` und Formulare mit React Hook Form und Zod. Zu n8n und React Hook Form: Abweichungen, Punkte 7 und 14; zu Radix: „Bekannt im Bestand“ unten.
+
+### CREDO Corporate Design
+
+- Schrift Montserrat für Fließtext (`next/font` in `src/app/layout.tsx`), Fallback Arial (`--font-sans`); Überschriften über `--font-heading`.
+- **Keine Farbverläufe.**
+- Farben in Komponenten nur als Tailwind-Theme-Tokens (`bg-primary`, `text-credo-gruen` …), nie als Hex-Wert; die Sperrklinke unter „Konventionen“ zählt das mit. Die CI-Werte hinter den Tokens in `globals.css`:
+
+| Farbe | CI-Wert | Token |
+|---|---|---|
+| Primärfarbe Dunkelgrau (Buttons, Links) | `#575756` | `--color-primary` (gleich `--color-credo-dunkelgrau`) |
+| CREDO-Linie Grau | `#DADADA` | `--color-credo-grau` |
+| CREDO-Linie Gelb | `#FBC900` | `--color-credo-gelb` |
+| CREDO-Linie Grün | `#6BAA24` | `--color-credo-gruen` |
+| CREDO-Linie Rot | `#E2001A` | `--color-credo-rot` |
+| CREDO-Linie Blau | `#009AC6` | `--color-credo-blau` |
+
+Dazu `--color-einrichtung-*` (Farbe je Einrichtung) und `--color-status-*` (Statusfarben).
+
+### Dateistruktur und Namen
+
+- Komponenten in kebab-case (`src/components/neuer-austritt-modal.tsx`).
+- API-Routen unter `src/app/api/<ressource>/route.ts`.
+- Hilfsfunktionen in `src/lib/`, kebab-case; Pfad-Alias `@/` (Abschnitt „Tech Stack“).
+- Deutsche Namen für UI-Komponenten und Fachlogik, ohne Umlaute (Abschnitt „Konventionen“).
+
+### Code-Konventionen
+
+- `"use client"` nur, wo die Komponente im Browser interagieren muss.
+- Named Exports bevorzugen. Next.js verlangt für `page.tsx` und `layout.tsx` `export default`.
+- Prisma-Modelle PascalCase im Singular, Felder camelCase, Tabellen per `@@map("snake_case")`.
+- Enum-Werte in SCREAMING_SNAKE_CASE (neue Zustände: Abweichungen, Punkt 2).
+- Übergreifende Konstanten in `src/lib/constants.ts` (Abweichungen, Punkt 8).
+- Statusfarben als CSS-Variablen `--color-status-*`.
+
+### API-Muster
+
+- Antwort `{ data: T }` bzw. `{ error: string }` mit passendem HTTP-Status (Abweichungen, Punkt 9).
+- Reihenfolge: Anmeldung (401) → Rolle (403) → Validierung (400), danach Vorgang und Mandant (404) und fachlicher Konflikt (409). Wrapper aus `src/lib/api-handler.ts`, wo sie passen; im Bestand nutzt sie nur ein Teil der Routen, und gerade die Routen von Paket 4 und „Ausstattung & Zugänge“ (etwa `onboarding/[id]/unterlagen`, `…/ausstattung`, `…/ausgaben`) prüfen selbst in derselben Reihenfolge. Zod-Schemas aus `src/lib/validations/`. Immer mit Rollenliste (SERVICE, Abschnitt „Konventionen“, „Berechtigungen“).
+- Statuscodes: 400 Validierung, 401 Anmeldung, 403 Rolle, 409 Duplikat oder Konflikt, 500 Server (Ergänzungen: Abweichungen, Punkt 10).
+- Fehlermeldungen für Benutzer auf Deutsch.
+- IBAN, SV-Nummer und Steuer-ID mit AES-256-GCM verschlüsseln (`src/lib/encryption.ts`); BEM-Gesundheitsdaten mit eigenem Schlüssel (`BEM_ENCRYPTION_KEY`).
+
+### Sicherheit
+
+- Sensible Felder verschlüsseln (API-Muster).
+- Rate Limiting auf dem Login (`src/lib/rate-limit.ts`).
+- Uploads, für neue und angefasste Routen: Typ aus den Bytes (`erkenneDateityp` in `src/lib/file-upload.ts`), nie aus `file.type` oder der Endung; Größe: Abweichungen, Punkt 4. Die meisten Upload-Routen des Bestands nutzen noch das Altmuster (Abweichungen, Punkt 4, „Offen“).
+- Dateizugriffe, für neue und angefasste Routen, mit Schutz gegen Path Traversal: nur unter festen Wurzeln je Operation (`pfadInWurzeln`, `leseVorlagenDatei`, `dateiLoeschen`). Ausnahme im Bestand: Abweichungen, Punkt 4, „Offen“.
+- CSP-Header über die Middleware (`src/lib/content-security-policy.ts`; Ausnahmen: Abweichungen, Punkt 11).
+- Keine Geheimnisse in Fehlermeldungen oder Logs; in die Konsole nur `fehlerKennung` (`src/lib/fehler-kennung.ts`).
+
+### Styling
+
+- Tailwind utility-first, passend zum vorhandenen Code. Muster:
+  - Buttons: `rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground`
+  - Inputs: `rounded-lg border border-input bg-background px-4 py-2.5 text-sm`
+  - Status-Badges: `inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium`
+  - Cards: `rounded-lg border bg-card`
+- Bestehende Tailwind-Klassen nicht ohne Auftrag ändern; neue Komponenten müssen sich visuell einfügen. Kein Widerspruch zur Sperrklinke: Sie verlangt nur, dass je Datei nichts dazukommt. Ein Altmuster löst man ab, wenn der Auftrag die Stelle ohnehin betrifft oder genau das verlangt (so der Zweig `ux-umbau`), und zieht dann ihren Stand nach. Zuerst vorhandene Bausteine nehmen (`DialogRahmen` in `src/components/unterlagen/dialog-rahmen.tsx`, `lucide-react`, Farb-Tokens), keine Klassenstrings einer bestehenden Seite kopieren (Abschnitt „Ausstattung & Zugänge“), Sperrklinke beachten (keine Palettenklassen, kein `fixed inset-0`, kein Inline-`<svg`).
+
+### UX-Prinzipien
+
+- Apple-like: einfach, klar, schön.
+- Leere Zustände mit Illustration oder Hinweis, nie eine leere Seite.
+- Ladezustand bei jeder asynchronen Aktion.
+- Bestätigung vor destruktiven Aktionen (Löschen, Abschluss) über einen Dialog (`DialogRahmen`, `src/components/ausstattung/abschluss-dialog.tsx`), nie `window.confirm` (Sperrklinke).
+- Optimistic Updates: Abweichungen, Punkt 3.
+
+### Datenbank
+
+- Entwicklungsdatenbank im Docker-Container `credo-hr-db-dev` auf Port 5433 (`lokale-umgebung.md`, Abschnitt 4).
+- Schema mit `npm run db:push`, Seed mit `npm run db:seed` (Abschnitt „Befehle“; Abweichungen, Punkte 1 und 5).
+- Cascade-Deletes für Kind-Records (Ausnahmen: Abweichungen, Punkt 12).
+- Indizes auf häufig gefilterte Felder.
+
+### Arbeitsweise
+
+- Phasen: erst ein MVP, dann in Paketen erweitern.
+- Parallele Agenten, wo es geht.
+- Bestehenden Code nicht unnötig anfassen. Neue Features entstehen neben dem Bestand, ohne Risiko für ihn (so im Repo: leerer Katalog = keine Änderung, neue Läufe kommen AUS).
+- Einstieg je Feature: Abweichungen, Punkt 13.
+- Vor jedem Push `npm run pruefen`; committen und pushen nur nach Freigabe. Das Repo ist öffentlich: keine Geheimnisse und keine echten Personendaten in Commits, Doku oder Testdaten.
+
+### Arbeitsprinzipien (nach Karpathy)
+
+Kurzfassung in eigenen Worten. Quelle: die Workspace-Datei, dort nach `multica-ai/andrej-karpathy-skills` (Leitlinien gegen typische Fehler von Sprachmodellen beim Programmieren; wie weit sie auf Andrej Karpathy selbst zurückgehen, ist hier nicht geprüft). Sie setzen auf Sorgfalt vor Tempo; bei Kleinigkeiten mit Augenmaß anwenden.
+
+1. **Erst klären, dann bauen.** Was man voraussetzt, sagt man dazu. Lässt der Auftrag mehr als eine Deutung zu, wird nachgefragt statt geraten. Ein einfacherer Weg kommt auf den Tisch, auch wenn er dem Auftrag widerspricht. Bleibt etwas unklar, ruht die Arbeit bis zur Antwort.
+2. **Einfach zuerst.** Nur, was verlangt ist: keine Abstraktion für einmal genutzten Code, keine Konfigurierbarkeit auf Vorrat, keine Fehlerbehandlung für Unmögliches. Lässt es sich deutlich kürzer lösen, kürzer lösen.
+3. **Gezielt ändern.** Nur anfassen, was der Auftrag verlangt, im Stil des Bestands. Fremden toten Code melden, nicht löschen; was die eigene Änderung verwaisen lässt, entfernen. Was im Diff steht, hat einen Grund im Auftrag — sonst gehört es nicht hinein.
+4. **Am Ziel prüfen.** Vorab festlegen, woran Erfolg zu erkennen ist (etwa ein Test, der den Fehler zeigt und danach besteht). Bei mehreren Schritten ein kurzer Plan mit einer Prüfung je Schritt; weiterarbeiten, bis die Prüfung belegt ist.
+
+### Abweichungen von der Workspace-Datei
+
+Es gilt jeweils das Repo.
+
+1. **Schema:** statt `npx prisma migrate dev --name …` immer `npm run db:push` (`prisma db push`). Kein Migrationsordner im Einsatz: `prisma/migrations/` ist ein ungenutzter Rest vom März 2026, `npm run db:migrate` nicht verwenden — `migrate dev` böte gegen eine per `db push` gepflegte Datenbank an, sie zurückzusetzen (`lokale-umgebung.md`, Abschnitt 6). Auf dem Server gleicht der Entrypoint ab, mit Sicherung davor.
+2. **Enums:** Neue Zustände werden Zeichenketten mit Wertliste im Code (Werte weiter in SCREAMING_SNAKE_CASE), kein neues Prisma-Enum, denn `db push --accept-data-loss` spielte einen umbenannten Enum-Wert still aus (Paket 4, Regel 1; in der Ausstattung halten Tests die Wertlisten gegen die Schemakommentare). Bestehende Enums wie `UserRole` bleiben.
+3. **Optimistic Updates mit Rollback:** im Self-Service bewusst keine (Plan `docs/module/selfservice/selfservice-portal-plan.html`, Abschnitt 9 „Masken“, entschieden am 17.10.2026): Nach jeder Handlung bleibt die Maske gesperrt, bis der neue Stand geladen ist (stilles Neuladen, das Muster des UX-Umbaus). **Außerhalb des Self-Service ist nichts entschieden:** Der Bestand kennt beides — die Karten der neueren Module (Abteilungsaufgaben, Ausstattung, Unterlagen) zeigen den Stand aus der Serverantwort, die Checkliste im Mutterschutz aktualisiert optimistisch mit Rollback (`mutterschutz-detail-content.tsx`). Vor einer neuen Oberfläche außerhalb des Self-Service den Auftraggeber fragen.
+4. **Uploads „max 10 MB“:** praktisch 9 MB Rohbytes im Portal (`contentLengthZuGross` vor dem Lesen, `leseBodyBegrenzt` danach, sonst 413), weil die Middleware Portal-Bodys bei 10 MiB still abschneidet (individuelle E-Mail, Regel 4; Übergabeprotokoll unter „Dokumente & Starterpaket“). Die öffentliche Upload-API von Paket 4 läuft ohne Middleware: je Datei höchstens 9,5 MiB bei 10 MiB Body (Paket 4, Regel 10). **Offen — Altmuster im Bestand** (Ablösung nur als eigener Auftrag): `validateUpload` (`src/lib/file-upload.ts`) prüft `file.type` und die Magic Bytes nur gegen den angegebenen Typ, mit `MAX_UPLOAD_SIZE` = 10 MiB — genau der Grenze, an der die Middleware still abschneidet; genutzt in `api/mutterschutz/[id]/dokumente`, `api/elternzeit/[id]/dokumente`, `api/elternzeit-antrag-endg/[token]/upload`, `api/bem/[id]/dokumente/upload`, `api/bem/[id]/einwilligung/papier` und `api/starterpaket-dokumente`. Eine eigene `file.type`-Prüfung mit 10 MB ohne Vorabprüfung haben `api/fragebogen/[token]/documents`, `api/civil-service/[id]/documents` und `api/offboarding/[id]/documents`. Der DELETE der Fragebogen-Route löscht ohne Wurzelprüfung (Abschnitt „Dokumente & Starterpaket“, „Offen“).
+5. **Seed:** `npm run db:seed` und `npx prisma db seed` sind gleich (`tsx prisma/seed.ts`). Der Seed legt nur an, was fehlt; System-Vorlagen und einmalige Datenmigrationen kommen aus `prisma/seed-check.js` — lokal danach von Hand, auf dem Server nur über den Entrypoint und dort nie von Hand (Abschnitt „Docker / Deployment“).
+6. **Dev-Umgebung:** Statt des Startrezepts mit `export`-Zeilen und festen Werten eine `.env` im Repo-Ordner mit Werten, die jeder Rechner selbst erzeugt (`lokale-umgebung.md`, Abschnitte 4 bis 8). Anmelden: dort Abschnitt 7 (`scripts/dev-passwort-neu.js`). Passwörter gehören nicht ins Repo (Altlasten: „Herkunft“ oben).
+7. **n8n „Workflow-Automatisierung via Webhooks“:** nur noch Zusatzkanal und Zulieferer (etwa der Stammablauf von S0). Mails gehen per SMTP (`triggerWebhooks` schickt zuerst die Mail), die täglichen Läufe startet seit 09/2026 der Zeitplaner, und Ereignisse in `EVENTS_OHNE_WEBHOOK` gehen an keine Webhook-URL.
+8. **Konstanten „zentral in `constants.ts`“:** dort nur Übergreifendes. Was ein Modul allein braucht (Grenzen, `MELDUNGEN`, Audit-Aktionen), steht in seiner reinen, client-sicheren Datei (`ausstattung.ts`, `unterlagen.ts`, `abteilungsaufgaben.ts` …).
+9. **Antwortform:** `{ data }`/`{ error }` gilt für neue Routen. Ältere Routen (etwa `GET /api/onboarding/[id]`, `GET /api/offboarding/[id]`) und die Cron-Routen antworten ohne `data`-Hülle — nicht umbauen, Oberfläche und Abnehmer lesen diese Form. Ein 409 trägt bei Bedarf einen `grund` und Einzelheiten (etwa `offen`).
+10. **Statuscodes:** Ein fremder Mandant bekommt 404 mit demselben Text wie ein unbekannter Vorgang, nicht 403 — 403 nur für die Rolle. Dazu kommen 410, 413, 415, 429 und 502 (Modulabschnitte).
+11. **CSP „via Middleware“:** grundsätzlich ja. Die Datei-Route von Paket 4 setzt ihre CSP selbst (`routeSetztEigeneCsp`), und `api/unterlagen/` liegt bewusst außerhalb der Middleware (Paket 4, Regeln 10 und 11).
+12. **Cascade-Deletes:** nicht, wo der Bestand den Vorgang überdauert — `Ausgabe.onboardingId` mit `SetNull` (Ausstattung, Regel 21), ebenso der Fremdschlüssel `offboarding_processes."onboardingId"` (Abschnitt „Docker / Deployment“, Vorab-Prüfung).
+13. **„README.md als Einstiegspunkt pro Feature-Ordner“:** Einstieg je Vorhaben unter `docs/module/<modul>/` (bisher nur der Self-Service mit eigener `README.md`) oder als Übergabe in `docs/historie/` (etwa Übergabe S0, Übergabe Paket 4), dazu eine Zeile in `docs/README.md`, die den Einstieg nennt („Hier anfangen“ bzw. „Einstieg in Abschnitt …“); in `src/` gibt es keine README-Dateien.
+14. **„Formulare mit React Hook Form und Zod“:** React Hook Form nutzen nur die öffentlichen Formulare Fragebogen (`src/app/fragebogen/[token]/`) und Modalitäten (`src/app/modalitaeten/[token]/page.tsx`). Die Dialoge und Karten des Portals führen eigenen Zustand und prüfen mit Zod auf dem Server (`src/lib/validations/`); neue Portal-Dialoge folgen diesem Muster.
+
+### Bekannt im Bestand
+
+Keine Regel und nicht nachahmen; bereinigt wird nur als eigener Auftrag.
+
+- Doppelpunktformen („Ansprechpartner:in“, „Mitarbeiter:in“) in UI-Texten und Kommentaren: im Ereigniskatalog `src/lib/events.ts` (Empfängerhinweise der Vorlagenverwaltung) und in den Mail-Defaults `src/lib/default-email-templates.ts`, über viele Dateien verteilt im BEM-Modul, vereinzelt im Vertragsende und in `mailer.ts`, `placeholder-catalog.ts`, `doc-template-resolvers.ts`, `permissions.ts`, auch am Enum `UserRole`.
+- Schrägstrich- und Paarformen („Mitarbeiter/in“, „Vorgesetzte/r“, „die/den“) in UI-Texten und in dieser Datei; ob sie bleiben dürfen, ist offen (Hausregel „Keine Gendersprache“).
+- Die Adresse des ersten Admin-Kontos (Abschnitt „Admin-Zugang“) steht auch in `prisma/seed.ts`, `src/lib/placeholder-catalog.ts`, `README.md` und den alten Testskripten im Projektordner — mit Doku allein nicht zu entfernen; ob sie bleibt, entscheidet der Auftraggeber.
+- Ein Farbverlauf: Fortschrittsleiste in `src/app/(portal)/dashboard/civil-service/[id]/civil-service-detail-content.tsx`.
+- Fest eingetragene Farben in älteren Dateien; die Sperrklinke lässt sie nur weniger werden.
+- Radix UI steht in `package.json`, wird auf diesem Stand aber nirgends importiert; Dialoge sind eigene Komponenten (für neue: `DialogRahmen`).
 
 ## Onboarding: zwei Spuren
 

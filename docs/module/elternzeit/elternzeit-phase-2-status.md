@@ -299,6 +299,16 @@ src/app/(portal)/dashboard/
 — in unserem Kontext synonym mit `BEAMTER`. Enum bleibt fuer Bestandsdaten.
 Logik-Checks (`BEAMTER || PLANSTELLENINHABER`) bleiben unveraendert.
 
+### KPI-Kacheln (Nachtrag 18.10.2026)
+
+Seit `4cc1358` liefern `GET /api/elternzeit` und `GET /api/mutterschutz` je Status eine Zahl
+(`statusCounts`, `groupBy` ueber `status` mit `baseWhere`): mit den Filtern der Liste (Mandant,
+Einrichtung, Suche u. a.), aber **ohne** den gewaehlten Status. Ein Klick auf eine Kachel filtert
+so nur die Liste, die uebrigen Kacheln behalten ihre Zahlen (laut Notiz der Sitzung vom April
+standen die Kacheln vorher immer auf 0). Code: `src/app/api/elternzeit/route.ts` und `src/app/api/mutterschutz/route.ts`,
+jeweils `statusCountsRaw`. Nach diesem Muster zaehlt seit `0e1d8de` auch die Verbeamtung
+(`docs/historie/deploy-selfservice-s0-2026-10.md`, Abschnitt 0).
+
 ---
 
 ## GoLive-Haertung (April 2026, Commit `4cc1358`)
@@ -318,6 +328,10 @@ damit GoLive-tauglich.
     Token, in der DB steht aber noch Klartext aus alten Vorgaengen).
     Vor dem Update DB-Check auf offene Tokens machen, ggf. neue Links
     nach dem Update versenden.
+  - **Warum SHA-256 ohne Salt und nicht bcrypt** (Nachtrag 18.10.2026): Die
+    Tokens sind zufaellige UUIDs mit 122 Bit; Durchprobieren ist aussichtslos,
+    einen langsamen Passwort-Hash braeuchte es nur bei erratbaren Werten
+    (vgl. `docs/module/onboarding/paket4-feinplanung.md`, Tabelle mit `randomUUID()`).
 
 - **IDOR-Schliessung Mutterschutz:** Alle 4 Bestands-Routes (`[id]` GET/
   PATCH/DELETE, `notizen` GET/POST, `checkliste/[itemId]` PATCH) und
@@ -428,6 +442,10 @@ Test (verhindert Mailflut beim ersten Vorgang).
 stattdessen ein Direct-SQL-INSERT-Snippet (siehe Deployment-Runbook der
 Session) oder die UI-Quick-Add-Buttons nutzen.
 
+> **Richtigstellung 18.10.2026:** Das Deployment-Runbook dieser Sitzung liegt
+> nicht im Repo. Der Weg auf Produktion ist die Schaltflaeche „+ Webhook“ je
+> Ereignis unter Einstellungen → Webhooks.
+
 ---
 
 ## Was bewusst NICHT in Phase 2 ist (→ Phase 3)
@@ -439,6 +457,11 @@ Session) oder die UI-Quick-Add-Buttons nutzen.
 - Analytics-Dashboard
 - Teilzeit-Antrag als Mini-Workflow
 
+Empfehlung aus der Sitzung vom April 2026 (Nachtrag 18.10.2026): die
+Unterzustaende der Phase 3 (`UNTERBROCHEN`, `RUECKKEHR_GEPLANT`, siehe
+Implementierungsplan) als eigene Workflow-Lib mit eigenen erlaubten
+Folgestatus bauen, nicht in den linearen Hauptablauf einfuegen.
+
 ---
 
 ## Aktivierung
@@ -448,10 +471,8 @@ Session) oder die UI-Quick-Add-Buttons nutzen.
 ```bash
 cd HR_Portal_CREDO
 docker start credo-hr-db-dev
-export DATABASE_URL="postgresql://credo:credo_dev_2026@localhost:5433/hr_portal?schema=public"
-export JWT_SECRET="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4"
-export ENCRYPTION_KEY="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
-export CRON_SECRET="cron-dev-secret-2026"
+# Umgebungsvariablen aus der .env im Repo-Ordner (Werte selbst erzeugt, nie ins Repo; Mindestlaengen
+# und Erzeugung): docs/entwicklung/lokale-umgebung.md, Abschnitt 5
 
 npm run db:push
 npm run db:generate
@@ -465,6 +486,13 @@ npx next dev -p 3000
 **Mandanten-Config setzen:** Login als SUPER_ADMIN → Mandanten → "Elternzeit-Konfig" pro Einrichtung pflegen (Geschaeftsfuehrung, BR Detmold-Kontakt).
 
 **Cron-Job aktivieren:** n8n-Workflow taeglich gegen `/api/cron/elternzeit-fristen` mit Bearer-Token aus `CRON_SECRET`.
+
+> **Richtigstellung 18.10.2026:** Seit 09/2026 startet der Zeitplaner des Portals den Lauf
+> „Elternzeit-Fristen“ selbst (Einstellungen → Automatische Laeufe, Standard 08:30; neue Laeufe kommen
+> ausgeschaltet an). n8n wird dafuer nicht mehr gebraucht (CLAUDE.md, „Automatische Läufe“). Die Route
+> verlangt ein `CRON_SECRET` mit mindestens 24 Zeichen (sonst Antwort 500 beim Handaufruf); der bis
+> zum 18.10.2026 oben abgedruckte Entwicklungswert war kuerzer. Die lokale Umgebung von heute:
+> `docs/entwicklung/lokale-umgebung.md`.
 
 ---
 

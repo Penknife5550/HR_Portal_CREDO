@@ -1,0 +1,13 @@
+[
+  {"mandantNummer": 742, "abrechnungskreis": "01", "personalNr": "1001", "vorname": "Anna", "nachname": "Beispiel", "email": "Anna.Beispiel@fes-minden.de", "teilzeitstunden": 25.5, "vertragsbeginn": "2019-08-01", "vertragsende": null},
+  {"mandantNummer": 712, "abrechnungskreis": "02", "personalNr": "1001", "vorname": "Anna", "nachname": "Beispiel", "email": "anna.beispiel@fes-minden.de", "teilzeitstunden": "6,5", "vertragsbeginn": "2024-09-01", "vertragsende": "2027-07-31"},
+  {"mandantNummer": 721, "abrechnungskreis": "01", "personalNr": "3005", "vorname": "Anna", "nachname": "Beispiel", "email": "anna.beispiel@fes-minden.de", "teilzeitstunden": null, "vertragsbeginn": "2023-09-01", "vertragsende": "2026-10-10"},
+  {"mandantNummer": 742, "abrechnungskreis": "02", "personalNr": "1001", "vorname": "Bernd", "nachname": "Muster", "email": "bernd.muster@cfh-minden.de", "teilzeitstunden": 39, "vertragsbeginn": "2021-02-01", "vertragsende": null},
+  {"mandantNummer": 736, "abrechnungskreis": "01", "personalNr": "2002", "vorname": "Clara", "nachname": "Ende", "email": "clara.ende@mvs-minden.de", "teilzeitstunden": 20, "vertragsbeginn": "2022-01-01", "vertragsende": "2026-10-05"},
+  {"mandantNummer": 768, "abrechnungskreis": "01", "personalNr": "4711", "vorname": "Dora", "nachname": "Format", "email": "dora.format@fes-minden.de", "vertragsbeginn": "2025-01-01"},
+  {"mandantNummer": 999, "abrechnungskreis": "01", "personalNr": "5000", "vorname": "Emil", "nachname": "Fremd", "email": "emil.fremd@fes-minden.de", "vertragsbeginn": "2025-01-01", "vertragsende": null},
+  {"mandantNummer": 737, "abrechnungskreis": "01", "personalNr": "6001", "vorname": "Frank", "nachname": "Doppel", "email": "doppel@fes-minden.de", "vertragsbeginn": "2020-01-01", "vertragsende": null},
+  {"mandantNummer": 737, "abrechnungskreis": "01", "personalNr": "6002", "vorname": "Franziska", "nachname": "Doppel", "email": "doppel@fes-minden.de", "vertragsbeginn": "2020-01-01", "vertragsende": null},
+  {"mandantNummer": 768, "abrechnungskreis": "01", "personalNr": "7001", "vorname": "Jan", "nachname": "Schmidt", "email": "j.schmidt@fes-minden.de", "vertragsbeginn": "2018-08-01", "vertragsende": null},
+  {"mandantNummer": 768, "abrechnungskreis": "01", "personalNr": "7002", "vorname": "Jan", "nachname": "Schmidt", "email": "j_schmidt@fes-minden.de", "vertragsbeginn": "2026-08-01", "vertragsende": null}
+]

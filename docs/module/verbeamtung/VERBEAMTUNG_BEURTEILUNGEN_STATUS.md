@@ -299,14 +299,16 @@ Sektion „Phase 6 — Audit-Sichtbarkeit, Verifikations-QR & PDF-Bundle".
 ```bash
 cd HR_Portal_CREDO
 docker start credo-hr-db-dev   # falls nicht läuft
-export DATABASE_URL="postgresql://credo:credo_dev_2026@localhost:5433/hr_portal?schema=public"
-export JWT_SECRET="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4"
-export ENCRYPTION_KEY="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
-export CRON_SECRET="cron-dev-secret-2026"
+# Umgebungsvariablen aus der .env im Repo-Ordner (Werte selbst erzeugt, nie ins Repo):
+# docs/entwicklung/lokale-umgebung.md, Abschnitt 5
 npx next dev -p 3000
 ```
 
-Login: `dimitri@credo-gruppe.de` / `Test1234!Admin`
+Anmelden: [`docs/entwicklung/lokale-umgebung.md`](../../entwicklung/lokale-umgebung.md), Abschnitt 7.
+
+> **Richtigstellung 18.10.2026:** Hier standen bis zum 18.10.2026 die Entwicklungswerte der damaligen
+> Datenbank und ein Testzugang. Sie bleiben in der Git-Historie lesbar; wer sie lokal noch nutzt,
+> erzeugt neue (lokale-umgebung.md, Abschnitte 5 und 7). `CRON_SECRET` braucht mindestens 24 Zeichen.
 
 **Wichtig nach `git pull` oder Schema-Änderung:**
 - `npx prisma generate` (Client refreshen)

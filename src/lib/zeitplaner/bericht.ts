@@ -429,6 +429,10 @@ const AUSWERTER: Record<LaufSchluessel, Auswerter> = {
     zaehler: [
       [probelauf ? "Würde löschen: Versandprotokoll" : "Gelöscht: Versandprotokoll", b.zahl("emailLogs")],
       [probelauf ? "Würde löschen: Lauf-Protokolle" : "Gelöscht: Lauf-Protokolle", b.zahl("protokolle")],
+      [
+        probelauf ? "Würde löschen: Personalstamm-Protokolle" : "Gelöscht: Personalstamm-Protokolle",
+        b.zahl("personalstammProtokolle"),
+      ],
     ],
     schritte: [],
     hinweis: null,

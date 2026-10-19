@@ -45,7 +45,7 @@ export const LAEUFE: readonly LaufDefinition[] = [
     schluessel: "wartung",
     name: "Wartung",
     beschreibung:
-      "Löscht Einträge des Versandprotokolls und Protokolle der automatischen Läufe, die älter als 90 Tage sind.",
+      "Löscht Einträge des Versandprotokolls und Protokolle der automatischen Läufe, die älter als 90 Tage sind, sowie Protokolleinträge des Personalstamm-Abgleichs, die älter als 365 Tage sind.",
     standardUhrzeit: "03:30",
     kannProbelauf: true,
     loescht: true,

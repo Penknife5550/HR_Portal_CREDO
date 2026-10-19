@@ -29,22 +29,22 @@ const unterpunkte = (rolle: string, schluessel: string) =>
 describe("Punkte je Rolle", () => {
   it("hoechstens sechs Punkte oben (E3)", () => {
     expect(NAVIGATION.length).toBeLessThanOrEqual(6);
-    expect(NAVIGATION.map((p) => p.text)).toEqual(["Vorgänge", "BEM", "Vorlagen", "Verwaltung"]);
+    expect(NAVIGATION.map((p) => p.text)).toEqual(["Vorgänge", "Personen", "BEM", "Vorlagen", "Verwaltung"]);
   });
 
   it("Super-Admin sieht alles, auch die Mandanten", () => {
-    expect(texte("SUPER_ADMIN")).toEqual(["Vorgänge", "BEM", "Vorlagen", "Verwaltung"]);
+    expect(texte("SUPER_ADMIN")).toEqual(["Vorgänge", "Personen", "BEM", "Vorlagen", "Verwaltung"]);
     expect(unterpunkte("SUPER_ADMIN", "verwaltung")).toEqual(["Benutzer", "BEM-Vorlagen", "Mandanten", "Einstellungen", "Audit-Log"]);
     expect(unterpunkte("SUPER_ADMIN", "vorlagen")).toHaveLength(6);
   });
 
   it("HR-Leitung sieht alles ausser den Mandanten", () => {
-    expect(texte("HR_LEITUNG")).toEqual(["Vorgänge", "BEM", "Vorlagen", "Verwaltung"]);
+    expect(texte("HR_LEITUNG")).toEqual(["Vorgänge", "Personen", "BEM", "Vorlagen", "Verwaltung"]);
     expect(unterpunkte("HR_LEITUNG", "verwaltung")).not.toContain("Mandanten");
   });
 
   it("Sachbearbeitung: Vorlagen nur mit Brief-Vorlagen – „Formulare“ nicht (U1-F3), keine Verwaltung", () => {
-    expect(texte("HR_SACHBEARBEITER")).toEqual(["Vorgänge", "BEM", "Vorlagen"]);
+    expect(texte("HR_SACHBEARBEITER")).toEqual(["Vorgänge", "Personen", "BEM", "Vorlagen"]);
     expect(unterpunkte("HR_SACHBEARBEITER", "vorlagen")).toEqual(["Brief-Vorlagen"]);
   });
 

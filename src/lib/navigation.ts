@@ -6,9 +6,10 @@
  * lesen von hier.
  *
  * Regeln:
- *   - Hoechstens sechs Punkte oben (E3). Heute sind es vier: Vorgänge · BEM ·
- *     Vorlagen · Verwaltung. Start, Aufgaben und Personen kommen mit ihren
- *     Paketen dazu; die Vorlagen ziehen dann unter „Verwaltung".
+ *   - Hoechstens sechs Punkte oben (E3). Heute sind es fuenf: Vorgänge ·
+ *     Personen · BEM · Vorlagen · Verwaltung („Personen" seit Self-Service S0,
+ *     Personalstamm aus DokuBit). Start und Aufgaben kommen mit ihren Paketen
+ *     dazu; die Vorlagen ziehen dann unter „Verwaltung".
  *   - Der Kopf zeigt NUR, was die Rolle auch oeffnen kann (Entscheidung
  *     U1-F3). Die Rollen hier muessen zu den Regeln der Middleware und der
  *     Seiten passen — navigation.test.ts ruft die Middleware fuer jeden
@@ -32,7 +33,7 @@ export interface NavUnterpunkt {
 }
 
 export interface NavPunkt {
-  schluessel: "vorgaenge" | "bem" | "vorlagen" | "verwaltung";
+  schluessel: "vorgaenge" | "personen" | "bem" | "vorlagen" | "verwaltung";
   text: string;
   /** Direkter Verweis; ohne `href` ist der Punkt ein Menue mit `kinder`. */
   href?: string;
@@ -46,6 +47,9 @@ const LEITUNG = ["SUPER_ADMIN", "HR_LEITUNG"] as const;
 
 export const NAVIGATION: readonly NavPunkt[] = [
   { schluessel: "vorgaenge", text: "Vorgänge", href: VORGAENGE_PFAD, rollen: ALLE_PORTAL },
+  // Personalstamm aus DokuBit (Self-Service S0), nur lesen — dieselben Rollen
+  // wie die Seite (`personen/page.tsx`, HR_EDIT_ROLES).
+  { schluessel: "personen", text: "Personen", href: "/personen", rollen: HR },
   {
     // BEM = „versiegelte Akte". Fuer alle Portal-Rollen sichtbar; die Liste
     // zeigt aber nur Faelle mit aktiver Freigabe. Externe BEM-Beauftragte

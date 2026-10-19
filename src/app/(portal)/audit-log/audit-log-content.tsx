@@ -16,6 +16,7 @@ import { UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
 import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
 import { AUSSTATTUNG_AUDIT_LABELS } from "@/lib/ausstattung";
 import { AUSGABEN_AUDIT_LABELS } from "@/lib/ausgaben";
+import { PERSONALSTAMM_AUDIT_LABELS } from "@/lib/constants";
 
 interface User {
   userId: string;
@@ -108,6 +109,9 @@ const ACTION_LABELS: Record<string, string> = {
   // Ausstattung & Zugaenge, Stufe 2 (A4): Ausgaben je Stueck, Zuordnung von
   // Austritt und Einstellung, Rueckgaben, Loeschfrist (AUSGABEN_AUDIT).
   ...AUSGABEN_AUDIT_LABELS,
+  // Personalstamm aus DokuBit (Self-Service S0): Lauf-Eintrag je Aufruf des
+  // Webhooks, Uebernahme, Adress- und Namenswechsel, Stilllegen, Reaktivieren.
+  ...PERSONALSTAMM_AUDIT_LABELS,
 };
 
 /**
