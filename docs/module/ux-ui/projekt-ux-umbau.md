@@ -8,7 +8,14 @@ Letzte Änderung: 19.10.2026 (`main` mit Self-Service S0 und Kachel-Fix gemergt,
 
 ## 0. Übergabe (Stand 19.10.2026)
 
-### 0.0 Hier anfangen (19.10.2026)
+### 0.0 Hier anfangen (20.10.2026)
+
+**Einstieg für die nächste Sitzung:**
+[`docs/historie/uebergabe-ux-umbau-2026-10-20.md`](../../historie/uebergabe-ux-umbau-2026-10-20.md),
+Abschnitt „Stand 20.10.2026 — hier weitermachen“ (nächste Schritte in Reihenfolge, feste Stände,
+Generalprobe, was nur auf dem Windows-Rechner liegt). **Stand 20.10.2026:** `ux-umbau` auf `eab3054`
+gepusht, Pull Request [#8](https://github.com/Penknife5550/HR_Portal_CREDO/pull/8) nach `main` als
+Entwurf offen; gemergt erst nach Etappe 1 von S0. Der Absatz darunter ist der Stand vom 19.10.2026.
 
 **Stand 19.10.2026:** `main` bis `5fc31bd` ist gemergt (`8f4f064`, mit Self-Service S0 und dem
 Kachel-Fix `0e1d8de`); Prüfung, Build, Pilot-Abnahme (213) und Kopf-Abnahme (26) sind grün
@@ -25,6 +32,7 @@ Etappe 1 (Platzhalter ‹E1: …›). **Nächste Schritte:** pushen und den Pull
 Freigabe, gemergt erst nach Etappe 1); nach Etappe 1 `main` in `ux-umbau` mergen, die Platzhalter
 füllen und die festen Stände nachrechnen (Plan, Abschnitt 0, Punkt 1); vor dem Termin die
 Entscheidungen in Abschnitt 0 des Plans (offen nur noch Punkte 2 und 5; 3, 7 und 8 am 19.10.2026 entschieden).
+Gepusht und Pull Request geöffnet am 20.10.2026 (siehe oben).
 
 ### 0.0a Stand 15.10.2026
 

@@ -1728,6 +1728,8 @@ Das Protokoll hier eintragen (Kopfzeile „Stand“ ergänzen) und nachführen:
   unverändert. Hat der DSB den Nachtrag zu den Sicherungen bekommen: ein neuer Abschnitt „Nachtrag vom
   … : Sicherungen“ samt Datum und Antwort; sonst die Entscheidung aus 0, Punkt 8, ins Protokoll.
 - [`pilot-ankuendigung.md`](../module/ux-ui/pilot-ankuendigung.md): „verschickt am …“.
+- [Übergabe UX-Umbau](uebergabe-ux-umbau-2026-10-20.md): Abschnitt „Stand … — hier weitermachen“
+  auf den Stand nach dem Deploy (oder eine neue Übergabe, auf die CLAUDE.md dann verweist).
 - Den S0-Plan nachführen (Abschnitt 8 dieses Plans, Zeile „Danach“): Abschnitt 7 und 9 immer, 8.1
   immer (der Code-Stand gilt auch für die Rücknahme in 8.8; das Image je nach Fall), 8.4 nur, wenn
   Etappe 2 noch nicht lief.
