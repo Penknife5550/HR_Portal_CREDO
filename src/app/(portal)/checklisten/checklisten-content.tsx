@@ -37,6 +37,7 @@
  * React beim Umsortieren die Eingabefelder der alten Position.
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import {
   useEffect,
   useLayoutEffect,
@@ -47,7 +48,6 @@ import {
 } from "react";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { abteilungLabel, DEPARTMENT_KEYS } from "@/lib/constants";
 import { istFuehrungskraft, istLinkAbteilung } from "@/lib/abteilungsaufgaben";
 import { CHECKLISTEN_HINWEIS_MAX } from "@/lib/validations/abteilungsaufgaben";
@@ -898,15 +898,14 @@ export function ChecklistenContent({ user }: { user: User }) {
   // =============================================
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Seitentitel */}
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">
+            <h1 className="text-2xl font-bold text-foreground">
               Checklisten-Vorlagen
-            </h2>
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Erstellen und verwalten Sie Checklisten für Onboarding und Offboarding
             </p>
@@ -996,7 +995,7 @@ export function ChecklistenContent({ user }: { user: User }) {
                   Die Punkte können in der Detail-Ansicht jedes Verbeamtungsvorgangs bearbeitet werden.
                   Gatekeeper-Punkte (🔒) müssen erledigt sein bevor die nächste Phase beginnt.
                 </p>
-                <Link href="/dashboard?tab=civil-service"
+                <Link href={vorgangslistePfad("verbeamtung")}
                   className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
                   Zum Verbeamtungs-Dashboard →
                 </Link>

@@ -1,3 +1,4 @@
+import { vorgangslistePfad } from "@/lib/adressen";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { EinstellungenContent } from "./einstellungen-content";
@@ -17,7 +18,7 @@ export default async function EinstellungenPage() {
   }
 
   if (!["SUPER_ADMIN", "HR_LEITUNG"].includes(session.role)) {
-    redirect("/dashboard");
+    redirect(vorgangslistePfad());
   }
 
   return <EinstellungenContent user={session} />;

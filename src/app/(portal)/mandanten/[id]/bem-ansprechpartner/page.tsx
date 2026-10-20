@@ -6,6 +6,7 @@
  * Zugang: SUPER_ADMIN, HR_LEITUNG.
  */
 
+import { vorgangslistePfad } from "@/lib/adressen";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -19,7 +20,7 @@ export default async function MandantBemAnsprechpartnerPage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!ADMIN_ROLES.includes(session.role)) redirect("/dashboard");
+  if (!ADMIN_ROLES.includes(session.role)) redirect(vorgangslistePfad());
 
   const { id } = await params;
   const organization = await prisma.organization.findUnique({

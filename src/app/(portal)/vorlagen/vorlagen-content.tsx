@@ -14,7 +14,6 @@ import {
   DOCUMENT_TYPE_LABELS,
 } from "@/lib/required-documents";
 import { useRouter } from "next/navigation";
-import { PortalHeader } from "@/components/portal-header";
 import {
   FIELD_REGISTRY,
   getDefaultFieldConfig,
@@ -404,14 +403,13 @@ export function VorlagenContent({ user }: { user: User }) {
   // =============================================
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Seitentitel */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground">
+          <h1 className="text-2xl font-bold text-foreground">
             Formularvorlagen
-          </h2>
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Konfigurieren Sie, welche Fragebogen-Schritte für jeden
             Beschäftigungstyp aktiviert sind.

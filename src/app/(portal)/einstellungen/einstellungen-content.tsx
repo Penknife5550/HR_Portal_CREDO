@@ -23,10 +23,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { abteilungLabel, LINK_ABTEILUNGEN } from "@/lib/constants";
 import { EVENT_GROUP_ORDER } from "@/lib/events";
 import { AutomatischeLaeufeTab } from "@/components/zeitplaner/automatische-laeufe-tab";
+import { MailTextDialog, TextAnsehenKnopf } from "@/components/vorgangs-mails/mail-text-dialog";
 import { AusstattungKatalogTab } from "@/components/ausstattung/katalog-tab";
 import {
   EREIGNIS_GRUPPEN,
@@ -224,12 +224,11 @@ export function EinstellungenContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Seitenheader */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground">Einstellungen</h2>
+          <h1 className="text-2xl font-bold text-foreground">Einstellungen</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             E-Mail-Versand, Vorlagen, Webhooks, Abteilungen, Ausstattung und automatische Läufe verwalten
           </p>
@@ -1355,6 +1354,9 @@ interface EmailLogEntry {
   messageId: string | null;
   isTest: boolean;
   createdAt: string;
+  /** Gibt es einen gespeicherten Text? Der Text selbst kommt erst auf Klick. */
+  textVorhanden: boolean;
+  textHinweis: string | null;
 }
 
 const LOG_STATUS_STYLE: Record<string, { label: string; className: string }> = {
@@ -1373,6 +1375,8 @@ function ProtokollTab() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  /** Protokollzeile, deren Text der Dialog gerade zeigt. */
+  const [textLogId, setTextLogId] = useState<string | null>(null);
 
   const loadLogs = useCallback(() => {
     setLoading(true);
@@ -1477,6 +1481,13 @@ function ProtokollTab() {
                     {log.messageId && (
                       <p className="font-mono text-xs text-muted-foreground">Message-ID: {log.messageId}</p>
                     )}
+                    {log.textVorhanden ? (
+                      <div className="pt-1">
+                        <TextAnsehenKnopf onClick={() => setTextLogId(log.id)} />
+                      </div>
+                    ) : (
+                      log.textHinweis && <p className="pt-1 text-xs text-ink-2 italic">{log.textHinweis}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -1484,6 +1495,11 @@ function ProtokollTab() {
           })}
         </div>
       )}
+
+      <MailTextDialog
+        quelle={textLogId ? `/api/settings/email-log/${textLogId}/text` : null}
+        onSchliessen={() => setTextLogId(null)}
+      />
 
       {/* Pagination */}
       {totalPages > 1 && (

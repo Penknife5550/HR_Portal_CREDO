@@ -7,6 +7,8 @@ Disallow: /fragebogen/
 Disallow: /modalitaeten/
 Disallow: /unterlagen/
 Disallow: /dashboard/
+Disallow: /vorgaenge/
+Disallow: /bem/
 Disallow: /benutzerverwaltung/
 Disallow: /checklisten/
 Disallow: /vorlagen/

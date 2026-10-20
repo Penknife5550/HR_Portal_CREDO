@@ -1,8 +1,8 @@
 "use client";
 
+import { bemPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 
 interface User {
   userId: string;
@@ -130,7 +130,6 @@ export function BemStatistikContent({ user }: { user: User }) {
   return (
     <div className="min-h-screen bg-background">
       <div className="print:hidden">
-        <PortalHeader user={user} />
       </div>
 
       <main className="mx-auto max-w-7xl px-4 py-8">
@@ -138,7 +137,7 @@ export function BemStatistikContent({ user }: { user: User }) {
           <div>
             <div className="flex items-center gap-3 print:hidden">
               <Link
-                href="/dashboard/bem"
+                href={bemPfad()}
                 className="text-sm text-credo-blau hover:underline"
               >
                 ← Zurück zur BEM-Übersicht

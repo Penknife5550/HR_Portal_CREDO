@@ -209,7 +209,7 @@ export interface ZurueckweisungMailEingabe extends PersonenMailEingabe {
 interface HrMailEingabe {
   vorgang: UnterlagenMailVorgang;
   positionen: readonly UnterlagenMailPosition[];
-  /** Fertiger Link auf den Vorgang im Portal: `<APP_URL>` + `portalPfad` des Bausteins (Onboarding `/dashboard/<id>?tab=dokumente`) */
+  /** Fertiger Link auf den Vorgang im Portal: `<APP_URL>` + `portalPfad` des Bausteins (Onboarding `/vorgaenge/onboarding/<id>?tab=dokumente`) */
   portalLink: string;
   /** Wer die Nachforderung angelegt hat; null, wenn das Konto geloescht ist. */
   anfordernd: { email: string | null; name: string | null; aktiv: boolean } | null;

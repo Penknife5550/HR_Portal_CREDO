@@ -1,3 +1,4 @@
+import { vorgangslistePfad } from "@/lib/adressen";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { ChecklistenContent } from "./checklisten-content";
@@ -16,7 +17,7 @@ export default async function ChecklistenPage() {
 
   // Nur SUPER_ADMIN und HR_LEITUNG duerfen Checklisten verwalten
   if (session.role !== "SUPER_ADMIN" && session.role !== "HR_LEITUNG") {
-    redirect("/dashboard");
+    redirect(vorgangslistePfad());
   }
 
   return <ChecklistenContent user={session} />;

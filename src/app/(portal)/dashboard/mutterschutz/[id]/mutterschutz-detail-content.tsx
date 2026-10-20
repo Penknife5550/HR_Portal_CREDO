@@ -6,9 +6,9 @@
  * Tabs: Uebersicht, Checkliste, Notizen
  */
 
+import { vorgangPfad, vorgangslistePfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import {
@@ -244,7 +244,6 @@ export function MutterschutzDetailContent({
   if (loading || !data) {
     return (
       <div>
-        <PortalHeader user={user} />
         <div className="p-8 text-center text-sm text-muted-foreground">
           Lade…
         </div>
@@ -254,11 +253,10 @@ export function MutterschutzDetailContent({
 
   return (
     <div>
-      <PortalHeader user={user} />
       <div className="mx-auto max-w-5xl p-4">
         <div className="mb-4">
           <Link
-            href="/dashboard?tab=mutterschutz"
+            href={vorgangslistePfad("mutterschutz")}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             ← Zurück zum Dashboard
@@ -404,7 +402,7 @@ export function MutterschutzDetailContent({
                   {data.elternzeitProzesse.map((ez) => (
                     <li key={ez.id} className="text-sm">
                       <Link
-                        href={`/dashboard/elternzeit/${ez.id}`}
+                        href={vorgangPfad("elternzeit", ez.id)}
                         className="text-credo-gruen hover:underline"
                       >
                         {ez.displayId}

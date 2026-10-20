@@ -230,8 +230,11 @@ const MUSTER: Muster[] = [
     schluessel: "svg",
     name: "Inline-<svg",
     zaehle: perRegex(/<svg\b/g),
-    // 149 seit Paket A4 (S32): Leeranzeige des Reiters „Rückgaben“ mit lucide-react.
-    gesamt: 149,
+    // 147 seit dem Merge von `main` nach `ux-umbau` (15.10.2026): Paket A4 (S32)
+    // brachte eine Leeranzeige mit lucide-react dazu (auf `main` 149), der Umbau
+    // hat an anderen Stellen Inline-SVG ersetzt. Die Staende je Datei sind
+    // unveraendert — nur die Summe sinkt.
+    gesamt: 147,
     stattdessen: "Symbol aus lucide-react",
   },
   {

@@ -2,6 +2,7 @@
  * Mutterschutz Dashboard – Konfiguration für ProcessDashboard
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import type { ProcessDashboardConfig } from "@/components/process-dashboard/types";
 
 const MUTTERSCHUTZ_STATUS_LABELS: Record<
@@ -20,7 +21,7 @@ const MUTTERSCHUTZ_STATUS_LABELS: Record<
 
 export const mutterschutzDashboardConfig: ProcessDashboardConfig = {
   apiEndpoint: "/api/mutterschutz",
-  detailUrlPrefix: "/dashboard/mutterschutz",
+  detailPfad: (id) => vorgangPfad("mutterschutz", id),
   title: "Mutterschutz",
   createButtonLabel: "Neuer Mutterschutz",
   searchPlaceholder: "Name, E-Mail oder Vorgangs-ID...",

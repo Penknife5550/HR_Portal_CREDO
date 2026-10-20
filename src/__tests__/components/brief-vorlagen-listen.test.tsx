@@ -27,9 +27,6 @@ import { SYSTEM_VORLAGE_MODUL_FEST } from "@/lib/brief-vorlagen-filter";
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-jest.mock("@/components/portal-header", () => ({
-  PortalHeader: () => <header data-testid="portal-header" />,
-}));
 
 const USER = { userId: "u1", email: "hr@credo-gruppe.de", role: "HR_LEITUNG", firstName: "H", lastName: "R" };
 

@@ -7,6 +7,7 @@
  * Filtern, Sortierung, Pagination und Aktionen.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { NeuerAustrittModal } from "@/components/neuer-austritt-modal";
@@ -385,7 +386,7 @@ export function OffboardingDashboardContent({ user }: { user: User }) {
                         key={ob.id}
                         className="cursor-pointer transition-colors hover:bg-muted/50"
                         onClick={() =>
-                          router.push(`/dashboard/offboarding/${ob.id}`)
+                          router.push(vorgangPfad("offboarding", ob.id))
                         }
                       >
                         <td className="px-4 py-3">

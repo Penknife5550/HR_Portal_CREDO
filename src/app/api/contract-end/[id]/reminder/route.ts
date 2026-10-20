@@ -19,6 +19,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { HR_EDIT_ROLES, canAccessProcess } from "@/lib/permissions";
 import { sendSupervisorReminder } from "@/lib/contract-end-reminder";
+import { CONTRACT_END_ANFRAGE_OFFEN } from "@/lib/contract-end-status";
 import { erinnerungNichtZugestelltMeldung, statusNichtZugestellt } from "@/lib/contract-end-versand";
 
 export async function POST(
@@ -50,8 +51,9 @@ export async function POST(
     }
 
     // Erinnern ergibt nur Sinn, solange die Anfrage offen ist
-    // (ENTSCHEIDUNG_UEBERNAHME = Alt-Bestandsdaten des frueheren Flows).
-    if (!["ANFRAGE_VORGESETZTER", "ENTSCHEIDUNG_UEBERNAHME"].includes(ce.status)) {
+    // (ENTSCHEIDUNG_UEBERNAHME = Alt-Bestandsdaten des frueheren Flows). Liste in
+    // src/lib/contract-end-status.ts (dieselbe liest der Test des Prozess-Adapters).
+    if (!CONTRACT_END_ANFRAGE_OFFEN.includes(ce.status)) {
       return NextResponse.json(
         { error: "Es gibt keine offene Vorgesetzten-Anfrage für diesen Vorgang." },
         { status: 409 },

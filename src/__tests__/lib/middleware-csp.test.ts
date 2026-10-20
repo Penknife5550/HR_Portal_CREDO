@@ -51,7 +51,7 @@ describe("routeSetztEigeneCsp", () => {
     `/api/onboarding/${ID}/documents/${DATEI}`,
     `/api/offboarding/${ID}/unterlagen/dateien/${DATEI}`,
     `/unterlagen/${DATEI}`,
-    `/dashboard/${ID}`,
+    `/vorgaenge/onboarding/${ID}`,
     `/x/api/onboarding/${ID}/unterlagen/dateien/${DATEI}`,
   ])("%s behaelt die CSP der Middleware", (pfad) => {
     expect(routeSetztEigeneCsp(pfad)).toBe(false);

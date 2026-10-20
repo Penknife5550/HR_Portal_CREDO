@@ -675,7 +675,7 @@ describe("POST /api/cron/dokument-ablauf", () => {
           tage_ueberfaellig: 0,
           dringlichkeit: "Warnung",
           frist_text: "Läuft in 30 Tagen ab (08.10.2026)",
-          portalLink: "http://localhost:3000/dashboard/onb1",
+          portalLink: "http://localhost:3000/vorgaenge/onboarding/onb1",
         }
       );
       const mail = rendered!;
@@ -806,7 +806,7 @@ describe("POST /api/cron/dokument-ablauf", () => {
           tage_ueberfaellig: 0,
           dringlichkeit: "Warnung",
           frist_text: "Läuft in 30 Tagen ab (08.10.2026)",
-          portalLink: "http://localhost:3000/dashboard/onb1",
+          portalLink: "http://localhost:3000/vorgaenge/onboarding/onb1",
         }
       );
       expect({ event, text: rendered!.text }).toEqual({
@@ -849,7 +849,7 @@ describe("POST /api/cron/dokument-ablauf", () => {
           tage_ueberfaellig: 0,
           dringlichkeit: "Warnung",
           frist_text: "Läuft in 30 Tagen ab (08.10.2026)",
-          portalLink: "http://localhost:3000/dashboard/onb1",
+          portalLink: "http://localhost:3000/vorgaenge/onboarding/onb1",
           ...extra,
         },
       );

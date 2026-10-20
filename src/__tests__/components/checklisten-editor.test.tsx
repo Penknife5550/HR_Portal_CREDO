@@ -29,11 +29,7 @@ import { ChecklistenContent } from "@/app/(portal)/checklisten/checklisten-conte
 // React 19 verlangt diese Marke, bevor act() Zustandsaenderungen einsammeln darf.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// Der Kopf der Seite zieht Router, next/image und die Sitzungswarnung mit; der
-// Editor selbst braucht nichts davon.
-jest.mock("@/components/portal-header", () => ({
-  PortalHeader: () => null,
-}));
+// Der Kopf haengt seit U1 im Portal-Layout, nicht mehr in der Seite.
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
   usePathname: () => "/checklisten",

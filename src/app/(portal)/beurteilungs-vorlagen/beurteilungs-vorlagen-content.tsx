@@ -17,7 +17,6 @@
  */
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { PortalHeader } from "@/components/portal-header";
 import {
   ALL_LEGAL_REFERENCES,
   type LegalReference,
@@ -523,15 +522,14 @@ export function BeurteilungsVorlagenContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         {/* Seitentitel */}
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">
+            <h1 className="text-2xl font-bold text-foreground">
               Beurteilungs-Vorlagen
-            </h2>
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Konfigurierbare Vorlagen für die dienstliche Beurteilung im Rahmen der
               Verbeamtung. Globale Vorlagen gelten für alle Mandanten — Mandanten können

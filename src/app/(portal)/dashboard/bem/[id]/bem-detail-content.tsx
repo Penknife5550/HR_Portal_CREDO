@@ -1,8 +1,8 @@
 "use client";
 
+import { bemPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import {
   BEM_STEPS,
   getNaechsterSchritt,
@@ -611,7 +611,6 @@ export function BemDetailContent({
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <PortalHeader user={user} />
         <main className="mx-auto max-w-5xl px-4 py-8 text-muted-foreground">
           Lade Akte…
         </main>
@@ -622,13 +621,12 @@ export function BemDetailContent({
   if (error || !fall) {
     return (
       <div className="min-h-screen bg-background">
-        <PortalHeader user={user} />
         <main className="mx-auto max-w-5xl px-4 py-8">
           <div className="rounded-lg border border-credo-rot/30 bg-credo-rot/10 px-4 py-3 text-sm text-credo-rot">
             {error || "Fall nicht gefunden."}
           </div>
           <Link
-            href="/dashboard/bem"
+            href={bemPfad()}
             className="mt-4 inline-block text-sm text-credo-blau hover:underline"
           >
             ← Zurück zur Übersicht
@@ -645,10 +643,9 @@ export function BemDetailContent({
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalHeader user={user} />
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Link
-          href="/dashboard/bem"
+          href={bemPfad()}
           className="mb-4 inline-block text-sm text-credo-blau hover:underline"
         >
           ← Zurück zur Übersicht

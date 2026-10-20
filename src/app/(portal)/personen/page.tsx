@@ -1,3 +1,4 @@
+import { vorgangslistePfad } from "@/lib/adressen";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
@@ -19,7 +20,7 @@ export default async function PersonenPage() {
   }
 
   if (!HR_EDIT_ROLES.includes(session.role)) {
-    redirect("/dashboard");
+    redirect(vorgangslistePfad());
   }
 
   return <PersonenContent user={session} />;

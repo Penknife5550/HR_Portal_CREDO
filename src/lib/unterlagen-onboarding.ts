@@ -44,6 +44,7 @@
  *     die Checkliste fasst die Uebernahme nie an.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import type { DocumentType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ablaufKalendertag, istFristpflichtig, pruefeGueltigBis } from "@/lib/dokument-fristen";
@@ -501,8 +502,8 @@ export const onboardingBaustein: UnterlagenModulBaustein<OnboardingUnterlagenVor
   audit: (id) => ({ processType: "ONBOARDING", fk: { onboardingId: id } }),
   // Die HR-Mails („Im Portal prüfen") landen gleich im Reiter „Dokumente" bei
   // der Karte, nicht in der „Übersicht" (`reiterAusSuche` in detail-content.tsx;
-  // Abweichung von Feinplanung 8.2, die `/dashboard/<id>` nennt).
-  portalPfad: (id) => `/dashboard/${id}?tab=dokumente`,
+  // Abweichung von Feinplanung 8.2, die nur die Adresse des Vorgangs nennt).
+  portalPfad: (id) => vorgangPfad("onboarding", id, "dokumente"),
   apiBasis: (id) => `/api/onboarding/${id}/unterlagen`,
   annahmePruefen,
   uebernehmen,

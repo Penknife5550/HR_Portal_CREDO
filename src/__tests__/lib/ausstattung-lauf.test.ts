@@ -330,7 +330,7 @@ describe("ausstattungSammelmailLauf (Abschnitt 4, E-A18)", () => {
     const { portalLink: beispielLink, ...beispielRest } = beispiel();
     expect(rest).toEqual(beispielRest);
     expect(typeof beispielLink).toBe("string");
-    expect(portalLink).toBe(`${BASIS}/dashboard/${VORGANG_ID}?tab=checklist`);
+    expect(portalLink).toBe(`${BASIS}/vorgaenge/onboarding/${VORGANG_ID}?tab=checkliste`);
     expect(portalLink).toBe(ausstattungPortalLink(VORGANG_ID));
     expect(payload).not.toHaveProperty("email");
 
@@ -554,11 +554,16 @@ describe("ausstattungSammelmailLauf (Abschnitt 4, E-A18)", () => {
 });
 
 describe("ausstattungPortalLink (Feinplan 1.10)", () => {
+  // Seit dem Merge von `main` nach `ux-umbau` (15.10.2026) die NEUE Adresse aus
+  // `vorgangPfad` samt deutschem Reiter-Alias; der alte Pfad `/dashboard/…` ist
+  // ausserhalb von `src/lib/adressen.ts` nicht mehr erlaubt (`adressen.test.ts`).
   it("fuehrt in den Reiter Checkliste der Detailseite", () => {
     const vorher = process.env.NEXT_PUBLIC_APP_URL;
     process.env.NEXT_PUBLIC_APP_URL = "https://hr.example.org";
     try {
-      expect(ausstattungPortalLink("onb-1")).toBe("https://hr.example.org/dashboard/onb-1?tab=checklist");
+      expect(ausstattungPortalLink("onb-1")).toBe(
+        "https://hr.example.org/vorgaenge/onboarding/onb-1?tab=checkliste",
+      );
     } finally {
       process.env.NEXT_PUBLIC_APP_URL = vorher;
     }

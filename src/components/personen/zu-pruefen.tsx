@@ -70,7 +70,7 @@ export function Hinweiszeile({ pruefung }: { pruefung: PersonalstammPruefung }) 
 function Gruppe({ titel, children }: { titel: string; children: ReactNode }) {
   return (
     <div className="mt-4">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{titel}</h4>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{titel}</h3>
       <ul className="mt-2 divide-y divide-border rounded-lg border border-border">{children}</ul>
     </div>
   );

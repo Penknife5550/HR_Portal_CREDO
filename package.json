@@ -78,6 +78,7 @@
     "eslint": "^9.27.0",
     "eslint-config-next": "^15.3.2",
     "jest": "^30.3.0",
+    "jest-axe": "^11.0.0",
     "jest-environment-jsdom": "^30.3.0",
     "postcss": "^8.5.3",
     "prisma": "^6.9.0",

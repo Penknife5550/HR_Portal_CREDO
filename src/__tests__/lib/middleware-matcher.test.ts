@@ -69,7 +69,8 @@ describe("Matcher der Middleware", () => {
       `/api/onboarding/${ID}/unterlagen/positionen/${ID}`,
       `/api/onboarding/${ID}/unterlagen/dateien/${ID}`,
       "/api/onboarding",
-      "/dashboard",
+      "/vorgaenge",
+      "/bem",
     ]) {
       expect({ pfad, middleware: laeuftDurchMiddleware(pfad) }).toEqual({ pfad, middleware: true });
     }

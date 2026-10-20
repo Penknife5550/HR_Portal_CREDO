@@ -125,9 +125,9 @@ describe("fristenMailFelder", () => {
       portalBasis: "https://hr.example.org/",
     });
     expect(mitBasis.warnungen_liste_html).toContain(
-      'href="https://hr.example.org/dashboard/civil-service/psi-1"',
+      'href="https://hr.example.org/vorgaenge/verbeamtung/psi-1"',
     );
-    expect(mitBasis.warnungen_liste).toContain("  https://hr.example.org/dashboard/civil-service/psi-1");
+    expect(mitBasis.warnungen_liste).toContain("  https://hr.example.org/vorgaenge/verbeamtung/psi-1");
 
     // Ohne Basis kein Link — ein relativer Link waere in einer Mail wertlos.
     const ohneBasis = fristenMailFelder([warnung()], { maxAnzeige: 50 });

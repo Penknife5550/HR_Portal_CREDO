@@ -23,6 +23,7 @@ import { formatDatumDE, formatZeitpunktDE } from "@/lib/format";
 import { MITARBEITER_NEUTRAL } from "@/lib/onboarding-spuren";
 import { escapeHtml } from "@/lib/email-layout";
 import { vorgangBezugAusPayload, type VorgangBezug } from "@/lib/vorgangs-mails";
+import { mailTextSpeichern } from "@/lib/mail-text-dienst";
 
 // =============================================
 // Typen
@@ -609,9 +610,9 @@ async function writeEmailLog(entry: {
   isTest?: boolean;
   /** Vorgang fuer den Reiter „E-Mails“ (src/lib/vorgangs-mails.ts). */
   bezug?: VorgangBezug | null;
-}): Promise<void> {
+}): Promise<string | null> {
   try {
-    await prisma.emailLog.create({
+    const zeile = await prisma.emailLog.create({
       data: {
         vorgangTyp: entry.bezug?.vorgangTyp ?? null,
         vorgangId: entry.bezug?.vorgangId ?? null,
@@ -626,11 +627,13 @@ async function writeEmailLog(entry: {
         isTest: entry.isTest ?? false,
       },
     });
+    return typeof zeile?.id === "string" ? zeile.id : null;
   } catch (err) {
     console.error(
       "[Mailer] Versandprotokoll konnte nicht geschrieben werden:",
       err instanceof Error ? err.message : err
     );
+    return null;
   }
 }
 
@@ -751,7 +754,7 @@ export async function sendEventEmail(
       attachments: options?.attachments,
     });
     if (result.ok) {
-      await writeEmailLog({
+      const logId = await writeEmailLog({
         event,
         status: "SENT",
         recipient: rendered.to,
@@ -763,6 +766,9 @@ export async function sendEventEmail(
         isTest,
         bezug,
       });
+      // Text NACH der Zeile und in eigenem try (mail-text-dienst.ts): Ein
+      // Fehler dort verliert weder die Zeile noch die Mail.
+      await mailTextSpeichern({ emailLogId: logId, event, html: rendered.html, isTest });
       return {
         status: "SENT",
         messageId: result.messageId,
@@ -771,7 +777,7 @@ export async function sendEventEmail(
       };
     }
 
-    await writeEmailLog({
+    const failedId = await writeEmailLog({
       event,
       status: "FAILED",
       recipient: rendered.to,
@@ -782,6 +788,9 @@ export async function sendEventEmail(
       isTest,
       bezug,
     });
+    // Auch eine nicht zugestellte Mail behaelt ihren Text: HR sieht, was
+    // hinausgehen sollte, und kann es erneut senden.
+    await mailTextSpeichern({ emailLogId: failedId, event, html: rendered.html, isTest });
     return { status: "FAILED", detail: result.error };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

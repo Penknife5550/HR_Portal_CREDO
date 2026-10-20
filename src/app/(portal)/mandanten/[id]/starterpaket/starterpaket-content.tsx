@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { formatBytes } from "@/lib/format";
 
 interface User {
@@ -299,7 +298,6 @@ export function StarterpaketContent({
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalHeader user={user} />
       <main className="mx-auto max-w-3xl px-4 py-8">
         <Link
           href="/mandanten"

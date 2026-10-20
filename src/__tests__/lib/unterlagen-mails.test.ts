@@ -56,7 +56,7 @@ import {
 
 const ALLE_EVENTS = Object.values(UNTERLAGEN_EVENTS);
 const LINK = "https://hr.fes-credo.de/unterlagen/5b0c9a3e-8a51-4c1f-9d2e-6f7a8b9c0d1e";
-const PORTAL = "https://hr.fes-credo.de/dashboard/00000000-0000-0000-0000-000000000014?tab=dokumente";
+const PORTAL = "https://hr.fes-credo.de/vorgaenge/onboarding/00000000-0000-0000-0000-000000000014?tab=dokumente";
 
 const VORGANG: UnterlagenMailVorgang = {
   nachforderungId: "nf-1",

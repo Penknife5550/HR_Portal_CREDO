@@ -234,7 +234,7 @@ try {
       <tr><td style="color:#666;font-size:14px;">Versendet am</td><td style="color:#333;font-size:14px;">\${sentFormatted}</td></tr>
     </table>
     <table cellpadding="0" cellspacing="0" style="margin:0 auto 20px;"><tr><td align="center" style="background-color:#005d6a;border-radius:6px;">
-      <a href="\${CONFIG.portalUrl}/dashboard/offboarding" target="_blank" style="display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Im HR-Portal oeffnen</a>
+      <a href="\${CONFIG.portalUrl}/vorgaenge/offboarding" target="_blank" style="display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Im HR-Portal oeffnen</a>
     </td></tr></table>
   </td></tr>
   <tr><td style="padding:0;"><table width="100%" cellpadding="0" cellspacing="0"><tr>
@@ -303,7 +303,7 @@ try {
     </table>
     <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 20px;">Die Antworten koennen jetzt im HR-Portal eingesehen und ausgewertet werden.</p>
     <table cellpadding="0" cellspacing="0" style="margin:0 auto 20px;"><tr><td align="center" style="background-color:#005d6a;border-radius:6px;">
-      <a href="\${CONFIG.portalUrl}/dashboard/offboarding" target="_blank" style="display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Ergebnisse ansehen</a>
+      <a href="\${CONFIG.portalUrl}/vorgaenge/offboarding" target="_blank" style="display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Ergebnisse ansehen</a>
     </td></tr></table>
   </td></tr>
   <tr><td style="padding:0;"><table width="100%" cellpadding="0" cellspacing="0"><tr>
@@ -382,7 +382,7 @@ try {
       <tr><td style="color:#666;font-size:14px;">Versendet am</td><td style="color:#333;font-size:14px;">\${sentFormatted}</td></tr>
     </table>
     <table cellpadding="0" cellspacing="0" style="margin:0 auto 20px;"><tr><td align="center" style="background-color:#005d6a;border-radius:6px;">
-      <a href="\${CONFIG.portalUrl}/dashboard/offboarding" target="_blank" style="display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Im HR-Portal oeffnen</a>
+      <a href="\${CONFIG.portalUrl}/vorgaenge/offboarding" target="_blank" style="display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Im HR-Portal oeffnen</a>
     </td></tr></table>
   </td></tr>
   <tr><td style="padding:0;"><table width="100%" cellpadding="0" cellspacing="0"><tr>
@@ -462,7 +462,7 @@ try {
     </table>
     <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 20px;">Die Bewertung kann jetzt im HR-Portal geprueft und fuer das Zeugnis uebernommen werden.</p>
     <table cellpadding="0" cellspacing="0" style="margin:0 auto 20px;"><tr><td align="center" style="background-color:#005d6a;border-radius:6px;">
-      <a href="\${CONFIG.portalUrl}/dashboard/offboarding" target="_blank" style="display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Bewertung pruefen</a>
+      <a href="\${CONFIG.portalUrl}/vorgaenge/offboarding" target="_blank" style="display:inline-block;padding:12px 35px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Bewertung pruefen</a>
     </td></tr></table>
   </td></tr>
   <tr><td style="padding:0;"><table width="100%" cellpadding="0" cellspacing="0"><tr>

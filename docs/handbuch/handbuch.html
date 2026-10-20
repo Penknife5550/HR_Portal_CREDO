@@ -393,6 +393,7 @@
           <li><a href="#onboarding-abteilungen">Aufgaben für Abteilungen</a></li>
           <li><a href="#onboarding-unterlagen">Unterlagen nachfordern</a></li>
           <li><a href="#vorgang-mails">E-Mails zu einem Vorgang nachsehen</a></li>
+          <li><a href="#ausstattung">Ausstattung &amp; Zugänge</a></li>
         </ol>
       </li>
       <li><a href="#offboarding">Offboarding: Austritte verwalten</a></li>
@@ -1088,7 +1089,7 @@
 
     <div class="hinweis">
       <span class="label">Tipp: bei jeder erledigten Aufgabe eine E-Mail bekommen</span>
-      <p>Möchten Sie erfahren, sobald eine Abteilung etwas abhakt – samt ihrem Kommentar? Tragen Sie unter <strong>Einstellungen → E-Mail-Vorlagen</strong> in der Vorlage „Onboarding-Aufgabe erledigt" (Gruppe Onboarding) das Postfach der Personalabteilung im Feld <strong>An</strong> ein. Ohne Empfänger verschickt das Portal diese E-Mail nicht; die Rückmeldungen sehen Sie dann nur im Portal.</p>
+      <p>Möchten Sie erfahren, sobald eine Abteilung etwas abhakt – samt ihrem Kommentar? Tragen Sie unter <strong>Einstellungen → E-Mail-Vorlagen</strong> in der Vorlage „Onboarding-Aufgabe erledigt" (Gruppe Onboarding) das Postfach der Personalabteilung im Feld <strong>An</strong> ein. Ohne Empfänger verschickt das Portal diese E-Mail nicht; die Rückmeldungen sehen Sie dann nur im Portal. Auch der Kommentar, den eine Abteilung zu einer Aufgabe schreibt, kommt jetzt per E-Mail bei Ihnen an.</p>
     </div>
 
     <div class="hinweis info">
@@ -1215,7 +1216,7 @@
 
     <div class="hinweis info">
       <span class="label">Wer darf das?</span>
-      <p>Den Reiter sehen Administrator, HR-Leitung und Sachbearbeiter. Einrichtungsleitungen und Vorgesetzte sehen ihn nicht, weil dort Adressen und Betreffzeilen stehen.</p>
+      <p>Den Reiter sehen Administrator, HR-Leitung und Sachbearbeiter. Einrichtungsleitungen und Vorgesetzte sehen ihn nicht, weil dort Adressen, Betreffzeilen und der Text der E-Mails stehen.</p>
     </div>
 
     <ol>
@@ -1245,9 +1246,117 @@
 
     <p>Beim Dokumentenpaket steht unter der Zeile <strong>Anhänge anzeigen</strong>. Ein Klick zeigt, welche Dateien mitgingen.</p>
 
+    <!-- Text einer E-Mail ansehen (Mailtext im Versandprotokoll, 10/2026): gilt erst, wenn die Funktion deployt ist. -->
+    <h4 id="vorgang-mails-text">Den Text einer E-Mail ansehen</h4>
+    <p>Bei jeder E-Mail mit gespeichertem Text steht der Knopf <strong>Text ansehen</strong>. So sehen Sie nicht nur, <em>dass</em> eine E-Mail hinausging, sondern auch, <em>was</em> die Person gelesen hat – zum Beispiel, wenn sie nachfragt, was ihr eigentlich geschickt wurde.</p>
+
+    <figure class="screenshot">
+      <img src="screenshots/vorgang-mails-reiter.png" alt="Der Reiter E-Mails eines Vorgangs mit vier Einträgen. Bei den beiden versendeten E-Mails von Mitarbeiterin und Führungskraft steht der Knopf Text ansehen. Der Eintrag nicht versendet nennt den Grund E-Mail-Vorlage ist deaktiviert und den Satz Kein Text: Die Mail wurde nicht erzeugt. Die älteste E-Mail trägt den Satz Kein Text gespeichert.">
+      <figcaption>Der Reiter E-Mails: „Text ansehen" steht nur dort, wo ein Text gespeichert ist. Bei den übrigen Zeilen steht, warum es keinen gibt. (Beispieldaten)</figcaption>
+    </figure>
+
+    <ol>
+      <li>Klicken Sie bei der E-Mail auf <strong>Text ansehen</strong>.</li>
+      <li>Es öffnet sich das Fenster „E-Mail ansehen". Oben stehen An, gegebenenfalls CC und BCC und der Betreff. Darunter sehen Sie die E-Mail so, wie die Person sie bekommen hat.</li>
+      <li>Mit <strong>Nur Text</strong> wechseln Sie auf eine schlichte Fassung ohne Gestaltung – praktisch zum Nachlesen oder zum Kopieren in eine Antwort. <strong>Ansicht</strong> bringt die gestaltete Fassung zurück.</li>
+      <li>Mit <strong>Schließen</strong> kehren Sie zur Liste zurück.</li>
+    </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/vorgang-mails-text.png" alt="Das Fenster E-Mail ansehen zu einer Einladung an eine Mitarbeiterin. Oben stehen An und Betreff, darunter ein blauer Hinweis Persönliche Links sind ersetzt und der Umschalter Ansicht und Nur Text. Im Rahmen steht die gestaltete E-Mail; unter dem Knopf Personalfragebogen ausfüllen steht anstelle des Links der Platzhalter Persönlicher Link, aus Sicherheitsgründen nicht gespeichert.">
+      <figcaption>Das Fenster „E-Mail ansehen". An der Stelle des persönlichen Links steht ein Platzhalter. (Beispieldaten)</figcaption>
+    </figure>
+
+    <div class="hinweis info">
+      <span class="label">Persönliche Links stehen nicht im Text</span>
+      <p>An der Stelle des Links steht „[Persönlicher Link – aus Sicherheitsgründen nicht gespeichert]". Die Person hat den echten Link bekommen; in diesem gespeicherten Text steht er nicht. Das ist Absicht: Ein solcher Link öffnet ohne Anmeldung zum Beispiel den Personalfragebogen oder die Seite zum Hochladen von Unterlagen. Soll die Person ihn noch einmal bekommen, nutzen Sie im Vorgang die Aktion, die ihn verschickt hat (zum Beispiel „Link erneut senden"); der Platzhalter hilft dabei nicht weiter. In dieser Ansicht lassen sich Links nicht anklicken.</p>
+    </div>
+
+    <p>Nicht zu jeder E-Mail gibt es einen Text:</p>
+    <table>
+      <caption>Wann ein Text fehlt – und was dann dasteht</caption>
+      <thead>
+        <tr><th scope="col">Lage</th><th scope="col">Was Sie sehen</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Die E-Mail ging vor Einführung der Textspeicherung hinaus</td><td>„Kein Text gespeichert …" in der Zeile. Nachträglich lässt sich der Text nicht herstellen.</td></tr>
+        <tr><td>Gelb „nicht versendet"</td><td>„Kein Text: Die Mail wurde nicht erzeugt." – es gab nichts zu schicken, etwa weil die Vorlage abgeschaltet war.</td></tr>
+        <tr><td>Rot „fehlgeschlagen"</td><td>Der Text ist da. Das Fenster sagt „Nicht zugestellt" und zeigt, was hinausgehen sollte.</td></tr>
+        <tr><td>Test aus den Einstellungen („Test senden")</td><td>Kein Text; Testmails stehen auch nicht im Reiter des Vorgangs.</td></tr>
+        <tr><td>BEM</td><td>Es gibt keinen Reiter und keinen Text. BEM-Fälle sind vertraulich; dort gilt das eigene Kommunikationsprotokoll des Falls.</td></tr>
+      </tbody>
+    </table>
+
+    <p>Anhänge werden nicht mit aufgehoben. Ihre Namen stehen wie bisher unter <strong>Anhänge anzeigen</strong>. Links ins Portal (etwa „Vorgang öffnen“ in einer HR-E-Mail) sind nicht klickbar; die Adresse steht hinter dem Linktext.</p>
+
+    <div class="hinweis warnung">
+      <span class="label">Vertraulich behandeln</span>
+      <p>Der Text kann Namen, Fristen und andere Angaben zur Person enthalten. Behandeln Sie ihn wie den Vorgang selbst: nicht weiterleiten, nicht außerhalb des Portals ablegen. Den Text sehen nur Administrator, HR-Leitung und Sachbearbeiter – diese drei Rollen sehen alle Einrichtungen, auch hier.</p>
+    </div>
+
     <div class="hinweis info">
       <span class="label">Gut zu wissen</span>
-      <p>Der Reiter zeigt E-Mails ab dem 30.09.2026. Ältere E-Mails und solche, die mehrere Vorgänge auf einmal betreffen (etwa die Sammelwarnung zu Verbeamtungs-Fristen), stehen nur unter <strong>Einstellungen → Versandprotokoll</strong>. Nach 90 Tagen werden die Einträge gelöscht. Der BEM-Bereich hat bewusst keinen solchen Reiter; dort gilt das eigene Kommunikationsprotokoll des Falls.</p>
+      <p>Der Reiter zeigt E-Mails ab dem 30.09.2026. Ältere E-Mails und solche, die mehrere Vorgänge auf einmal betreffen (etwa die Sammelwarnung zu Verbeamtungs-Fristen), stehen nur unter <strong>Einstellungen → Versandprotokoll</strong>. Nach 90 Tagen werden die Einträge gelöscht – mit ihnen auch der gespeicherte Text der E-Mail. Nicht im Protokoll stehen E-Mails, die Sie selbst aus Brief-Vorlagen versenden, und Einladungen zur Kontoeinrichtung; sie gehen am Versandprotokoll vorbei. Der BEM-Bereich hat bewusst keinen solchen Reiter; dort gilt das eigene Kommunikationsprotokoll des Falls.</p>
+    </div>
+
+    <h3 id="ausstattung">3.9 Ausstattung &amp; Zugänge</h3>
+    <p>Eine neue Person braucht am ersten Tag mehr als einen Vertrag: einen Rechner, ein Telefon, ein E-Mail-Konto, Schlüssel. Bisher musste die Führungskraft das per Anruf oder E-Mail melden. Jetzt wählt sie es im Formular „Einstellungsmodalitäten" aus – und das Portal macht daraus Aufgaben für die zuständigen Stellen.</p>
+
+    <div class="hinweis info">
+      <span class="label">Wer darf das?</span>
+      <p>Die Karte „Ausstattung &amp; Zugänge" bearbeiten Administrator, HR-Leitung und Sachbearbeiter. Den Katalog (was überhaupt zur Auswahl steht) pflegen Administratoren unter <strong>Einstellungen → Ausstattung &amp; Zugänge</strong>.</p>
+    </div>
+
+    <h4>Was die Führungskraft sieht</h4>
+    <p>Im Formular „Einstellungsmodalitäten" gibt es einen zusätzlichen Schritt <strong>Ausstattung &amp; Zugänge</strong> („Was zum Arbeitsbeginn bereitstehen soll"). Er steht vor der Zusammenfassung; das Formular hat damit sechs statt fünf Schritte. Die Auswahl ist nach Stellen geordnet – IT-Abteilung, Sekretariat, Facility Management – und zeigt zum Beispiel Rechner, Telefon, E-Mail-Konto, Schlüssel oder ein Dienst-iPad. Das Übliche ist schon vorausgewählt; die Führungskraft nimmt heraus, was nicht gebraucht wird, und ergänzt, was fehlt. Zu jeder Stelle gibt es ein freiwilliges Feld „Weitere Hinweise", dazu den Satz, dass dort keine Angaben zu Gesundheit, Schwangerschaft, Behinderung oder Religion stehen dürfen.</p>
+
+    <figure class="screenshot">
+      <img src="screenshots/ausstattung-formular.png" alt="Der Schritt 5 von 6 Ausstattung und Zugänge im Formular Einstellungsmodalitäten, gegliedert nach IT-Abteilung, Sekretariat und Facility Management, mit Kontrollkästchen, Auswahl-Schaltflächen für Zugänge und Schlüssel sowie einem Feld für weitere Hinweise je Stelle.">
+      <figcaption>Der neue Schritt im Formular der Führungskraft. Jede Auswahl wird später zur Aufgabe der genannten Stelle. (Beispieldaten)</figcaption>
+    </figure>
+
+    <div class="hinweis warnung">
+      <span class="label">Achtung: nur für neue Links</span>
+      <p>Der Schritt erscheint nur bei Vorgesetzten-Links, die ab dem 14.10.2026 erstellt wurden. Bei laufenden Vorgängen mit älterem Link bleibt das Formular unverändert, und es entstehen keine Ausstattungs-Aufgaben.</p>
+    </div>
+
+    <h4>Die Karte „Ausstattung &amp; Zugänge" im Reiter Checkliste</h4>
+    <p>Hat die Führungskraft die Modalitäten abgeschickt, steht ihre Auswahl im Reiter <strong>Checkliste</strong> auf der Karte <strong>Ausstattung &amp; Zugänge</strong>. Jede gewählte Position ist dort eine Zeile mit der zuständigen Stelle und der Bemerkung der Führungskraft. Bei Schlüsseln und Zugängen ist jede gewählte Option eine eigene Aufgabe.</p>
+    <p>Die Auswahl der Führungskraft ist nicht das letzte Wort. Sie können:</p>
+    <ul>
+      <li><strong>Position hinzufügen…</strong> – etwas ergänzen, das die Führungskraft vergessen hat.</li>
+      <li><strong>Bearbeiten…</strong> – Bemerkung oder Stelle einer Position ändern.</li>
+      <li><strong>Streichen…</strong> – eine Position herausnehmen, die doch nicht gebraucht wird.</li>
+      <li><strong>Hinweis an eine Stelle…</strong> – einer Stelle etwas mitteilen, das zu keiner Position gehört.</li>
+    </ul>
+
+    <figure class="screenshot">
+      <img src="screenshots/ausstattung-karte.png" alt="Die Karte Ausstattung und Zugänge im Reiter Checkliste mit den Schaltflächen Hinweis an eine Stelle und Position hinzufügen, gegliedert nach IT-Abteilung und Facility Management. Jede Position zeigt Fälligkeit oder Erledigt-Stand sowie Bearbeiten, Streichen und Übergabe vermerken.">
+      <figcaption>Die Karte im Reiter Checkliste: Jede Position mit Stelle, Fälligkeit und Stand. Bei Zugängen heißt der Knopf „Einrichtung vermerken …". (Beispieldaten)</figcaption>
+    </figure>
+
+    <h4>Verschicken</h4>
+    <p>Verschickt wird wie gewohnt über <strong>Abteilungen informieren…</strong> (siehe <a href="#onboarding-abteilungen">Kapitel 3.6</a>). Die Ausstattungs-Aufgaben stehen dort zusammen mit den übrigen Aufgaben der Stelle – IT, Gebäudewirtschaft und Sekretariat bekommen jeweils einen Link. Ergänzen oder ändern Sie nach dem Versand etwas, sehen bereits informierte Stellen die neuen Aufgaben sofort auf ihrer Link-Seite.</p>
+
+    <h4>Was die Stelle sieht – und die Übergabe vermerken</h4>
+    <p>Auf der Link-Seite steht die Gruppe <strong>Ausstattung &amp; Zugänge</strong> mit den Aufgaben der Stelle, jeweils mit Fälligkeit und der Bemerkung der Führungskraft. Hat die Stelle einen Gegenstand übergeben, vermerkt sie das mit <strong>Übergabe vermerken</strong> und trägt die <strong>Schlüssel-, Chip- oder Inventarnummer</strong> ein. Der Vermerk ist getrennt vom Abhaken: erst die Übergabe festhalten, dann die Aufgabe abhaken. Ein Vermerk lässt sich über <strong>Entfernen</strong> zurücknehmen.</p>
+
+    <figure class="screenshot">
+      <img src="screenshots/ausstattung-link-it.png" alt="Die Link-Seite Onboarding-Aufgaben der IT-Abteilung mit Infokarte, Fortschrittsbalken und der Gruppe Ausstattung und Zugänge. Bei der Aufgabe Dienst-iPad bereitstellen steht ein vermerkter Eintrag mit Inventarnummer und Übergabedatum sowie der Link Übergabe vermerken.">
+      <figcaption>Die Link-Seite der IT-Abteilung. Unter der Aufgabe steht die vermerkte Übergabe mit Inventarnummer. (Beispieldaten)</figcaption>
+    </figure>
+
+    <h4>Abschluss mit offenen Ausstattungs-Aufgaben</h4>
+    <p>Wollen Sie den Vorgang abschließen, obwohl noch Ausstattungs- oder Hinweis-Aufgaben offen sind, fragt das Portal nach und nennt die offenen Aufgaben samt Stelle. Mit der Bestätigung schließen Sie trotzdem ab. Offene Aufgaben aus der Checklisten-Vorlage blockieren den Abschluss wie bisher nicht.</p>
+
+    <div class="ergebnis">
+      <span class="label">Das Ergebnis ist</span>
+      <p>Jede Ausstattungs-Position steht als Aufgabe bei der richtigen Stelle, mit Fälligkeit und Bemerkung. Was übergeben wurde, ist mit Nummer festgehalten – das Portal weiß beim Austritt, was zurückkommen muss (siehe <a href="#offboarding-rueckgaben">Kapitel 4, Rückgaben</a>).</p>
+    </div>
+
+    <div class="hinweis">
+      <span class="label">Tipp: Übergabeprotokoll als Word-Vorlage</span>
+      <p>Für die Übergabe gibt es die System-Vorlage „Übergabeprotokoll Ausstattung"; sie listet die vermerkten Stücke je Stelle auf.</p>
     </div>
 
     <a class="nach-oben" href="#inhalt">↑ Zurück zum Inhaltsverzeichnis</a>
@@ -1289,7 +1398,7 @@
     <ul>
       <li><strong>Übersicht</strong> – Stammdaten, die Führungskraft und der Bearbeitungsstand.</li>
       <li><strong>Checkliste</strong> – alle Aufgaben zum Abhaken und die Karte „Aufgaben für Abteilungen".</li>
-      <li><strong>Rückgaben</strong> – Gegenstände wie Schlüssel, Laptop oder Dienstwagen erfassen und als zurückgegeben markieren.</li>
+      <li><strong>Rückgaben</strong> – was die Person bekommen hat, kommt als Vorschlag; Zustand je Gegenstand eintragen (zurück, beschädigt, fehlt, verbleibt).</li>
       <li><strong>Dokumente</strong> – Dateien hochladen und ablegen.</li>
       <li><strong>Notizen</strong> – Bemerkungen festhalten.</li>
       <li><strong>Exit-Interview</strong> – die Abschluss-Befragung starten (siehe Kapitel 9).</li>
@@ -1304,18 +1413,35 @@
       <figcaption>Die Offboarding-Detailseite. Über „Status ändern" stellen Sie den Bearbeitungsstand weiter; die Reiter führen durch alle Aufgaben. (Beispieldaten)</figcaption>
     </figure>
 
-    <h4>Eine Rückgabe erfassen</h4>
-    <p>So behalten Sie den Überblick, welche Gegenstände noch ausstehen.</p>
+    <h4 id="offboarding-rueckgaben">Rückgaben: was zurückkommen muss</h4>
+    <p>Hat die Person bei der Einstellung Gegenstände bekommen (siehe <a href="#ausstattung">Kapitel 3.9</a>), weiß das Portal das und schlägt sie beim Austritt als Rückgabe vor. Die Abteilungen hatten dafür bei der Übergabe die Schlüssel-, Chip- oder Inventarnummer vermerkt.</p>
     <ol>
       <li>Öffnen Sie den Reiter <strong>Rückgaben</strong>.</li>
-      <li>Klicken Sie auf <strong>+ Gegenstände</strong>.</li>
-      <li>Wählen Sie die Kategorie (zum Beispiel „IT-Hardware" oder „Schlüssel") und geben Sie eine Bezeichnung ein.</li>
-      <li>Sobald die Person den Gegenstand zurückgibt, klicken Sie auf <strong>Rückgabe bestätigen</strong>.</li>
+      <li>Klicken Sie auf <strong>Einstellung zuordnen …</strong> und wählen Sie die passende Einstellung (Suche nach Vorgangsnummer oder Nachname; Vorschläge stehen schon da). Das Portal zeigt, was daraus als Rückgabe oder Sperraufgabe übernommen wird – zugeordnet wird nur, was Sie bestätigen.</li>
+      <li>Je Gegenstand tragen Sie den Zustand ein: <strong>Zurückerhalten</strong>, <strong>Beschädigt zurückerhalten</strong>, <strong>Fehlt</strong> oder <strong>Verbleibt bei der Person</strong>. Bei Zugängen (etwa der Dienst-E-Mail) gilt „gesperrt".</li>
+      <li>Fehlt ein Schlüssel oder Transponder, bekommt die Gebäudewirtschaft automatisch die Aufgabe „Schließung prüfen". Was nicht vorgeschlagen wurde, ergänzen Sie mit <strong>Gegenstand hinzufügen …</strong>.</li>
     </ol>
+
+    <figure class="screenshot">
+      <img src="screenshots/rueckgaben-reiter.png" alt="Der Reiter Rückgaben eines Offboarding-Vorgangs mit der zugeordneten Einstellung, einer Tabelle der Gegenstände mit Kennung und Zustand (fehlt, zurück) und den Knöpfen Zustand, Kennung und Löschen.">
+      <figcaption>Der Reiter „Rückgaben": oben die zugeordnete Einstellung, darunter die Gegenstände mit Kennung und Zustand. (Beispieldaten)</figcaption>
+    </figure>
+
+    <p>Die Stellen sehen ihre Rücknahmen auf ihrer Link-Seite und bestätigen dort den Zustand selbst – Zurückerhalten, Beschädigt oder Fehlt. Zustand im Portal und Aufgabe der Stelle laufen dabei gleich.</p>
+
+    <figure class="screenshot">
+      <img src="screenshots/rueckgabe-link-facility.png" alt="Die Link-Seite Offboarding-Aufgaben der Gebäudewirtschaft mit der Gruppe Ausstattung und Zugänge: eine Aufgabe Schließung prüfen für einen fehlenden Schlüssel sowie eine erledigte Rücknahme mit den Schaltflächen Zurückerhalten, Beschädigt zurückerhalten und Fehlt.">
+      <figcaption>Die Link-Seite der Gebäudewirtschaft beim Austritt: Die Stelle hält fest, in welchem Zustand der Schlüssel zurückkam. (Beispieldaten)</figcaption>
+    </figure>
 
     <div class="ergebnis">
       <span class="label">Das Ergebnis ist</span>
-      <p>Der Gegenstand ist als zurückgegeben markiert. So sehen Sie auf einen Blick, was noch fehlt.</p>
+      <p>Jeder Gegenstand hat einen Zustand. So sehen Sie auf einen Blick, was noch fehlt. Wollen Sie den Austritt abschließen, obwohl noch Rückgaben offen sind, fragt das Portal nach. Ein Gegenstand mit „Verbleibt bei der Person" wird mit dem Abschluss für einen späteren Austritt freigegeben.</p>
+    </div>
+
+    <div class="hinweis info">
+      <span class="label">Gut zu wissen</span>
+      <p>Der Reiter „Rückgaben" hatte bis zum Update einen Fehler; er ist behoben. Das Rückgabeprotokoll gibt es als Word-Vorlage „Rückgabeprotokoll Ausstattung". Ohne zugeordnete Einstellung erfassen Sie Gegenstände wie bisher von Hand mit <strong>Gegenstand hinzufügen …</strong>.</p>
     </div>
 
     <h3 id="offboarding-abteilungen">Aufgaben für Abteilungen</h3>
@@ -1502,6 +1628,11 @@
     <div class="hinweis">
       <span class="label">Tipp: Entscheidung steht schon fest?</span>
       <p>Wissen Sie die Antwort der Führungskraft bereits aus einem Gespräch, können Sie auf der Detailseite auch direkt <strong>Direkt Nicht-Übernahme (Offboarding) →</strong> auslösen, ohne erst den Formular-Umweg abzuwarten.</p>
+    </div>
+
+    <div class="hinweis">
+      <span class="label">Nicht angekommen?</span>
+      <p>Konnte die E-Mail mit der Anfrage nicht zugestellt werden, zeigt die Detailseite „Anfrage nicht zugestellt – erneut senden". Die Führungskraft hat dann nie einen Link bekommen; mit <strong>Anfrage erneut senden</strong> holen Sie das nach. Bei der Vertragsverlängerung steht die Betriebsstätte jetzt im Schreiben.</p>
     </div>
 
     <div class="ergebnis">
@@ -1969,6 +2100,7 @@
       <li><strong>Zuständig</strong> – eine Auswahlliste statt des früheren Freitexts. Sie hat drei Teile: <em>— keine —</em>, die Gruppe <strong>Im Portal</strong> (Personalabteilung, Mitarbeiter/in – diese Aufgaben bekommen nie einen Link) und die Gruppe <strong>Per Link</strong> (IT-Abteilung, Verwaltung / Sekretariat, Facility Management, Buchhaltung, Datenschutzbeauftragte/r, Führungskraft des Vorgangs sowie selbst angelegte Abteilungen aus <strong>Einstellungen → Abteilungen</strong>). Stand in einem Punkt noch ein alter Freitext, den das Portal nicht zuordnen konnte, steht er ganz oben als <em>Unbekannt: Werkstatt (bitte zuordnen)</em> – wählen Sie dann die passende Stelle.</li>
       <li><strong>Hinweis für die zuständige Stelle (optional)</strong> – ein bis zwei Sätze, was genau gemeint ist, zum Beispiel „Konto in der Schulverwaltung und in Microsoft 365 anlegen". Rechts zählt ein Zähler mit („0 / 500"). Dieser Hinweis steht später in der E-Mail an die Stelle und auf ihrer Aufgabenseite – schreiben Sie dort nichts Vertrauliches hinein.</li>
     </ul>
+    <p><strong>Reihenfolge:</strong> Die Punkte lassen sich per Ziehen am Griff, mit den Pfeilen oder über <strong>+ Punkt darunter</strong> ordnen. Die Reihenfolge der Vorlage gilt im Vorgang über alle Kategorien hinweg; bereits laufende Vorgänge behalten ihre bisherige Reihenfolge.</p>
     <p>In der Übersicht der Vorlage zeigt jeder Punkt ein farbiges Etikett mit der Stelle; ein kleines Ketten-Symbol bedeutet „wird im Vorgang per Link an die Abteilung verschickt". Daneben steht die Fälligkeit im Klartext, etwa „7 Tage vor Vertragsbeginn" oder „Am letzten Arbeitstag".</p>
 
     <div class="hinweis warnung">
@@ -2108,7 +2240,7 @@
       <tbody>
         <tr><td><strong>Versand-Status</strong></td><td>Eine Ampel pro E-Mail-Art: Grün heißt „alles bereit", Rot heißt „hier fehlt noch etwas".</td></tr>
         <tr><td><strong>E-Mail-Vorlagen</strong></td><td>Den Text der automatischen E-Mails anpassen – Betreff, Empfänger und Inhalt.</td></tr>
-        <tr><td><strong>Versandprotokoll</strong></td><td>Die Liste aller verschickten E-Mails mit Status (verschickt, fehlgeschlagen, übersprungen).</td></tr>
+        <tr><td><strong>Versandprotokoll</strong></td><td>Die Liste aller verschickten E-Mails mit Status (verschickt, fehlgeschlagen, übersprungen). Ein Klick auf einen Eintrag klappt die Einzelheiten auf; bei E-Mails mit gespeichertem Text öffnet <strong>Text ansehen</strong> die E-Mail (siehe <a href="#vorgang-mails-text">Kapitel 3.8</a>). Dieses Protokoll umfasst alle Einrichtungen; es sehen nur Administrator und HR-Leitung.</td></tr>
         <tr><td><strong>SMTP</strong></td><td>Die technischen Zugangsdaten für den E-Mail-Versand. „SMTP" ist das Standardverfahren, mit dem Programme E-Mails versenden – und der <strong>primäre Versandweg</strong> des Portals.</td></tr>
         <tr><td><strong>Webhooks</strong></td><td>Nur ein optionaler Zusatzkanal, um andere Programme anzubinden. Für den E-Mail-Versand nicht nötig – das übernimmt SMTP.</td></tr>
         <tr><td><strong>Abteilungen</strong></td><td>Die E-Mail-Adressen der Abteilungen, die ihre Checklisten-Aufgaben per Link erhalten – zentral oder je Einrichtung (siehe „Abteilungen pflegen" unten).</td></tr>
@@ -2196,7 +2328,7 @@
         <tr><th scope="col">Lauf</th><th scope="col">Was er tut</th><th scope="col">Uhrzeit</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Wartung</strong></td><td>Löscht Einträge des Versandprotokolls und Protokolle der Läufe, die älter als 90 Tage sind. <em>Löscht endgültig.</em></td><td>03:30</td></tr>
+        <tr><td><strong>Wartung</strong></td><td>Löscht Einträge des Versandprotokolls (mit dem gespeicherten E-Mail-Text) und Protokolle der Läufe, die älter als 90 Tage sind. <em>Löscht endgültig.</em></td><td>03:30</td></tr>
         <tr><td><strong>BEM-Aufbewahrung</strong></td><td>Löscht BEM-Fälle, deren Aufbewahrungsfrist abgelaufen ist. <em>Löscht endgültig.</em></td><td>03:00</td></tr>
         <tr><td><strong>Aufbewahrung erzeugter Dokumente</strong></td><td>Löscht erzeugte Briefe, die älter als 12 Monate sind – die führende Ablage ist das DMS –, sowie Text und Anhänge individueller E-Mails nach 12 Monaten (der Nachweis bleibt). <em>Löscht endgültig.</em></td><td>03:15</td></tr>
         <tr><td><strong>Unterlagen-Fristen</strong></td><td>Erinnert Personen an angeforderte Unterlagen, meldet verstrichene Fristen, holt gescheiterte E-Mails nach und löscht zurückgewiesene Dateien nach 30 Tagen (siehe <a href="#onboarding-unterlagen">Kapitel 3.7</a>). <em>Löscht endgültig.</em></td><td>07:00</td></tr>
@@ -2296,6 +2428,9 @@
     <h3>Eine E-Mail wurde nicht verschickt.</h3>
     <p>Öffnen Sie den Vorgang und dort den Reiter <strong>E-Mails</strong> (siehe <a href="#vorgang-mails">Kapitel 3.8</a>). Dort steht bei jeder E-Mail, ob sie verschickt wurde, und bei Problemen der Grund. Ältere E-Mails und Sammelmails finden Administrator und HR-Leitung unter <strong>Einstellungen → Versandprotokoll</strong>. Zeigt das Portal oben ein rotes Banner „SMTP ist nicht aktiv", muss zuerst der E-Mail-Versand eingerichtet werden (siehe Kapitel 12.3).</p>
 
+    <h3>Ich möchte wissen, was in einer E-Mail genau stand.</h3>
+    <p>Öffnen Sie den Vorgang, dort den Reiter <strong>E-Mails</strong>, und klicken Sie bei der E-Mail auf <strong>Text ansehen</strong> (siehe <a href="#vorgang-mails-text">Kapitel 3.8</a>). Steht dort stattdessen „Kein Text gespeichert", ging die E-Mail vor Einführung dieser Funktion hinaus. Persönliche Links zeigt dieser Text nie; dort steht ein Platzhalter.</p>
+
     <h3>Es kommen keine automatischen Erinnerungen.</h3>
     <p>Erinnerungen verschickt das Portal nur, wenn der passende automatische Lauf eingeschaltet ist, etwa „Onboarding-Erinnerungen". Administrator und HR-Leitung sehen das unter <strong>Einstellungen → Automatische Läufe</strong>: Steht die Karte auf „aus", ist der Lauf nicht eingeschaltet; ist sie rot „ausgeblieben", lief er zur geplanten Zeit nicht (siehe <a href="#verwaltung-laeufe">Kapitel 12.4</a>). Läuft alles, prüfen Sie im Reiter „E-Mails" des Vorgangs, ob die Erinnerung „nicht versendet" wurde – dann ist oft die Vorlage ausgeschaltet.</p>
 
@@ -2384,7 +2519,7 @@
 </div>
 
 <footer class="fuss">
-  <p><strong>CREDO HR-Portal – Handbuch für Einsteiger.</strong> Stand: September 2026 (zuletzt ergänzt: Abschnitt 3.7 „Unterlagen nachfordern"). Dieses Handbuch beschreibt die Bedienung des Portals für Mitarbeitende der Personalverwaltung.</p>
+  <p><strong>CREDO HR-Portal – Handbuch für Einsteiger.</strong> Stand: 14.10.2026 (zuletzt ergänzt: Abschnitt 3.9 „Ausstattung &amp; Zugänge“ und die Rückgaben im Offboarding). Datumsangaben erscheinen im Portal einheitlich als TT.MM.JJJJ; prüfen Sie beim nächsten LOGA-Import einmal kurz, ob die Datumsfelder sauber übernommen werden. Dieses Handbuch beschreibt die Bedienung des Portals für Mitarbeitende der Personalverwaltung.</p>
   <address>
     <p>Christlicher Schulverein Minden e.V. · Kingsleyallee 6 · 32425 Minden</p>
     <p>Telefon 0571 388 60 - 148 · presse@fes-minden.de · fes-minden.de</p>

@@ -33,7 +33,7 @@ export interface ProcessDashboardProps {
 export function ProcessDashboard({ config, renderCreateModal }: ProcessDashboardProps) {
   const {
     apiEndpoint,
-    detailUrlPrefix,
+    detailPfad,
     title,
     createButtonLabel,
     searchPlaceholder = "Name, E-Mail oder Vorgangs-ID...",
@@ -474,7 +474,7 @@ export function ProcessDashboard({ config, renderCreateModal }: ProcessDashboard
                     <tr
                       key={row.id}
                       className="cursor-pointer transition-colors hover:bg-muted/50"
-                      onClick={() => router.push(`${detailUrlPrefix}/${row.id}`)}
+                      onClick={() => router.push(detailPfad(row.id))}
                     >
                       {columns.map((col) => {
                         const value = getCellValue(row, col.key);

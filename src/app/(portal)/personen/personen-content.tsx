@@ -21,7 +21,6 @@
 
 import { useEffect, useState } from "react";
 import { Search, Users } from "lucide-react";
-import { PortalHeader } from "@/components/portal-header";
 import { Hinweiszeile, ZuPruefen } from "@/components/personen/zu-pruefen";
 import { IMPORT_QUELLE_MANUELL, PERSONALSTAMM_QUELLE } from "@/lib/constants";
 import { formatDatumDE, formatZeitpunktDE } from "@/lib/format";
@@ -222,12 +221,11 @@ export function PersonenContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-7xl px-4 py-8">
         {/* Kopf */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground">Personen</h2>
+          <h1 className="text-2xl font-bold text-foreground">Personen</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Personen und Anstellungen kommen täglich aus DokuBit. Geändert wird nur dort — das Portal
             übernimmt es mit dem nächsten Abgleich.
@@ -244,9 +242,9 @@ export function PersonenContent({ user }: { user: User }) {
 
         {/* Zu prüfen */}
         <section className="mb-6 rounded-lg border border-border bg-card p-4" aria-labelledby="zu-pruefen">
-          <h3 id="zu-pruefen" className="mb-2 text-sm font-semibold text-foreground">
+          <h2 id="zu-pruefen" className="mb-2 text-sm font-semibold text-foreground">
             Zu prüfen
-          </h3>
+          </h2>
           {pruefung ? (
             <ZuPruefen pruefung={pruefung} />
           ) : pruefungFehler ? (

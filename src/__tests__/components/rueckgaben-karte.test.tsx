@@ -78,9 +78,6 @@ jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
   usePathname: () => "/dashboard/offboarding/off-1",
 }));
-jest.mock("@/components/portal-header", () => ({
-  PortalHeader: () => <header data-testid="portal-header" />,
-}));
 
 // =============================================
 // Fixtures (wie der Server sie baut)

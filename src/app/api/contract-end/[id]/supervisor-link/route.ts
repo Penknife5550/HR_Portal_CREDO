@@ -30,6 +30,7 @@ import { prisma } from "@/lib/db";
 import { generateToken, getTokenExpiryDate, getSession } from "@/lib/auth";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
+import { CONTRACT_END_ANFRAGE_GESPERRT } from "@/lib/contract-end-status";
 import {
   anfrageNichtZugestelltMeldung,
   statusNichtZugestellt,
@@ -37,20 +38,7 @@ import {
 } from "@/lib/contract-end-versand";
 import type { ContractEndStatus } from "@prisma/client";
 
-/**
- * In diesen Status ist keine (neue) Anfrage an die Fuehrungskraft moeglich
- * (400). Die ersten beiden: Die Fuehrungskraft hat schon geantwortet.
- */
-const CONTRACT_END_ANFRAGE_GESPERRT: readonly ContractEndStatus[] = [
-  "RUECKMELDUNG_UEBERNAHME",
-  "RUECKMELDUNG_KEINE_UEBERNAHME",
-  "ENTSCHEIDUNG_KEINE_UEBERNAHME",
-  "VERTRAG_ERSTELLT",
-  "VERTRAG_UNTERSCHRIEBEN",
-  "ABGESCHLOSSEN",
-  "STORNIERT",
-];
-
+/** Die Fuehrungskraft hat schon geantwortet — eigene Meldung (Teilmenge der Sperrliste). */
 const SCHON_GEANTWORTET: readonly ContractEndStatus[] = [
   "RUECKMELDUNG_UEBERNAHME",
   "RUECKMELDUNG_KEINE_UEBERNAHME",
@@ -101,6 +89,8 @@ export async function POST(
         { status: 403 }
       );
     }
+    // Liste in src/lib/contract-end-status.ts (dieselbe liest der Test des
+    // Prozess-Adapters).
     if (CONTRACT_END_ANFRAGE_GESPERRT.includes(contractEnd.status)) {
       return NextResponse.json(
         {

@@ -18,6 +18,7 @@ import { getSession } from "@/lib/auth";
 import { canAccessProcess, HR_EDIT_ROLES } from "@/lib/permissions";
 import { createOffboardingProcess } from "@/lib/offboarding";
 import { ohneVorgesetztenToken } from "@/lib/contract-end-antwort";
+import { CONTRACT_END_OFFBOARDING_AUS } from "@/lib/contract-end-status";
 
 export async function POST(
   _request: NextRequest,
@@ -62,19 +63,13 @@ export async function POST(
     // schuetzt gegen Doppelklick / parallele Requests. Erlaubt: HR loest direkt
     // aus (ANGELEGT/ANFRAGE_VORGESETZTER) ODER bestaetigt die Ablehnung der
     // Fuehrungskraft (RUECKMELDUNG_KEINE_UEBERNAHME). ENTSCHEIDUNG_UEBERNAHME =
-    // Alt-Bestandsdaten.
+    // Alt-Bestandsdaten. Die Liste liegt in src/lib/contract-end-status.ts
+    // (dieselbe liest der Test des Prozess-Adapters).
     const claim = await prisma.contractEndProcess.updateMany({
       where: {
         id,
         offboardingId: null,
-        status: {
-          in: [
-            "ANGELEGT",
-            "ANFRAGE_VORGESETZTER",
-            "ENTSCHEIDUNG_UEBERNAHME",
-            "RUECKMELDUNG_KEINE_UEBERNAHME",
-          ],
-        },
+        status: { in: [...CONTRACT_END_OFFBOARDING_AUS] },
       },
       data: {
         decision: "KEINE_UEBERNAHME",

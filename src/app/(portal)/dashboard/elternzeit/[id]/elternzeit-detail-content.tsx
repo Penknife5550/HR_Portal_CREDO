@@ -7,9 +7,9 @@
  * Aktions-Buttons: Magic Link senden, Genehmigen, Ablehnen, PDF generieren
  */
 
+import { vorgangPfad, vorgangslistePfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { MailProtokoll } from "@/components/vorgangs-mails/mail-protokoll";
 import { HR_EDIT_ROLES } from "@/lib/permissions";
 import {
@@ -502,7 +502,6 @@ export function ElternzeitDetailContent({
   if (loading || !data) {
     return (
       <div>
-        <PortalHeader user={user} />
         <div className="p-8 text-center text-sm text-muted-foreground">
           Lade…
         </div>
@@ -533,11 +532,10 @@ export function ElternzeitDetailContent({
 
   return (
     <div>
-      <PortalHeader user={user} />
       <div className="mx-auto max-w-5xl p-4">
         <div className="mb-4">
           <Link
-            href="/dashboard?tab=elternzeit"
+            href={vorgangslistePfad("elternzeit")}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             ← Zurück zum Dashboard
@@ -830,7 +828,7 @@ export function ElternzeitDetailContent({
             {data.mutterschutz && (
               <Section title="Verknuepfter Mutterschutz">
                 <Link
-                  href={`/dashboard/mutterschutz/${data.mutterschutz.id}`}
+                  href={vorgangPfad("mutterschutz", data.mutterschutz.id)}
                   className="text-sm text-credo-gruen hover:underline"
                 >
                   {data.mutterschutz.displayId} — {data.mutterschutz.status}

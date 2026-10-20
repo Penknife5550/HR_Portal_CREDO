@@ -8,6 +8,9 @@
  *    der Statuswechsel ist an den Status gebunden (gleichzeitige Antwort → 409).
  *  - Gesendet ist nur, was hinausging: FAILED → 502, SKIPPED → 409, beide mit
  *    `mailStatus`, und `supervisorLinkSentAt` geht zurueck auf null.
+ *
+ * Die Statusliste liegt in src/lib/contract-end-status.ts (dieselbe liest der
+ * Test des Prozess-Adapters). Hier steht ausgeschrieben, was die Route tut.
  */
 
 import { ContractEndStatus } from "@prisma/client";
@@ -40,6 +43,7 @@ jest.mock("@/lib/permissions", () => ({
 jest.mock("@/lib/webhooks", () => ({ triggerWebhooks: mockTriggerWebhooks }));
 
 import { POST } from "@/app/api/contract-end/[id]/supervisor-link/route";
+import { CONTRACT_END_ANFRAGE_GESPERRT, CONTRACT_END_UEBERGAENGE } from "@/lib/contract-end-status";
 import { NextRequest } from "next/server";
 
 function req(body: Record<string, unknown> = { supervisorEmail: "leitung@example.org" }): NextRequest {
@@ -111,6 +115,29 @@ describe("POST /api/contract-end/[id]/supervisor-link", () => {
 
     expect((await POST(req({ supervisorEmail: "keine-adresse" }), { params: params() })).status).toBe(400);
     expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
+
+  it("401 ohne Session, 403 ohne HR-Rolle, 403 ohne Org-Scope, 404 unbekannt", async () => {
+    mockGetSession.mockResolvedValueOnce(null);
+    expect((await POST(req(), { params: params() })).status).toBe(401);
+
+    mockGetSession.mockResolvedValueOnce({ userId: "u1", role: "VORGESETZTER" });
+    expect((await POST(req(), { params: params() })).status).toBe(403);
+
+    mockCanAccessProcess.mockResolvedValueOnce(false);
+    expect((await POST(req(), { params: params() })).status).toBe(403);
+
+    mockPrisma.contractEndProcess.findUnique.mockResolvedValueOnce(null);
+    expect((await POST(req(), { params: params() })).status).toBe(404);
+
+    expect(mockPrisma.contractEndProcess.updateMany).not.toHaveBeenCalled();
+    expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
+
+  it("400 bei ungültiger Adresse — nichts geschrieben", async () => {
+    const res = await POST(req({ supervisorEmail: "keine-adresse" }), { params: params() });
+    expect(res.status).toBe(400);
+    expect(mockPrisma.contractEndProcess.updateMany).not.toHaveBeenCalled();
   });
 
   it("201: die Antwort trägt weder Token noch Link, das Ablaufdatum bleibt", async () => {
@@ -302,5 +329,55 @@ describe("POST /api/contract-end/[id]/supervisor-link", () => {
     const res = await POST(req(), { params: params() });
     expect(res.status).toBe(502);
     expect(mockPrisma.contractEndProcess.updateMany).toHaveBeenLastCalledWith(RUECKSTELLUNG);
+  });
+
+  it("die beiden Listen decken jeden Status des Moduls ab", () => {
+    expect([...GESPERRT, ...MOEGLICH].sort()).toEqual(Object.keys(CONTRACT_END_UEBERGAENGE).sort());
+  });
+
+  it.each(GESPERRT)("400 im Status %s — nichts geschrieben, keine Mail", async (status) => {
+    mockPrisma.contractEndProcess.findUnique.mockResolvedValue(vorgang({ status }));
+    const res = await POST(req(), { params: params() });
+
+    expect(res.status).toBe(400);
+    expect(mockPrisma.contractEndProcess.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.contractRenewalData.upsert).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    expect(mockTriggerWebhooks).not.toHaveBeenCalled();
+  });
+
+  it.each(MOEGLICH)("201 aus dem Status %s — neuer Link, alte Rückmeldung zurückgesetzt, Mail", async (status) => {
+    mockPrisma.contractEndProcess.findUnique.mockResolvedValue(vorgang({ status }));
+    const res = await POST(req(), { params: params() });
+
+    expect(res.status).toBe(201);
+    // Bedingt auf einen nicht gesperrten Status (gleichzeitige Antwort der
+    // Fuehrungskraft gewinnt) – dieselbe Liste wie im Adapter-Test.
+    expect(mockPrisma.contractEndProcess.updateMany).toHaveBeenCalledWith({
+      where: { id: "ce1", status: { notIn: [...CONTRACT_END_ANFRAGE_GESPERRT] } },
+      data: expect.objectContaining({
+        supervisorEmail: "leitung@example.org",
+        supervisorToken: mockToken,
+        status: "ANFRAGE_VORGESETZTER",
+        decision: "OFFEN",
+        supervisorRespondedAt: null,
+        supervisorDeclineReason: null,
+        lastSupervisorReminderAt: null,
+        supervisorReminderCount: 0,
+        escalatedAt: null,
+        vorstandAbgestimmt: null,
+        vorstandAbstimmungVermerk: null,
+      }),
+    });
+    expect(mockTriggerWebhooks).toHaveBeenCalledWith(
+      "contract-end-supervisor-link",
+      expect.objectContaining({
+        supervisorEmail: "leitung@example.org",
+        formularLink: expect.stringContaining(`/vertrag-formular/${mockToken}`),
+      }),
+    );
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: "SUPERVISOR_LINK_CREATED" }) }),
+    );
   });
 });

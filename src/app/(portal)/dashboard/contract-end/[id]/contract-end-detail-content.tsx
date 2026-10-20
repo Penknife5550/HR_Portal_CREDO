@@ -5,10 +5,10 @@
  * Tabs: Übersicht (Stammdaten + Entscheidung A/B) | Vertragsdaten | Dokumente.
  */
 
+import { vorgangPfad, vorgangslistePfad } from "@/lib/adressen";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { TemplateGenerationSection } from "@/components/template-generation-section";
 import { DokumentenpaketSection } from "@/components/dokumentenpaket-section";
 import { IndividuelleMailKarte } from "@/components/individuelle-mail/individuelle-mail-karte";
@@ -296,7 +296,6 @@ export function ContractEndDetailContent({
   if (loading) {
     return (
       <div>
-        <PortalHeader user={user} />
         <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
           Wird geladen…
         </div>
@@ -307,11 +306,10 @@ export function ContractEndDetailContent({
   if (loadError || !data) {
     return (
       <div>
-        <PortalHeader user={user} />
         <div className="mx-auto max-w-3xl px-4 py-12 text-center">
           <p className="text-sm text-destructive">{loadError || "Vorgang nicht gefunden."}</p>
           <button
-            onClick={() => router.push("/dashboard?tab=contract-end")}
+            onClick={() => router.push(vorgangslistePfad("vertragsende"))}
             className="mt-4 rounded-md border border-border px-4 py-2 text-sm hover:bg-accent"
           >
             Zurück zur Übersicht
@@ -338,14 +336,13 @@ export function ContractEndDetailContent({
 
   return (
     <div>
-      <PortalHeader user={user} />
 
       {/* Header-Leiste */}
       <div className="border-b bg-card">
         <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => router.push("/dashboard?tab=contract-end")}
+              onClick={() => router.push(vorgangslistePfad("vertragsende"))}
               className="rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               ← Zurück
@@ -649,7 +646,7 @@ function Entscheidung({
           </button>
           {data.offboarding && (
             <Link
-              href={`/dashboard/offboarding/${data.offboarding.id}`}
+              href={vorgangPfad("offboarding", data.offboarding.id)}
               className="inline-flex rounded-lg bg-credo-rot px-4 py-2 text-sm font-semibold text-white hover:bg-credo-rot/90"
             >
               Zum Offboarding {data.offboarding.displayId} (inkl. Zeugnis) →

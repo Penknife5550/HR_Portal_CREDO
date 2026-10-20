@@ -1,3 +1,4 @@
+import { vorgangslistePfad } from "@/lib/adressen";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { AuditLogContent } from "./audit-log-content";
@@ -15,7 +16,7 @@ export default async function AuditLogPage() {
   }
 
   if (session.role !== "SUPER_ADMIN" && session.role !== "HR_LEITUNG") {
-    redirect("/dashboard");
+    redirect(vorgangslistePfad());
   }
 
   return <AuditLogContent user={session} />;

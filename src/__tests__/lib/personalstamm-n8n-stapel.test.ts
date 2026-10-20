@@ -14,7 +14,8 @@ import fs from "fs";
 import path from "path";
 
 const ORDNER = path.join(process.cwd(), "docs", "module", "selfservice");
-const anleitung = fs.readFileSync(path.join(ORDNER, "s0-personalstamm-n8n.md"), "utf-8");
+// Unter Windows mit core.autocrlf=true steht die Anleitung mit CRLF im Arbeitsbaum.
+const anleitung = fs.readFileSync(path.join(ORDNER, "s0-personalstamm-n8n.md"), "utf-8").replace(/\r\n/g, "\n");
 const vorlage = JSON.parse(fs.readFileSync(path.join(ORDNER, "s0-personalstamm-n8n.json"), "utf-8")) as {
   nodes: { name: string; parameters: { jsCode?: string } }[];
 };

@@ -8,9 +8,9 @@
  * Pagination, kollabierbare JSON-Details.
  */
 
+import { vorgangPfad } from "@/lib/adressen";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PortalHeader } from "@/components/portal-header";
 import { ABTEILUNGS_AUDIT_LABELS } from "@/lib/abteilungsaufgaben";
 import { UNTERLAGEN_AUDIT_LABELS } from "@/lib/unterlagen";
 import { INDIVIDUELLE_MAIL_AUDIT_LABELS } from "@/lib/individuelle-mail";
@@ -176,7 +176,7 @@ function ProcessLink({ entry }: { entry: AuditLogEntry }) {
   if (entry.offboardingId) {
     return (
       <Link
-        href={`/dashboard/offboarding/${entry.offboardingId}`}
+        href={vorgangPfad("offboarding", entry.offboardingId)}
         className="text-xs text-primary hover:underline"
       >
         Offboarding
@@ -186,7 +186,7 @@ function ProcessLink({ entry }: { entry: AuditLogEntry }) {
   if (entry.onboardingId) {
     return (
       <Link
-        href={`/dashboard/${entry.onboardingId}`}
+        href={vorgangPfad("onboarding", entry.onboardingId)}
         className="text-xs text-primary hover:underline"
       >
         Onboarding
@@ -257,12 +257,11 @@ export function AuditLogContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-7xl px-4 py-8">
         {/* Header */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground">Audit-Log</h2>
+          <h1 className="text-2xl font-bold text-foreground">Audit-Log</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Protokoll aller Systemaktivitäten
           </p>

@@ -9,7 +9,6 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import { PortalHeader } from "@/components/portal-header";
 
 // =============================================
 // Types
@@ -568,15 +567,14 @@ export function ExitInterviewVorlagenContent({ user }: { user: User }) {
   // =============================================
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Seitentitel */}
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">
+            <h1 className="text-2xl font-bold text-foreground">
               Exit-Interview Vorlagen
-            </h2>
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Erstellen und verwalten Sie Fragebogen-Vorlagen für Exit-Interviews
             </p>

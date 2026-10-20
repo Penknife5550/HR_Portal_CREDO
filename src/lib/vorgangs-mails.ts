@@ -30,6 +30,7 @@
  */
 
 import { getEventDefinition } from "@/lib/events";
+import { textHinweis } from "@/lib/mail-text-archiv";
 
 export type VorgangTyp = "ONBOARDING" | "OFFBOARDING" | "CIVIL_SERVICE" | "CONTRACT_END" | "ELTERNZEIT" | "MUTTERSCHUTZ";
 
@@ -102,7 +103,7 @@ export function vorgangBezugAusPayload(event: string, payload: Record<string, un
 // Module (URL-Segment der Route ↔ Vorgangsart)
 // ---------------------------------------------
 
-/** URL-Segment in /api/vorgaenge/[modul]/[id]/mails — wie die Pfade unter /dashboard. */
+/** URL-Segment in /api/vorgaenge/[modul]/[id]/mails — die englischen Modulnamen der Schnittstellen (nicht die der Seiten, src/lib/adressen.ts). */
 export const VORGANGS_MODULE: Readonly<Record<string, VorgangTyp>> = {
   onboarding: "ONBOARDING",
   offboarding: "OFFBOARDING",
@@ -111,6 +112,16 @@ export const VORGANGS_MODULE: Readonly<Record<string, VorgangTyp>> = {
   elternzeit: "ELTERNZEIT",
   mutterschutz: "MUTTERSCHUTZ",
 };
+
+/**
+ * Vorgangsart zu einem Modulnamen aus der Adresse — `undefined`, wenn es das
+ * Modul nicht gibt. NUR eigene Schluessel zaehlen: `VORGANGS_MODULE["__proto__"]`
+ * oder `["constructor"]` liefert sonst einen Wert, und der Filter der
+ * Abfrage bekaeme ein Objekt statt einer Vorgangsart.
+ */
+export function vorgangTypAusModul(modul: string): VorgangTyp | undefined {
+  return Object.prototype.hasOwnProperty.call(VORGANGS_MODULE, modul) ? VORGANGS_MODULE[modul] : undefined;
+}
 
 // ---------------------------------------------
 // Zeilen fuer den Reiter
@@ -131,6 +142,10 @@ export interface VorgangsMailZeile {
   grund: string | null;
   /** Anhaenge bei SENT (Vermerk des Mailers, z. B. beim Dokumentenpaket). */
   anhang: string | null;
+  /** Gibt es zu dieser Zeile einen gespeicherten Text? (Den Text selbst liefert die Zeile nie.) */
+  textVorhanden: boolean;
+  /** Fertiger Satz, warum es keinen Text gibt; `null`, wenn einer da ist. */
+  textHinweis: string | null;
 }
 
 export interface VorgangsMailAntwort {
@@ -145,7 +160,7 @@ export const MAIL_STATUS_TEXTE: Record<string, string> = {
 };
 
 export const VORGANGS_MAIL_HINWEIS =
-  "Aus dem Versandprotokoll, neueste zuerst. Einträge werden nach 90 Tagen gelöscht. Mails, die vor Einführung dieses Reiters verschickt wurden, stehen nur unter Einstellungen → Versandprotokoll.";
+  "Aus dem Versandprotokoll, neueste zuerst. Einträge werden nach 90 Tagen gelöscht. Der Text einer Mail steht mit ersetzten persönlichen Links zur Ansicht bereit; Mails, die vor Einführung der Textspeicherung hinausgingen, haben keinen Text. Mails, die vor Einführung dieses Reiters verschickt wurden, stehen nur unter Einstellungen → Versandprotokoll.";
 
 /** Hoechstens so viele Zeilen je Vorgang. */
 export const VORGANGS_MAIL_LIMIT = 300;
@@ -160,8 +175,11 @@ export function mailZeileBauen(log: {
   cc: string | null;
   bcc: string | null;
   detail: string | null;
+  /** Die Relation `text` der Abfrage mit `select: { emailLogId: true }` — nie der Inhalt. */
+  text?: { emailLogId: string } | null;
 }): VorgangsMailZeile {
   const gesendet = log.status === "SENT";
+  const hatText = Boolean(log.text);
   return {
     id: log.id,
     zeitpunkt: log.createdAt.toISOString(),
@@ -175,5 +193,8 @@ export function mailZeileBauen(log: {
     bcc: log.bcc || null,
     grund: gesendet ? null : log.detail || null,
     anhang: gesendet ? log.detail || null : null,
+    textVorhanden: hatText,
+    // Der Reiter liest nie Test-Versand (isTest: false in der Abfrage).
+    textHinweis: textHinweis({ event: log.event, status: log.status, hatText, ohneBetreff: !log.subject }),
   };
 }

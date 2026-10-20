@@ -38,6 +38,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { fehlerKennung } from "@/lib/fehler-kennung";
 import { getBaseUrl } from "@/lib/url";
+import { vorgangPfad } from "@/lib/adressen";
 import { triggerWebhooks } from "@/lib/webhooks";
 import { ONBOARDING_ENDSTATUS, faelligkeitAus, onboardingEmpfaengerEinrichtung } from "@/lib/abteilungsaufgaben";
 import {
@@ -115,14 +116,15 @@ export async function ausstattungNachholenLauf(jetzt: Date = new Date()): Promis
 
 /**
  * Link der Sammelmail auf den Vorgang im Portal, gleich im Reiter Checkliste
- * (dort steht die Karte „Ausstattung & Zugänge“). EINZIGE Stelle des neuen
- * Codes mit dem Pfad der Detailseite (Feinplan 1.10): Auf `ux-umbau` verbietet
- * `adressen.test.ts` die Zeichenkette ausserhalb von `src/lib/adressen.ts` —
- * beim Zusammenfuehren wird nur diese Zeile auf
- * `vorgangPfad("onboarding", id, "checkliste")` umgestellt.
+ * (dort steht die Karte „Ausstattung & Zugänge“). Seit dem Merge von `main`
+ * nach `ux-umbau` (15.10.2026) ueber `vorgangPfad` — so war es im Feinplan 1.10
+ * vorgesehen, und `adressen.test.ts` laesst die alten Adressen ausserhalb von
+ * `src/lib/adressen.ts` nicht mehr zu (auch nicht im Kommentar). Die neue
+ * Adresse heisst `/vorgaenge/onboarding/<id>?tab=checkliste`; die Detailseite
+ * versteht den deutschen Alias (`detail-content.tsx`, `alias: "checkliste"`).
  */
 export function ausstattungPortalLink(onboardingId: string): string {
-  return `${getBaseUrl()}/dashboard/${onboardingId}?tab=checklist`;
+  return `${getBaseUrl()}${vorgangPfad("onboarding", onboardingId, "checkliste")}`;
 }
 
 /** Antwortfeld `ausstattung.sammelmail` des Laufs „Onboarding-Erinnerungen“. */

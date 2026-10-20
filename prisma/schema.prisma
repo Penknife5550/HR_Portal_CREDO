@@ -2212,11 +2212,32 @@ model EmailLog {
   vorgangId  String?
   createdAt  DateTime @default(now())
 
+  /// Kopie des versendeten Mailtextes (10/2026) — bewusst in einer eigenen
+  /// Tabelle: Eine Spalte hier ginge ueber jedes `findMany` ohne `select` in
+  /// jede Listenantwort. Der Text kommt nur, wenn ihn jemand ausdruecklich laedt.
+  text EmailLogText?
+
   @@index([event])
   @@index([status])
   @@index([createdAt])
   @@index([vorgangTyp, vorgangId])
   @@map("email_logs")
+}
+
+/// Text einer protokollierten Mail — so, wie er hinausging, mit ERSETZTEN
+/// persoenlichen Links (src/lib/mail-text-archiv.ts). Hoechstens eine Zeile je
+/// Protokollzeile; wird mit ihr geloescht (Cascade, Aufbewahrung 90 Tage).
+/// Nie bei BEM, nie beim Test-Versand, nie bei SKIPPED.
+model EmailLogText {
+  emailLogId String   @id
+  log        EmailLog @relation(fields: [emailLogId], references: [id], onDelete: Cascade)
+  /// HTML-Teil der Mail, Zugangslinks durch einen Platzhalter ersetzt.
+  bodyHtml   String   @db.Text
+  /// true, wenn der Text bei MAX_TEXT_ZEICHEN abgeschnitten wurde.
+  gekuerzt   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@map("email_log_texte")
 }
 
 // =============================================

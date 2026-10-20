@@ -1,3 +1,4 @@
+import { vorgangslistePfad } from "@/lib/adressen";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { MandantenContent } from "./mandanten-content";
@@ -16,7 +17,7 @@ export default async function MandantenPage() {
   }
 
   if (session.role !== "SUPER_ADMIN") {
-    redirect("/dashboard");
+    redirect(vorgangslistePfad());
   }
 
   return <MandantenContent user={session} />;

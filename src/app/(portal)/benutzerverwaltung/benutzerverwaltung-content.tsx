@@ -7,8 +7,8 @@
  * HR-Portal-Benutzern (SUPER_ADMIN, HR_LEITUNG, HR_SACHBEARBEITER).
  */
 
+import { rollenName } from "@/lib/navigation";
 import { useState, useEffect, useCallback } from "react";
-import { PortalHeader } from "@/components/portal-header";
 
 interface User {
   userId: string;
@@ -42,32 +42,29 @@ interface UserFormData {
   isBemBeauftragte: boolean;
 }
 
-const ROLE_LABELS: Record<string, { label: string; color: string }> = {
-  SUPER_ADMIN: {
-    label: "Super Admin",
-    color: "bg-red-100 text-red-800",
-  },
-  HR_LEITUNG: {
-    label: "HR-Leitung",
-    color: "bg-blue-100 text-blue-800",
-  },
-  HR_SACHBEARBEITER: {
-    label: "Sachbearbeiter",
-    color: "bg-gray-100 text-gray-800",
-  },
-  EINRICHTUNGSLEITUNG: {
-    label: "Einrichtungsleitung",
-    color: "bg-amber-100 text-amber-800",
-  },
-  VORGESETZTER: {
-    label: "Vorgesetzter",
-    color: "bg-green-100 text-green-800",
-  },
-  BEM_BEAUFTRAGTER: {
-    label: "BEM-Beauftragte:r (extern)",
-    color: "bg-[#009AC6]/10 text-[#009AC6]",
-  },
+/**
+ * Farbe je Rolle. Die NAMEN kommen aus `rollenName()` (src/lib/navigation.ts)
+ * — dieselben wie im Kopf des Portals. Eine unbekannte Rolle zeigt ihren
+ * Schluessel in der neutralen Farbe, nie den Namen einer anderen Rolle.
+ */
+const ROLLEN_FARBEN: Record<string, string> = {
+  SUPER_ADMIN: "bg-red-100 text-red-800",
+  HR_LEITUNG: "bg-blue-100 text-blue-800",
+  HR_SACHBEARBEITER: "bg-gray-100 text-gray-800",
+  EINRICHTUNGSLEITUNG: "bg-amber-100 text-amber-800",
+  VORGESETZTER: "bg-green-100 text-green-800",
+  BEM_BEAUFTRAGTER: "bg-[#009AC6]/10 text-[#009AC6]",
 };
+/** Neutral — dieselbe Farbe wie die Sachbearbeitung, aber mit dem eigenen Namen der Rolle. */
+const ROLLEN_FARBE_UNBEKANNT = ROLLEN_FARBEN.HR_SACHBEARBEITER;
+
+/** Externe Konten sind in der Liste als solche gekennzeichnet. */
+function rollenAnzeige(rolle: string): { label: string; color: string } {
+  return {
+    label: rolle === "BEM_BEAUFTRAGTER" ? `${rollenName(rolle)} (extern)` : rollenName(rolle),
+    color: ROLLEN_FARBEN[rolle] ?? ROLLEN_FARBE_UNBEKANNT,
+  };
+}
 
 /**
  * Rollen, die ueber diese Oberflaeche vergeben werden duerfen — spiegelt
@@ -79,10 +76,10 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
  * diesen Rollen bleiben bearbeitbar (siehe rollenOptionen).
  */
 const VERGEBBARE_ROLLEN: { value: string; label: string; nurSuperAdmin?: boolean }[] = [
-  { value: "HR_SACHBEARBEITER", label: "Sachbearbeiter" },
-  { value: "HR_LEITUNG", label: "HR-Leitung" },
-  { value: "SUPER_ADMIN", label: "Super Admin", nurSuperAdmin: true },
-  { value: "BEM_BEAUFTRAGTER", label: "BEM-Beauftragte:r (extern, nur BEM)" },
+  { value: "HR_SACHBEARBEITER", label: rollenName("HR_SACHBEARBEITER") },
+  { value: "HR_LEITUNG", label: rollenName("HR_LEITUNG") },
+  { value: "SUPER_ADMIN", label: rollenName("SUPER_ADMIN"), nurSuperAdmin: true },
+  { value: "BEM_BEAUFTRAGTER", label: `${rollenName("BEM_BEAUFTRAGTER")} (extern, nur BEM)` },
 ];
 
 const EMPTY_FORM: UserFormData = {
@@ -206,7 +203,6 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-muted">
-      <PortalHeader user={user} />
 
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Erfolgsmeldung */}
@@ -226,9 +222,9 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">
+            <h1 className="text-2xl font-bold text-foreground">
               Benutzerverwaltung
-            </h2>
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               HR-Portal Benutzer verwalten
             </p>
@@ -269,8 +265,7 @@ export function BenutzerverwaltungContent({ user }: { user: User }) {
                 </thead>
                 <tbody className="divide-y">
                   {users.map((u) => {
-                    const roleInfo =
-                      ROLE_LABELS[u.role] || ROLE_LABELS.HR_SACHBEARBEITER;
+                    const roleInfo = rollenAnzeige(u.role);
                     const isSelf = u.id === user.userId;
 
                     return (
@@ -497,7 +492,7 @@ function UserModal({
   if (!rollenOptionen.some((r) => r.value === initialData.role)) {
     rollenOptionen.unshift({
       value: initialData.role,
-      label: `${ROLE_LABELS[initialData.role]?.label ?? initialData.role} (Bestand, nicht neu vergebbar)`,
+      label: `${rollenName(initialData.role)} (Bestand, nicht neu vergebbar)`,
     });
   }
 
